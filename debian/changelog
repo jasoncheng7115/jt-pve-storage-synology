@@ -1,3 +1,16 @@
+jt-pve-storage-synology (0.2.2~beta1-1) unstable; urgency=low
+
+  * Fix stray spaces inside every Traditional Chinese sentence: GitHub renders a
+    soft line break between two Chinese characters as a visible space. All four
+    documents unwrapped, and make check-zh now fails on it, on italic emphasis,
+    and on a space after full-width punctuation.
+  * Synology::Command, ported almost unchanged from the Dell EMC project:
+    bounded commands, bounded file tests, bounded sysfs.
+  * Synology::Multipath: the mandatory conf.d drop-in, dm-uuid addressing,
+    one-map operations, kernel-confirmed device identity.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 22:30:00 +0800
+
 jt-pve-storage-synology (0.2.1~beta1-1) unstable; urgency=low
 
   * Synology::Naming: name building and the ownership gate, which takes the

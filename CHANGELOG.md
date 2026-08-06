@@ -6,6 +6,35 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.2.2~beta1] - 2026-08-06
+
+### Fixed
+
+- **Every Traditional Chinese document rendered with stray spaces inside its
+  sentences.** GitHub turns a soft line break between two Chinese characters
+  into a *visible* space, so a tidily wrapped paragraph reached the reader as
+  「登記簿值得 先讀一遍」. Found by looking at the rendered page — it is invisible
+  in an editor. All four Chinese documents are unwrapped, and `make check-zh`
+  now fails on a wrapped Chinese paragraph, on `*text*` italic emphasis (English
+  typography; Chinese uses bold or 「」), on `<em>` inside a Chinese span on the
+  site, and on a space after full-width punctuation.
+- The status notice still said "specification and discovery" and named three
+  modules when there are six. It now says what is actually true: the module
+  layer works, the PVE plugin is not written.
+
+### Added
+
+- `Synology::Command` — bounded external commands, bounded file tests, bounded
+  sysfs, **ported almost unchanged** from the Dell EMC project. This is the most
+  hardware-punished code in the family and rewriting it would throw away the
+  incidents that shaped it; the comments are kept verbatim for that reason.
+- `Synology::Multipath` — the mandatory `conf.d` drop-in (multipathd ships no
+  Synology entry, so without it the generic defaults apply and those include
+  `no_path_retry "queue"`), addressing by `dm-uuid-mpath-<wwid>` rather than
+  `/dev/mapper/<wwid>` which does not exist on a node with
+  `user_friendly_names yes`, one-map-at-a-time operations, and device identity
+  taken from the kernel because `mapping_index` is reused.
+
 ## [0.2.1~beta1] - 2026-08-06
 
 ### Added

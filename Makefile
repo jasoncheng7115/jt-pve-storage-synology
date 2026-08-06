@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.2.1~beta1
+VERSION = 0.2.2~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -21,7 +21,7 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets critic release-check deb deb-clean clean
+        check-multipath-flush check-secrets check-zh critic release-check deb deb-clean clean
 
 all:
 	@echo "Nothing to build. Run 'make install', 'make test' or 'make deb'."
@@ -44,7 +44,7 @@ uninstall:
 	rm -rf $(PERL5DIR)/PVE/Storage/Custom/Synology/
 	@for f in $(BIN_SCRIPTS); do rm -f $(BINDIR)/$$(basename $$f); done
 
-test: syntax unit check-multipath-flush check-secrets
+test: syntax unit check-multipath-flush check-secrets check-zh
 	@echo "All checks passed."
 
 # Modules that subclass PVE::Storage::Plugin cannot be compiled without a
@@ -173,7 +173,16 @@ check-secrets:
 	fi; \
 	echo "  OK: no credential found in a URL."
 
-release-check: check-multipath-flush check-secrets syntax unit unit-nopve
+# Three ways a Traditional Chinese document renders wrongly while looking
+# correct in the editor: a wrapped paragraph becomes a visible space on GitHub,
+# `*text*` is English italics, and a space after full-width punctuation is an
+# un-wrapping artefact. All three were found by Jason looking at a rendered
+# page, so they are checked rather than remembered.
+check-zh:
+	@echo "Checking the Traditional Chinese documents..."
+	@perl tools/check-zh-markdown.pl
+
+release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
 		| sed 's/-[0-9]*$$//'); \

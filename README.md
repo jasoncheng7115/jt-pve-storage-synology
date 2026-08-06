@@ -9,13 +9,14 @@ locally.
 
 ---
 
-> ### Status: specification and discovery. **There is no plugin yet.**
+> ### Status: the module layer works. **The PVE plugin is not written yet.**
 >
-> `synologyiscsi` cannot be added to a node yet. What the repository now holds
-> is the layer beneath a plugin — `Synology::API`, `::LUN` and `::Target`, with
-> 91 unit tests and a full create/snapshot/rollback/clone/map/delete lifecycle
-> driven against real hardware — plus `bin/pve-syno-api-probe`, a read-only tool
-> that asks a DSM what it actually supports.
+> `synologyiscsi` cannot be added to a node yet. What the repository holds is
+> the layer beneath a plugin: `Synology::API`, `::LUN`, `::Target`, `::Naming`,
+> `::Multipath` and `::Command`, with unit tests and a full
+> create/snapshot/rollback/clone/map/delete lifecycle driven against real
+> hardware — plus `bin/pve-syno-api-probe`, a read-only tool that asks a DSM
+> what it actually supports.
 >
 > It is public at this stage because the discovery tool is useful on its own,
 > and because the honest register of what is and is not known about Synology's
@@ -67,7 +68,7 @@ its structure is its own.
 ### Rollback, and why it took a while to get here
 
 Neither reference implementation has a snapshot rollback: Kubernetes and Cinder
-both restore by cloning a snapshot into a *new* volume, so neither needed one.
+both restore by cloning a snapshot into a **new** volume, so neither needed one.
 The method was found by asking a DSM about nine candidate names, one of which
 answered — **`restore_snapshot`**, taking `src_lun_uuid` and `snapshot_uuid`.
 
