@@ -1,3 +1,14 @@
+jt-pve-storage-synology (0.6.3~beta1-1) unstable; urgency=low
+
+  * Documentation: R-14 probed on hardware with a temporary account. A
+    non-administrator is refused at LOGIN with 402, not denied the storage calls
+    with 105 as this project previously documented. DSM 7.1.1 has no
+    iSCSI-specific group, and the minimum cannot be isolated through the API.
+  * Record a third API that reports success without acting:
+    Group.Member add to administrators.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 07:30:00 +0800
+
 jt-pve-storage-synology (0.6.2~beta1-1) unstable; urgency=medium
 
   * reap_orphans now also clears a tracking entry left by a node crash: a

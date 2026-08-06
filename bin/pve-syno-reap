@@ -31,7 +31,7 @@ use warnings;
 
 use Getopt::Long;
 
-my $VERSION = '0.6.2~beta1';
+my $VERSION = '0.6.3~beta1';
 
 my ($remove, $storage, $all, $help, $quiet);
 GetOptions(

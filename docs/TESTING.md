@@ -609,6 +609,49 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### R-14, probed on hardware: a plain account cannot even authenticate
+
+A temporary account was created on the NAS with the owner's permission, probed, and
+deleted. Both groups were byte-for-byte identical before and after.
+
+| Step | Result |
+|---|---|
+| Groups that exist on DSM 7.1.1 | exactly three: `administrators`, `http`, `users`. **There is no iSCSI or SAN-specific group** |
+| New account, no groups at all | **login refused, error 402** |
+| Added to `users` (membership confirmed from the group side) | **login still refused, 402** |
+| `SYNO.Core.Group.Member add group="administrators"` | **reported `success: true` and did nothing** |
+| `SYNO.Core.User get` on the account | returns `name` and `uid` only — no privilege fields at all |
+| The account this plugin uses (`dev`) | is in `administrators` |
+
+So the API cannot be used to isolate a minimum privilege set, and the probing stopped
+there rather than guessing at an undocumented model on a production NAS.
+
+**What this changes in the documentation:** the honest statement is not "an
+administrator is required" — that was never demonstrated either — but that **a plain
+DSM user cannot authenticate at all**, and the gate is something DSM exposes only
+through its own interface. R-14 stays open, with the remaining step written down as
+something to check in the UI rather than through the API.
+
+#### A third DSM API that reports success without acting
+
+`SYNO.Core.Group.Member/add` answered `success: true` for `administrators` and the
+membership list — read back from the group's own side — did not change. The same call
+for `users` DID take effect, so it is not that the method is broken; it silently
+declines the privileged case.
+
+That is now three:
+
+| Call | Reports | Does |
+|---|---|---|
+| `SYNO.Core.ISCSI.LUN create` with a 255-char name | failure (18990068) | **creates the LUN** |
+| `multipath -w <wwid>` (with multipathd running) | `wwid ... removed` | nothing |
+| `SYNO.Core.Group.Member add` to `administrators` | `success: true` | nothing |
+
+**Verify the effect, not the answer.** Rule 35 says `success` is the only success;
+these say that even `success` is not enough when the effect can be read back
+independently. And the user-side `additional=["groups"]` returns an empty list for an
+account that IS in a group, so the side you ask matters too.
+
 ### Node failure, fencing and takeover — the tests that needed a node to lose
 
 Run on pc-pve2, with Jason's permission to disrupt it. The cluster kept quorum
@@ -1003,7 +1046,7 @@ one, the plugin refuses rather than assumes.
 | # | Question |
 |---|---|
 | R-25 | **The unit of a snapshot's `create_time`.** Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until 2026-08-06, when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
-| R-14 | The minimum DSM privileges. The probe ran as an administrator, so it proved "an administrator can" and not "a non-administrator cannot". See `DSM-ACCOUNT.md` |
+| R-14 | **NARROWED, see above.** Probed with a temporary account on hardware: DSM 7.1.1 has only three groups and none is iSCSI-specific; an account with no groups is refused at login with **402**, and so is one in `users`. `SYNO.Core.User get` exposes no privilege fields, and `Group.Member add` to `administrators` reports success without acting — so the minimum set cannot be isolated through the API. What remains is a UI check: whether granting the DSM application privilege to a non-administrator is enough to authenticate, and if so which iSCSI calls then return 105. See `DSM-ACCOUNT.md` |
 
 ### Supported by design, unverified — needs hardware this project does not have
 

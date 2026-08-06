@@ -6,6 +6,40 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.3~beta1] - 2026-08-07
+
+**R-14 probed on hardware, and this page's previous answer to it was wrong.**
+Documentation only — no code change.
+
+### Corrected
+
+- **A non-administrator DSM account does not get as far as being denied the storage
+  calls. It is refused at login.** `docs/DSM-ACCOUNT.md` predicted that a plain
+  account would authenticate and then answer `105` on every LUN listing. A temporary
+  account created on the test NAS with the owner's permission, probed, and deleted,
+  showed otherwise:
+
+  | Step | Result |
+  |---|---|
+  | Groups on DSM 7.1.1 | exactly three — `administrators`, `http`, `users`; **none iSCSI-specific** |
+  | No groups at all | login refused, **error 402** |
+  | Member of `users` (confirmed from the group side) | login refused, **402** |
+  | `SYNO.Core.User get` | returns `name` and `uid` only; no privilege fields |
+  | `Group.Member add` to `administrators` | **reported `success: true` and changed nothing** |
+
+  So the minimum cannot be isolated through the API, and the probing stopped rather
+  than guessing at an undocumented model on a production NAS. The honest statement is
+  now: **the account in use is an administrator and no smaller working configuration
+  has been demonstrated.** The remaining step is a DSM-interface check, written down
+  in `DSM-ACCOUNT.md` with the exact command to run.
+
+- **A third API that reports success without acting**, joining the LUN create that
+  refuses a 255-character name and makes the LUN anyway, and `multipath -w` which
+  prints `wwid ... removed` and does nothing. Rule 35 says `success` is the only
+  success; these three say that even `success` is not enough where the effect can be
+  read back independently — and the user-side `additional=["groups"]` returns an
+  empty list for an account that *is* in a group, so which side you ask matters too.
+
 ## [0.6.2~beta1] - 2026-08-07
 
 **Node failure, fencing and takeover.** Run on a node the owner allowed to be

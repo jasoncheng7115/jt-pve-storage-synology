@@ -59,19 +59,13 @@ over SMB or Drive, which is the difference between an incident and a disaster.
 
 ### Verifying the minimum for yourself
 
-The honest state of this: on the test NAS, the account used was already an
-administrator, so the read-only probe proved **"an administrator can"** and did
-not prove **"a non-administrator cannot"**. To settle it on your own NAS:
+**This has now been tested and the earlier text on this page was wrong about what
+would happen.** A non-administrator account was created on the test NAS and probed:
+it did not get as far as being denied the LUN listing with `105`. It was refused at
+**login**, with error **402**, both with no groups and as a member of `users`.
 
-```bash
-# create a NON-administrator account in DSM first, then:
-bin/pve-syno-api-probe --host <nas> --user <that account>
-```
-
-If the API discovery succeeds but every LUN and target listing answers
-**105 (insufficient permission)**, the account is not enough — and that is the
-expected result. If it works, tell us: it would be a better answer than the one
-on this page.
+The full measurement, and the DSM-interface check that could still narrow it, are in
+the section above — see *What the plugin's DSM account actually needs*.
 
 ---
 
@@ -127,6 +121,53 @@ Allow/Block List, and remove the address.
 ---
 
 ---
+
+### What the plugin's DSM account actually needs
+
+**Measured, and the answer is uncomfortable: this has not been narrowed to a
+minimum.** What was established on hardware, with a temporary account created and
+deleted with the owner's permission:
+
+- DSM 7.1.1 offers exactly three groups — `administrators`, `http`, `users` — and
+  **none of them is iSCSI- or SAN-specific.** There is no "storage operator" role to
+  grant.
+- An account with **no groups** is refused at login with error **402**.
+- An account in **`users`** is *also* refused at login with **402**. So it is not
+  that a plain user can log in and then be denied the storage calls — it cannot
+  authenticate at all.
+- `SYNO.Core.User get` returns only `name` and `uid`. The privilege model is not
+  exposed there.
+- `SYNO.Core.Group.Member add` to `administrators` reports `success: true` and
+  changes nothing, so the API cannot even be used to test the administrator case.
+
+**So the honest position is: the account this plugin uses today is an administrator,
+and no smaller working configuration has been demonstrated.** That is a real
+consideration for a production deployment and it is stated here rather than glossed.
+
+#### The check that would settle it, if you want to try
+
+In the DSM interface rather than the API:
+
+1. Control Panel → User & Group → create a user, no shared-folder permissions, no
+   home folder.
+2. On the **Applications** tab, allow **DSM** and deny everything else.
+3. Then, from a node:
+
+   ```bash
+   pve-syno-api-probe --host <nas> --user <that user>
+   ```
+
+   The probe creates nothing and deletes nothing.
+
+- If it **logs in**, the DSM application privilege is the gate, and the probe's
+  output will show which iSCSI calls return **105** (insufficient permission). That
+  list is the answer to R-14 and worth reporting back.
+- If it is still refused with **402**, then SAN Manager access on this DSM version
+  requires `administrators`, and the documentation should say so plainly.
+
+Until then, treat the account as privileged: dedicated to this plugin, no shared
+folders, no other applications, 2FA if you accept a standing device token, and
+pinned by IP in the firewall.
 
 ## Where the credentials are stored
 
