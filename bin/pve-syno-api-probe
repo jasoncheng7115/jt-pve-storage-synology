@@ -30,18 +30,23 @@ use LWP::UserAgent;
 use HTTP::Request::Common qw(POST);
 
 # Term::ReadKey is not installed on a stock Proxmox VE node and this tool has
-# to run there, so echo is turned off with stty and put back in an END block —
-# a die between the two would otherwise leave the operator's terminal silent.
+# to run there, so echo is turned off with stty. The restore is registered as
+# an END block BEFORE echo is disabled, not written after the read: a die or a
+# Ctrl-C between the two would otherwise leave the operator's terminal silent
+# with no clue why.
+my $echo_off = 0;
+END { system('stty', 'echo') if $echo_off }
+
 sub read_password {
     my ($prompt) = @_;
     print STDERR $prompt;
-    my $restore = 0;
     if (-t STDIN) {
-        $restore = (system('stty', '-echo') == 0);
+        $echo_off = 1 if system('stty', '-echo') == 0;
     }
     my $answer = <STDIN>;
-    if ($restore) {
+    if ($echo_off) {
         system('stty', 'echo');
+        $echo_off = 0;
         print STDERR "\n";
     }
     $answer //= '';
@@ -124,6 +129,7 @@ my $ua = LWP::UserAgent->new(
 $ua->max_redirect(0);
 
 my $sid;
+my $syno_token;
 my %api_info;    # api name => { path, minVersion, maxVersion, requestFormat }
 
 # Every call is a POST with a form body. DSM accepts GET with the parameters in
@@ -143,13 +149,27 @@ sub call {
     );
     $form{_sid} = $sid if defined $sid && !$opt{no_sid};
 
+    # DSM's Control Panel has "Improve protection against cross-site request
+    # forgery attacks". With it on, a session alone is not enough: every
+    # request has to echo back the token the login issued, or the NAS answers
+    # 105 (insufficient permission) — which reads exactly like an account that
+    # lacks a privilege, and sends everyone looking in the wrong place.
+    # Neither reference client handles this, so neither works on a NAS with
+    # that setting enabled.
+    $form{SynoToken} = $syno_token if defined $syno_token && !$opt{no_sid};
+
     # An API whose requestFormat is JSON wants every parameter JSON-encoded —
     # a string quoted, a number bare. This is why Synology's CSI driver wraps
     # names in strconv.Quote and its numbers not at all; it is not decoration.
     # The NAS says which APIs those are, so ask it rather than deciding here.
+    # Written as a guarded lookup rather than $api_info{$api}{requestFormat},
+    # which would autovivify an empty entry for every API asked about and make
+    # a later "does this NAS advertise it" test answer yes.
+    my $fmt = $api_info{$api} ? ($api_info{$api}{requestFormat} // '') : '';
+
     my $json_params = exists $opt{json_params}
         ? $opt{json_params}
-        : (($api_info{$api}{requestFormat} // '') eq 'JSON' ? 1 : 0);
+        : ($fmt eq 'JSON' ? 1 : 0);
 
     if ($json_params) {
         for my $k (keys %form) {
@@ -159,7 +179,21 @@ sub call {
         }
     }
 
-    my $res = $ua->request(POST "$base/webapi/$path", [ %form ]);
+    my $req = POST "$base/webapi/$path", [ %form ];
+
+    # This NAS answers 119 (SID not found) to a request whose session is only
+    # in the `_sid` form parameter, which is the way OpenStack Cinder's driver
+    # carries it. The cookie is what it accepts — the way Synology's own CSI
+    # driver does it. So send both: the cookie because it works here, `_sid`
+    # because a DSM that wants that instead is not going to say so either.
+    if (defined $sid && !$opt{no_sid}) {
+        $req->header(Cookie => "id=$sid");
+        # DSM's own web interface sends the anti-CSRF token as a header. The
+        # form parameter above covers the other convention.
+        $req->header('X-SYNO-TOKEN' => $syno_token) if defined $syno_token;
+    }
+
+    my $res = $ua->request($req);
 
     my $out = {
         http    => $res->code,
@@ -327,10 +361,11 @@ say_head('Authentication (SYNO.API.Auth)');
     my $auth_ver = $auth_max >= 6 ? 6 : $auth_max;
 
     my %p = (
-        account => $user,
-        passwd  => $pass,
-        session => 'dsm',
-        format  => 'sid',
+        account            => $user,
+        passwd             => $pass,
+        session            => 'dsm',
+        format             => 'sid',
+        enable_syno_token  => 'yes',
     );
     if (defined $device_id) {
         $p{device_id} = $device_id;
@@ -363,9 +398,22 @@ say_head('Authentication (SYNO.API.Auth)');
     $report{auth_version} = $auth_ver;
     $report{auth_path}    = $auth_cgi;
 
+    if ($r->{data}{synotoken}) {
+        $syno_token = $r->{data}{synotoken};
+        say_line('  CSRF token issued — this DSM has the anti-CSRF setting ON.');
+        say_line('  Every later request must echo it back or the NAS answers 105,');
+        say_line('  which looks like a permission problem and is not one. Neither');
+        say_line('  reference client sends it, so neither works on this NAS.');
+        $report{syno_token_required} = 1;
+    } else {
+        $report{syno_token_required} = 0;
+    }
+
     if ($r->{data}{did}) {
         say_line('  device token issued: %s', $r->{data}{did});
-        say_line('  Keep it. With --device-id it logs in without a one-time code.');
+        say_line('  Keep it: with --device-id it logs in without a one-time code.');
+        say_line('  Treat it as a credential — it is a standing 2FA bypass for');
+        say_line('  this account, so it does not belong in a repository.');
         $report{device_token} = $r->{data}{did};
     }
 }
@@ -505,12 +553,57 @@ if ($show_luns) {
                 ($l->{size} // 0) / 1024 ** 3,
                 $l->{status}   // '?',
                 $l->{uuid}     // '?');
+            # vpd_unit_sn is the SCSI VPD unit serial number, which is what the
+            # node's WWID is built out of — the one field that lets a LUN be
+            # matched to a device by the kernel's own identification of it
+            # rather than by the path it was found on. Neither reference client
+            # reads it. lun_id and restored_time are equally unremarked on, and
+            # restored_time existing is evidence that a restore API does.
+            say_line('       vpd_unit_sn=%s lun_id=%s type_str=%s',
+                $l->{vpd_unit_sn} // '-', $l->{lun_id} // '-', $l->{type_str} // '-');
+            say_line('       block_size=%s allocated=%.1f GiB create_from=%s restored_time=%s',
+                $l->{block_size} // '-',
+                ($l->{allocated_size} // 0) / 1024 ** 3,
+                (defined $l->{create_from} && $l->{create_from} ne '' ? $l->{create_from} : '-'),
+                $l->{restored_time} // '-');
         }
         $report{lun_count} = scalar @$luns;
         $report{lun_sample_keys} = [ sort keys %{ $luns->[0] // {} } ];
         say_line('');
         say_line('  fields a LUN row actually carries: %s',
             join(', ', @{ $report{lun_sample_keys} })) if @$luns;
+
+        # `list` does not carry dev_attribs; `get` does. Reading one existing
+        # LUN is the only way to learn which attribute names this DSM uses and
+        # what it defaults them to — and those are what decide whether a thin
+        # LUN ever gives space back. Synology's CSI driver takes them entirely
+        # from its caller and defaults nothing.
+        if (@$luns) {
+            my $one = $luns->[0];
+            my $g = call('SYNO.Core.ISCSI.LUN', 'get', 1,
+                { uuid => $one->{uuid},
+                  additional => '["allocated_size","status","is_action_locked"]' });
+            if ($g->{success} && ref $g->{data}{lun}) {
+                my $attrs = $g->{data}{lun}{dev_attribs};
+                say_line('');
+                say_line('  dev_attribs of an existing LUN (%s):', $one->{name} // '?');
+                if (ref $attrs eq 'ARRAY' && @$attrs) {
+                    for my $a (@$attrs) {
+                        say_line('    %-28s enable=%s',
+                            $a->{dev_attrib} // '?', $a->{enable} // '?');
+                    }
+                } else {
+                    say_line('    none reported — %s',
+                        JSON->new->canonical->encode($attrs // 'absent'));
+                }
+                $report{dev_attribs} = $attrs;
+                say_line('  full field list from get: %s',
+                    join(', ', sort keys %{ $g->{data}{lun} }));
+            } else {
+                say_line('  get on one LUN refused: %s',
+                    $g->{transport} // err_text($g->{error}));
+            }
+        }
     }
 
     say_head('Targets (SYNO.Core.ISCSI.Target list)');
@@ -616,34 +709,108 @@ my @CANDIDATES = (
     [ 'SYNO.Core.ISCSI.LUN' => 'restore_from_snapshot' ],
 );
 
+# Every candidate is asked about a LUN and a snapshot that cannot exist. A
+# uuid DSM has never issued is a stronger safety property than sending no
+# parameters at all: a method with an all-optional signature could act on a
+# default when given nothing, whereas one told to operate on this uuid can only
+# refuse. And the refusal is more informative — 18990505 / 18990531 / 18990532
+# name the object it could not find, which proves both that the method exists
+# and that it got as far as looking.
+my $NOWHERE = '00000000-0000-0000-0000-0000pveprobe';
+
+my @HOST_CANDIDATES = map { [ 'SYNO.Core.ISCSI.Host' => $_ ] }
+    qw(list enum get query info);
+
 if (!$probe_methods) {
     say_line('  skipped. --probe-methods asks the NAS which of these exist:');
-    say_line('    %s', join(', ', map { "$_->[1]" } @CANDIDATES));
+    say_line('    %s', join(', ', map { $_->[1] } @CANDIDATES));
     say_line('');
-    say_line('  It sends each one with NO PARAMETERS and reads the error code:');
-    say_line('    103 = no such method          101 = it exists, parameters wrong');
-    say_line('  A restore with no snapshot named cannot restore anything, but');
-    say_line('  these are destructive methods, so the flag is opt-in.');
+    say_line('  Each is sent naming a LUN and a snapshot uuid the NAS has never');
+    say_line('  issued (%s),', $NOWHERE);
+    say_line('  so an existing method can only refuse. The error code answers the');
+    say_line('  question:');
+    say_line('    103         no such method');
+    say_line('    18990505/31 method exists, no such LUN');
+    say_line('    18990532    method exists, no such snapshot');
+    say_line('    101         method exists, wants different parameters');
+    say_line('');
+    say_line('  These are still destructive methods being named, so the flag is');
+    say_line('  opt-in even though nothing they could act on is real.');
 } else {
-    say_line('  Sending each candidate with no parameters. 103 = absent,');
-    say_line('  101 = present. Nothing can act: no object is named.');
+    say_line('  Naming a LUN and snapshot uuid the NAS has never issued, so an');
+    say_line('  existing method can only refuse:  %s', $NOWHERE);
     say_line('');
-    for my $c (@CANDIDATES) {
-        my ($api, $method) = @$c;
-        next if !$api_info{$api};
-        my $r = call($api, $method, $api_info{$api}{maxVersion} // 1, {});
+
+    my $probe = sub {
+        my ($api, $method, $params) = @_;
+        return if !$api_info{$api};
+
+        my $r = call($api, $method, $api_info{$api}{maxVersion} // 1, $params);
         my $code = $r->{error};
+
         my $verdict =
-            $r->{success}                    ? 'SUCCEEDED WITH NO PARAMETERS — investigate'
-          : !defined $code                   ? 'no error code: ' . ($r->{transport} // '?')
-          : $code == 103                     ? 'absent'
-          : $code == 102                     ? 'API absent'
-          : $code == 104                     ? 'version not supported'
-          : $code == 105                     ? 'no permission for this account'
-          : 'PRESENT (' . err_text($code) . ')';
-        say_line('  %-24s %s', $method, $verdict);
+            $r->{success}      ? 'SUCCEEDED — stop and investigate before doing anything else'
+          : !defined $code     ? 'no error code: ' . ($r->{transport} // '?')
+          : $code == 103       ? 'absent'
+          : $code == 102       ? 'API absent'
+          : $code == 104       ? 'version not supported'
+          : $code == 105       ? 'no permission for this account (or CSRF token missing)'
+          : $code == 101       ? 'PRESENT — wants other parameters (101)'
+          : 'PRESENT — refused on the fake object: ' . err_text($code);
+
+        say_line('  %-26s %s', $method, $verdict);
         $report{methods}{"$api.$method"} = { code => $code, verdict => $verdict };
+    };
+
+    say_line('  snapshot rollback candidates (SYNO.Core.ISCSI.LUN):');
+    $probe->($_->[0], $_->[1], {
+        snapshot_uuid => $NOWHERE,
+        src_lun_uuid  => $NOWHERE,
+        uuid          => $NOWHERE,
+    }) for @CANDIDATES;
+
+    say_line('');
+    say_line('  read methods of the access-control object (SYNO.Core.ISCSI.Host):');
+    $probe->($_->[0], $_->[1], {}) for @HOST_CANDIDATES;
+}
+
+# ---------------------------------------------------------------------------
+# 6b. Does `list` page, and does it say so?
+# ---------------------------------------------------------------------------
+
+say_head('Listing completeness');
+say_line('  A listing that silently caps reads as "this is everything", and the');
+say_line('  callers that decide what may be DELETED are the ones that read it.');
+say_line('  So: does LUN list honour a limit, and does it report a total?');
+say_line('');
+
+if ($api_info{'SYNO.Core.ISCSI.LUN'} && defined $report{lun_count}) {
+    my $r = call('SYNO.Core.ISCSI.LUN', 'list', 1,
+        { offset => 0, limit => 1,
+          additional => '["allocated_size","status","is_action_locked"]' });
+
+    if (!$r->{success}) {
+        say_line('  limit=1 refused: %s — offset/limit may not be accepted here',
+            $r->{transport} // err_text($r->{error}));
+    } else {
+        my $n = scalar @{ $r->{data}{luns} // [] };
+        my @keys = sort grep { !/^luns\z/ } keys %{ $r->{data} };
+        say_line('  asked for 1 of %d, got %d', $report{lun_count}, $n);
+        say_line('  other keys beside luns: %s', @keys ? join(', ', @keys) : 'NONE');
+        if ($n == 1) {
+            say_line('  => limit IS honoured. Paging is therefore possible, and a');
+            say_line('     bare list may be capped by a server-side default. Find');
+            say_line('     the total before trusting any listing.');
+        } elsif ($n == $report{lun_count}) {
+            say_line('  => limit is IGNORED: list always returns everything. Simpler,');
+            say_line('     but then nothing reports a total either, so a short answer');
+            say_line('     cannot be told from a complete one.');
+        }
+        $report{list_limit_honoured} = ($n == 1 ? 1 : 0);
+        $report{list_extra_keys}     = \@keys;
     }
+} else {
+    say_line('  skipped: the LUN listing above did not succeed');
 }
 
 # ---------------------------------------------------------------------------
