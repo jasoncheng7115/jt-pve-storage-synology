@@ -1,0 +1,32 @@
+Source: jt-pve-storage-synology
+Section: admin
+Priority: optional
+Maintainer: Jason Cheng (Jason Tools) <jason@jason.tools>
+Build-Depends: debhelper (>= 12)
+Standards-Version: 4.5.0
+Homepage: https://github.com/jasoncheng7115/jt-pve-storage-synology
+
+Package: jt-pve-storage-synology
+Architecture: all
+Depends: ${misc:Depends},
+         libwww-perl,
+         liblwp-protocol-https-perl,
+         libjson-perl,
+         liburi-perl
+Recommends: open-iscsi, multipath-tools, sg3-utils, psmisc, lsscsi
+Description: Synology NAS storage plugin for Proxmox VE (discovery stage)
+ A Proxmox VE custom storage plugin for Synology NAS over iSCSI, in which one
+ VM disk is one thin LUN on the NAS, so DSM's own snapshots and clones act on
+ the unit an operator thinks about — no LVM layer and no shared LUN carved up
+ locally.
+ .
+ THIS PACKAGE DOES NOT YET CONTAIN THE PLUGIN. Synology publishes no
+ specification for the SAN Manager Web API, so the project is establishing the
+ facts first. What ships here is pve-syno-api-probe, a read-only tool that asks
+ a DSM what it actually supports and reports which questions remain open. It
+ creates nothing and deletes nothing, and is safe to run against a production
+ NAS.
+ .
+ Because the plugin itself is absent, this package does not depend on
+ proxmox-ve: the probe is useful from any Debian host that can reach a DSM. The
+ dependency will be added with the plugin.

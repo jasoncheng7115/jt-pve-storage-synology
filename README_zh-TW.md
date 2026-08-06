@@ -86,7 +86,7 @@ Synology NAS 的擁有者能為這個專案做的最有價值的一件事。
 任何東西，跑完會自己登出。對正式機是安全的。
 
 ```bash
-bin/pve-syno-api-probe --host 192.168.1.50 --user pve-storage
+bin/pve-syno-api-probe --host 192.0.2.10 --user pve-storage
 ```
 
 密碼會以關閉回顯的方式提示輸入——絕不從命令列傳入，那會在 `ps` 和 shell 歷史裡

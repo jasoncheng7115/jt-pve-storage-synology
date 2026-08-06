@@ -94,9 +94,9 @@ them**:
 Read from a host that had a LUN attached:
 
 ```
-scsi-360014055f81ee18d0f41d41fcd8becd8 -> sdg
+scsi-36001405a1b2c3d4d5e6fd4a7bd8c9dd0 -> sdg
 VENDOR=SYNOLOGY  MODEL=Storage
-SERIAL=5f81ee18-0f41-41fc-8bec-816622bdd576     <- the LUN's uuid, unchanged
+SERIAL=a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d     <- the LUN's uuid, unchanged
 ```
 
 The relation is deterministic:
@@ -109,7 +109,7 @@ WWID = "3" + "6001405" + (the uuid with "-" replaced by "d", first 25 characters
 LIO-based — **but this is not stock LIO behaviour.** Upstream's
 `spc_gen_naa_6h_vendor_specific()` converts the serial with `hex_to_bin()` and
 **skips** any character that is not hex, which would give
-`360014055f81ee180f4141fc8bec81662` — and that is not what the NAS produces.
+`36001405a1b2c3d45e6f4a7b8c9d0e1f2` — and that is not what the NAS produces.
 Synology maps the hyphen to `d` rather than dropping it. Reading the upstream
 source would have given a confidently wrong answer here; only hardware gave the
 right one.
@@ -131,13 +131,20 @@ Three consequences:
    drop-in silently ineffective, and an ineffective `no_path_retry` means
    queueing forever when every path is gone.
 
-One sample does not prove a rule. Predictions for two LUNs that were not
-attached, to be checked when a test LUN is made:
+**One sample does not prove a rule.** The rule above reproduces one observed
+WWID exactly, which is enough to act on as a cross-check and not enough to rely
+on. The predicted WWIDs of two further LUNs are recorded privately, to be
+checked the first time a test LUN is attached — and if the rule turns out to be
+wrong, this section changes and the plugin keeps reading the WWID from the
+kernel, which it does regardless.
 
-| uuid | predicted WWID |
-|---|---|
-| `2738c2d2-1620-494c-8363-6322ba801219` | `360014052738c2d2d1620d494cd8363d6` |
-| `01516325-653a-4f9f-b331-63db3f30a4f3` | `3600140501516325d653ad4f9fdb331d6` |
+If you attach a Synology LUN on any DSM version, this is a five-second
+contribution:
+
+```bash
+# uuid from SAN Manager or the probe; WWID from the host that has it attached
+ls -l /dev/disk/by-id/ | grep -i 6001405
+```
 
 ### `dev_attribs` — the real key names
 
@@ -298,8 +305,8 @@ On the test NAS, read from `SYNO.Core.Network.Interface`:
 
 | Interface | Address | Speed | Status |
 |---|---|---|---|
-| `ovs_eth0` | 192.168.1.118 (static) | 1000 | connected |
-| `ovs_eth1` | 192.168.1.189 (**DHCP**) | 1000 | connected |
+| `ovs_eth0` | 192.0.2.10 (static) | 1000 | connected |
+| `ovs_eth1` | 192.0.2.11 (**DHCP**) | 1000 | connected |
 
 That is two paths available already. Three things have to be right first:
 
@@ -321,8 +328,8 @@ That is two paths available already. Three things have to be right first:
    iscsiadm -m iface -I path1 --op=new
    iscsiadm -m iface -I path1 --op=update -n iface.net_ifacename -v <nic1>
 
-   iscsiadm -m discovery -t st -p 192.168.1.118 -I path0
-   iscsiadm -m discovery -t st -p 192.168.1.189 -I path1
+   iscsiadm -m discovery -t st -p 192.0.2.10 -I path0
+   iscsiadm -m discovery -t st -p 192.0.2.11 -I path1
    iscsiadm -m node -T <target-iqn> -I path0 --login
    iscsiadm -m node -T <target-iqn> -I path1 --login
 
@@ -340,7 +347,7 @@ and watch the map, rather than pulling a cable or disabling a NAS interface:
 ```bash
 nft add table inet mptest
 nft add chain inet mptest out '{ type filter hook output priority 0; }'
-nft add rule inet mptest out ip daddr 192.168.1.189 tcp dport 3260 drop
+nft add rule inet mptest out ip daddr 192.0.2.11 tcp dport 3260 drop
 
 multipath -ll        # that path must go failed, I/O must continue
 nft delete table inet mptest      # and it must come back

@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# The Makefile's install target is the single definition of what goes where,
+# so packaging and a manual `make install` cannot drift apart.
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/jt-pve-storage-synology
+
+override_dh_auto_test:
+	$(MAKE) check-multipath-flush check-secrets syntax

@@ -98,7 +98,7 @@ This works today, and it is worth running before anything else. It is
 It is safe against a production NAS.
 
 ```bash
-bin/pve-syno-api-probe --host 192.168.1.50 --user pve-storage
+bin/pve-syno-api-probe --host 192.0.2.10 --user pve-storage
 ```
 
 The password is prompted for with echo off — never passed on the command line,

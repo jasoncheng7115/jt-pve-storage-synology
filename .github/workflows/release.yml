@@ -1,0 +1,90 @@
+name: Release
+
+# A pushed tag is the only thing that publishes. The tag and debian/changelog
+# must agree about the version: a release whose own files disagree about what
+# it is, is worse than no release.
+#
+# Git tags cannot contain "~", so the tag uses a hyphen (v0.1.0-beta1) while
+# the Debian version keeps the tilde (0.1.0~beta1). That is not an
+# inconsistency to fix — dpkg needs the tilde to sort a prerelease BELOW the
+# final version, and git simply forbids the character.
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential debhelper fakeroot \
+            libwww-perl liblwp-protocol-https-perl libjson-perl liburi-perl
+
+      - name: The tag and debian/changelog must agree
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          deb=$(dpkg-parsechangelog --show-field Version | sed 's/-[0-9]*$//')
+          # The tag carries a hyphen where the Debian version carries a tilde.
+          normalised=$(printf '%s' "$deb" | tr '~' '-')
+          echo "tag:              $tag"
+          echo "debian/changelog: $deb  (normalised: $normalised)"
+          if [ "$tag" != "$normalised" ]; then
+            echo "ERROR: the tag and debian/changelog name different versions."
+            echo "Nothing is published until they agree."
+            exit 1
+          fi
+
+      - name: Checks
+        run: make check-multipath-flush check-secrets syntax unit
+
+      - name: Build
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect
+        run: |
+          mkdir -p artifacts
+          cp ../jt-pve-storage-synology_*_all.deb artifacts/
+          (cd artifacts && sha256sum *.deb > SHA256SUMS)
+          cat artifacts/SHA256SUMS
+
+      # The changelog entry for this version becomes the release notes, so the
+      # notes cannot drift from the package's own record of itself.
+      - name: Release notes from debian/changelog
+        run: |
+          {
+            echo "## What is in this release"
+            echo
+            dpkg-parsechangelog --show-field Changes \
+              | sed '1d' | sed 's/^ //' | sed 's/^\.$//'
+            echo
+            echo "### Before installing"
+            echo
+            echo "Read [docs/TESTING.md](https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md)."
+            echo "It is the register of what has been verified against real"
+            echo "hardware and what has not. Every 0.x release is a prerelease."
+            echo
+            echo '```'
+            cat artifacts/SHA256SUMS
+            echo '```'
+          } > notes.md
+          cat notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/jt-pve-storage-synology_*_all.deb
+            artifacts/SHA256SUMS
+          body_path: notes.md
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          fail_on_unmatched_files: true

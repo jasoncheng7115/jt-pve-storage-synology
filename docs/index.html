@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jt-pve-storage-synology -- Synology NAS storage plugin for Proxmox VE</title>
+<meta name="description" content="A Proxmox VE storage plugin for Synology NAS over iSCSI: one VM disk is one thin LUN. Currently at the discovery stage, with a read-only DSM API probe and an honest register of what is verified against hardware. MIT License.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="jt-pve-storage-synology">
+<meta property="og:description" content="Synology NAS storage plugin for Proxmox VE over iSCSI. One VM disk = one thin LUN. Discovery stage: read-only DSM API probe plus a verified/not-verified register. Open source, MIT.">
+<meta property="og:url" content="https://jasoncheng7115.github.io/jt-pve-storage-synology/">
+<meta property="og:site_name" content="jt-pve-storage-synology">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="jt-pve-storage-synology">
+<meta name="twitter:description" content="Synology NAS storage plugin for Proxmox VE. Discovery stage. Open source, MIT License.">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top-nav">
+    <div class="top-nav__brand">
+        <div class="top-nav__brand-icon">SY</div>
+        <span><span>jt-pve-storage-synology</span></span>
+    </div>
+    <div class="top-nav__actions">
+        <button class="lang-toggle" onclick="toggleLang()" title="Switch Language">
+            <span class="lang-en">繁體中文</span>
+            <span class="lang-zh">English</span>
+        </button>
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology" class="github-link" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <span>GitHub</span>
+        </a>
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+    </div>
+</header>
+
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Start here</span><span class="lang-zh">從這裡開始</span>
+        </div>
+        <a href="#hero" class="sidebar__link"><span class="lang-en">Overview</span><span class="lang-zh">概覽</span></a>
+        <a href="#status" class="sidebar__link"><span class="lang-en">Status &amp; risk</span><span class="lang-zh">狀態與風險</span></a>
+        <a href="#why" class="sidebar__link"><span class="lang-en">Why this is awkward</span><span class="lang-zh">麻煩在哪裡</span></a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">What we know</span><span class="lang-zh">已知的事實</span>
+        </div>
+        <a href="#verified" class="sidebar__link"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></a>
+        <a href="#open" class="sidebar__link"><span class="lang-en">Still open</span><span class="lang-zh">尚未確認</span></a>
+        <a href="#rollback" class="sidebar__link"><span class="lang-en">Why rollback is refused</span><span class="lang-zh">為何拒絕倒回</span></a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Use it</span><span class="lang-zh">使用</span>
+        </div>
+        <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
+        <a href="#account" class="sidebar__link"><span class="lang-en">DSM account</span><span class="lang-zh">DSM 帳號</span></a>
+        <a href="#requirements" class="sidebar__link"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Project</span><span class="lang-zh">專案</span>
+        </div>
+        <a href="#roadmap" class="sidebar__link"><span class="lang-en">Roadmap</span><span class="lang-zh">開發階段</span></a>
+        <a href="#contribute" class="sidebar__link"><span class="lang-en">How to help</span><span class="lang-zh">如何協助</span></a>
+        <a href="#related" class="sidebar__link"><span class="lang-en">Related projects</span><span class="lang-zh">相關專案</span></a>
+    </div>
+</nav>
+
+<main class="main-content">
+
+<section class="hero" id="hero">
+    <div class="hero__grid-bg"></div>
+    <div class="hero__glow"></div>
+    <div class="hero__glow-left"></div>
+    <div class="hero__content">
+        <!-- The version sits on this line, immediately after the class, because
+             `make release-check` reads it from here to prove the site has not
+             drifted from the package. Do not reflow it. -->
+        <div class="hero__badge">v0.1.0~beta1 <span class="hero__badge-sep">·</span>
+            <span class="lang-en">discovery stage</span><span class="lang-zh">探索階段</span>
+        </div>
+        <h1 class="hero__title">jt-pve-storage-synology</h1>
+        <p class="hero__subtitle">
+            <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
+            <span class="lang-zh">透過 iSCSI 連接 Synology NAS 的 Proxmox VE 儲存 plugin。</span>
+        </p>
+        <p class="hero__project-desc">
+            <span class="lang-en">One VM disk is one thin LUN on the NAS, so DSM's own snapshots, clones and capacity act on the unit an operator actually thinks about — no LVM layer, and no shared LUN carved up locally.</span>
+            <span class="lang-zh">一顆 VM 磁碟就是 NAS 上一個精簡配置 LUN，所以 DSM 自己的快照、複本與容量都作用在操作者心裡想的那個單位上——沒有 LVM 夾層，也不把一個共用 LUN 在本機切開。</span>
+        </p>
+        <div class="hero__actions">
+            <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology" class="btn btn--primary" target="_blank" rel="noopener">GitHub</a>
+            <a href="TESTING.md" class="btn btn--outline">
+                <span class="lang-en">Verified / not verified</span><span class="lang-zh">驗證登記簿</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<div class="content-wrap">
+
+<section class="doc-section" id="status">
+    <h2 class="section-title"><span class="lang-en">Status and risk</span><span class="lang-zh">狀態與風險</span></h2>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">There is no plugin yet.</span><span class="lang-zh">還沒有 plugin。</span></strong>
+        <span class="lang-en">This repository holds the development specification, the project rules, and a read-only tool that asks a DSM what it actually supports. The plugin itself is not written. Do not plan production storage around this yet — there is nothing to plan around.</span>
+        <span class="lang-zh">這個程式庫目前包含開發規格、專案規則，以及一個唯讀工具，用來問一台 DSM 它實際上支援什麼。plugin 本身還沒有寫。現在不要把正式儲存規劃在這上面——現在也還沒有東西可以規劃。</span>
+    </div>
+
+    <p>
+        <span class="lang-en">It is public at this stage for two reasons. The discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers. And the register of what is and is not known about that API is worth reading <em>before</em> anyone trusts a plugin built on top of it — including this one.</span>
+        <span class="lang-zh">在這個階段就公開有兩個理由。探索工具本身對任何想知道自己的 DSM 的 SAN API 提供什麼的人都有用；而那份「哪些知道、哪些不知道」的登記簿，值得在任何人信任一個建立在它上面的 plugin <em>之前</em>先讀——包括信任這一個之前。</span>
+    </p>
+</section>
+
+<section class="doc-section doc-section--accent" id="why">
+    <h2 class="section-title"><span class="lang-en">Why this is awkward</span><span class="lang-zh">麻煩在哪裡</span></h2>
+
+    <p>
+        <span class="lang-en">Synology publishes no specification for the SAN Manager Web API. The only official document, the DSM Login Web API Guide, covers logging in and discovering APIs — and documents no LUN, target, mapping or snapshot call at all.</span>
+        <span class="lang-zh">Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件 DSM Login Web API Guide 只涵蓋登入與 API 探索，完全沒有記載任何 LUN、target、對應或快照的呼叫。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">What does exist is two independent implementations that talk to it in production: <strong>Synology's own CSI driver</strong> and <strong>OpenStack Cinder's Synology driver</strong>. This project's facts come from reading those two against each other, and then from asking real hardware.</span>
+        <span class="lang-zh">真正存在的是兩份在生產環境和它對話的獨立實作：<strong>Synology 官方的 CSI driver</strong> 與 <strong>OpenStack Cinder 內建的 Synology driver</strong>。這個專案的事實來自把這兩份互相對讀，然後再去問實機。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">That last step is not a formality. The two disagree, and where they disagree at least one of them is wrong on any given DSM. On the DSM 7.1.1 used for testing, <strong>Cinder's way of carrying a session fails every call</strong>, and on a NAS with anti-CSRF protection enabled — a default-available setting — <strong>neither client works at all</strong>, because neither sends the token DSM then requires.</span>
+        <span class="lang-zh">最後那一步不是形式。兩份的做法有出入，而只要有出入，在任一台特定的 DSM 上至少有一份是錯的。在用來測試的 DSM 7.1.1 上，<strong>Cinder 帶工作階段的方式讓每一個呼叫都失敗</strong>；而在開啟防 CSRF 保護的 NAS 上（那是一個隨手可開的設定），<strong>兩份都完全不能用</strong>，因為兩份都沒有送 DSM 要求的那個 token。</span>
+    </p>
+
+    <div class="alert alert--info">
+        <span class="lang-en">Where nothing could be established, this plugin <strong>refuses the operation</strong> rather than guessing. A storage plugin that quietly guesses is worse than one that says no.</span>
+        <span class="lang-zh">凡是無法確認的地方，這個 plugin <strong>拒絕該操作</strong>，而不是猜。一個會默默猜測的 storage plugin 比一個會說不的更糟。</span>
+    </div>
+
+    <p>
+        <span class="lang-en">Only protocol facts are taken from those projects — API names, method names, parameters, error codes. No code is derived from either; this is Perl and its structure is its own.</span>
+        <span class="lang-zh">從那兩個專案取用的只有協定事實——API 名稱、方法名稱、參數、錯誤碼。沒有任何程式碼衍生自它們；本專案是 Perl，結構是自己的。</span>
+    </p>
+</section>
+
+<section class="doc-section" id="verified">
+    <h2 class="section-title"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Read-only, against a DS918+ on DSM 7.1.1. Full detail in the register.</span>
+        <span class="lang-zh">在一台 DS918+（DSM 7.1.1）上以唯讀方式取得。完整內容見登記簿。</span>
+    </p>
+
+    <h3 class="subsection-title"><span class="lang-en">Findings that changed the design</span><span class="lang-zh">改變了設計的發現</span></h3>
+
+    <div class="table-wrap">
+    <table>
+        <thead><tr>
+            <th><span class="lang-en">Finding</span><span class="lang-zh">發現</span></th>
+            <th><span class="lang-en">Consequence</span><span class="lang-zh">後果</span></th>
+        </tr></thead>
+        <tbody>
+        <tr>
+            <td><span class="lang-en">A session must be carried as a <code>Cookie: id=&lt;sid&gt;</code> header, and DSM never sets that cookie itself</span><span class="lang-zh">工作階段必須以 <code>Cookie: id=&lt;sid&gt;</code> 標頭攜帶，而 DSM 自己從不設定這個 cookie</span></td>
+            <td><span class="lang-en">The client must construct it from the login's answer. A form parameter alone fails with 119</span><span class="lang-zh">用戶端必須自己從登入回應組出來。只用表單參數會得到 119</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en">Anti-CSRF protection makes a missing token answer <strong>105, insufficient permission</strong></span><span class="lang-zh">開啟防 CSRF 後，少了 token 會回 <strong>105 權限不足</strong></span></td>
+            <td><span class="lang-en">A code that reads exactly like a privilege problem and is not one</span><span class="lang-zh">一個看起來完全像權限問題、但根本不是的錯誤碼</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en">Auto Block: 3 attempts in 5 minutes blocks that IP for a day</span><span class="lang-zh">自動封鎖：5 分鐘 3 次失敗，該 IP 被封鎖一天</span></td>
+            <td><span class="lang-en">A wrong password would lock a node out for 24 hours in about 30 seconds of normal polling. So a rejected credential stops on the first failure</span><span class="lang-zh">密碼設錯時，正常輪詢約 30 秒就會讓一個節點被鎖 24 小時。所以憑證被拒絕時第一次就停</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en"><code>can_snapshot</code> and <code>emulate_tpu</code> are both <strong>0</strong> by default</span><span class="lang-zh"><code>can_snapshot</code> 與 <code>emulate_tpu</code> 預設都是 <strong>0</strong></span></td>
+            <td><span class="lang-en">A LUN created without asking for them cannot be snapshotted and never gives freed space back</span><span class="lang-zh">沒有明確要求就建立的 LUN 拍不出快照，也永遠不會把釋放的空間還回去</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en"><code>vpd_unit_sn</code> is the LUN's uuid, and the WWID derives from it deterministically</span><span class="lang-zh"><code>vpd_unit_sn</code> 就是 LUN 的 uuid，而 WWID 由它確定性地衍生</span></td>
+            <td><span class="lang-en">A node can identify its device by the kernel's own view instead of the path it was found on. Both reference clients use only by-path</span><span class="lang-zh">節點可以靠核心自己的認定辨識裝置，而不是靠它從哪個路徑被發現。兩份參考實作都只用 by-path</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en"><code>max_sessions</code> defaults to <strong>1</strong></span><span class="lang-zh"><code>max_sessions</code> 預設是 <strong>1</strong></span></td>
+            <td><span class="lang-en">A target left at the default admits exactly one node, so no cluster can share it and no map can be multipathed</span><span class="lang-zh">停在預設值的 target 只容許一個節點，所以叢集無法共用，也做不出 multipath</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <h3 class="subsection-title"><span class="lang-en">A rule the kernel source would get wrong</span><span class="lang-zh">一條讀核心原始碼會讀錯的規則</span></h3>
+
+    <p>
+        <span class="lang-en">A Synology LUN's WWID is built from its uuid:</span>
+        <span class="lang-zh">Synology LUN 的 WWID 是由它的 uuid 組成的：</span>
+    </p>
+
+    <div class="config-block"><pre><code>WWID = "3" + "6001405" + (uuid with "-" replaced by "d", first 25 characters)</code></pre></div>
+
+    <p>
+        <span class="lang-en"><code>6001405</code> is Linux-IO's IEEE company identifier, so the target is LIO-based — which is exactly the trap. Upstream LIO converts the serial with <code>hex_to_bin()</code> and <strong>skips</strong> every non-hex character, which would drop the hyphens and produce a different WWID entirely. Synology maps them to <code>d</code>. Reading the upstream source would have given a confidently wrong answer; only hardware gave the right one.</span>
+        <span class="lang-zh"><code>6001405</code> 是 Linux-IO 的 IEEE 公司識別碼，所以 target 是 LIO 系的——而這正是陷阱。上游 LIO 用 <code>hex_to_bin()</code> 轉換序號，會<strong>跳過</strong>每一個非十六進位字元，那樣會把連字號丟掉，算出完全不同的 WWID。Synology 是把它們映射成 <code>d</code>。讀上游原始碼會得到一個很有自信的錯誤答案，只有實機給了對的。</span>
+    </p>
+
+    <div class="alert alert--info">
+        <span class="lang-en">The last 11 characters of the uuid are discarded, so the WWID cannot be inverted back to a uuid. The computed value is a <strong>cross-check</strong>; the kernel's own identification is what decides.</span>
+        <span class="lang-zh">uuid 的最後 11 個字元被丟掉了，所以 WWID 無法反推回 uuid。算出來的值是<strong>交叉核對</strong>用的，最終認定由核心自己的識別決定。</span>
+    </div>
+</section>
+
+<section class="doc-section" id="open">
+    <h2 class="section-title"><span class="lang-en">Still open</span><span class="lang-zh">尚未確認</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Nothing in this list is acted on by code. Where a decision depends on one, the plugin refuses.</span>
+        <span class="lang-zh">這份清單裡沒有任何一項會被程式碼拿去行動。凡是決策依賴其中一項的，plugin 一律拒絕。</span>
+    </p>
+
+    <div class="module-list">
+        <div class="module-item">
+            <div class="module-item__name">R-1 <span class="status-badge status-badge--planned"><span class="lang-en">blocks rollback</span><span class="lang-zh">擋住倒回</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">The method name for restoring a LUN from its snapshot. Neither reference client has one</span><span class="lang-zh">從快照還原 LUN 的方法名稱。兩份參考實作都沒有</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">R-2</div>
+            <div class="module-item__desc"><span class="lang-en">Whether unmapping replaces a LUN's target list or adds to it — if it replaces, unmapping one node could unmap all of them</span><span class="lang-zh">解除對應是取代整份 target 清單還是加入——若是取代，解除一個節點可能把全部一起解掉</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">R-9</div>
+            <div class="module-item__desc"><span class="lang-en">Whether a LUN listing has a server-side cap. A silently truncated listing reads as "this is everything", and the code that reads it decides what may be deleted</span><span class="lang-zh">LUN 列表有沒有伺服器端上限。被靜默截斷的清單讀起來就是「全部就這些」，而讀它的程式碼決定什麼可以刪</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">R-12</div>
+            <div class="module-item__desc"><span class="lang-en">Whether DSM tolerates concurrent requests. Cinder wraps every single request in a process-wide lock, which it did not do for fun</span><span class="lang-zh">DSM 能不能承受並行請求。Cinder 把每一個請求都包在行程級鎖裡，它不是沒事那樣做的</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">R-13</div>
+            <div class="module-item__desc"><span class="lang-en">Whether a second login on one account evicts the first. If it does, every node in a cluster would evict every other, on every poll</span><span class="lang-zh">同一帳號第二次登入會不會擠掉第一次。若會，叢集裡每個節點會在每次輪詢互相擠掉對方</span></div>
+        </div>
+    </div>
+
+    <p class="mt-3">
+        <a href="TESTING.md" class="btn btn--outline"><span class="lang-en">The full register and test plan</span><span class="lang-zh">完整登記簿與測試計畫</span></a>
+    </p>
+</section>
+
+<section class="doc-section doc-section--accent" id="rollback">
+    <h2 class="section-title"><span class="lang-en">Why rollback is refused</span><span class="lang-zh">為什麼倒回被拒絕</span></h2>
+
+    <p>
+        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one. SAN Manager's interface plainly has a Restore button, and every LUN reports a <code>restored_time</code> field, so the API exists — but <strong>its method name is not known</strong>, and this project does not send guessed names to destructive operations.</span>
+        <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<em>新的</em> volume」來還原，所以兩者都不需要。SAN Manager 的介面上明明有「還原」按鈕，而每一顆 LUN 都會回報 <code>restored_time</code> 欄位，所以 API 確實存在——但<strong>它的方法名稱未知</strong>，而這個專案不會拿猜來的名稱去做破壞性操作。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">The alternative some plugins take — clone the snapshot, delete the original, rename the clone into its place — is not acceptable here. It destroys the original before the replacement is proven, and it changes the LUN's identity, so every node then sees a different disk.</span>
+        <span class="lang-zh">有些 plugin 採用的替代方案——複製快照、刪掉原本的、把複本改成它的名字——在這裡不被接受。它在替代品被證明之前就毀掉了原件，而且它改變了 LUN 的身分，所以每個節點看到的都是另一顆磁碟。</span>
+    </p>
+
+    <div class="alert alert--success">
+        <span class="lang-en">Snapshot create, list and delete all work, so <code>vzdump</code> snapshot mode is unaffected. Only the rollback operation is refused, and it is refused with a message that says why.</span>
+        <span class="lang-zh">快照的建立、列出、刪除都可用，所以 <code>vzdump</code> 的快照模式不受影響。只有倒回這個操作被拒絕，而且拒絕時會說明原因。</span>
+    </div>
+</section>
+
+<section class="doc-section" id="probe">
+    <h2 class="section-title"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">This works today. It is read-only and safe against a production NAS.</span>
+        <span class="lang-zh">這個現在就能用。它是唯讀的，對正式機是安全的。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">It creates nothing, deletes nothing, and logs out after itself. The password is prompted for with echo off — never passed on the command line, where it would be visible in <code>ps</code> and in the shell history.</span>
+        <span class="lang-zh">它不建立、不刪除任何東西，跑完會自己登出。密碼以關閉回顯的方式提示輸入——絕不從命令列傳入，那會在 <code>ps</code> 和 shell 歷史裡看得到。</span>
+    </p>
+
+    <div class="config-block"><pre><code><span class="comment"># from a .deb release, or straight out of the repository</span>
+<span class="cmd">pve-syno-api-probe</span> --host <span class="string">192.0.2.10</span> --user <span class="string">pve-storage</span></code></pre></div>
+
+    <p>
+        <span class="lang-en">It reports the API set and every version range the NAS accepts, whether anti-CSRF is on, the DSM volumes and their filesystems, the LUNs and targets as they are now, the <code>dev_attribs</code> of an existing LUN, and a closing register of what the run settled and what still needs a write to answer.</span>
+        <span class="lang-zh">它會回報 NAS 接受的 API 範圍與每一個版本區間、防 CSRF 是否開啟、DSM 儲存空間及其檔案系統、目前的 LUN 與 target、一顆既有 LUN 的 <code>dev_attribs</code>，最後給出一份登記簿：這次跑完解決了什麼、還有什麼需要寫入才能回答。</span>
+    </p>
+
+    <div class="table-wrap">
+    <table>
+        <thead><tr>
+            <th><span class="lang-en">Option</span><span class="lang-zh">選項</span></th>
+            <th><span class="lang-en">What it does</span><span class="lang-zh">作用</span></th>
+        </tr></thead>
+        <tbody>
+        <tr><td><code>--probe-methods</code></td><td><span class="lang-en">Asks which snapshot-restore method names exist. Opt-in — see below</span><span class="lang-zh">探測哪些快照還原方法名稱存在。需明確開啟，見下</span></td></tr>
+        <tr><td><code>--otp &lt;code&gt;</code></td><td><span class="lang-en">For an account with 2-factor authentication. Reports the device token DSM issues</span><span class="lang-zh">用於開啟兩步驟驗證的帳號。會回報 DSM 發出的 device token</span></td></tr>
+        <tr><td><code>--verify</code></td><td><span class="lang-en">Verify the TLS certificate. Off by default because DSM ships a self-signed one</span><span class="lang-zh">驗證 TLS 憑證。預設關閉，因為 DSM 出廠是自簽憑證</span></td></tr>
+        <tr><td><code>--json</code></td><td><span class="lang-en">Also print the findings as JSON</span><span class="lang-zh">同時以 JSON 輸出結果</span></td></tr>
+        </tbody>
+    </table>
+    </div>
+
+    <h3 class="subsection-title"><span class="lang-en">About <code>--probe-methods</code></span><span class="lang-zh">關於 <code>--probe-methods</code></span></h3>
+
+    <p>
+        <span class="lang-en">It names a LUN and snapshot uuid the NAS has never issued, so a method that exists can only refuse — and the refusal code proves it is there. DSM answers <strong>103</strong> for a method it does not have, and an object-not-found code for one it does. Nothing it could act on is real, but the names being sent are destructive ones, so it asks first.</span>
+        <span class="lang-zh">它指名一個 NAS 從未發出過的 LUN 與快照 uuid，所以存在的方法只能拒絕——而拒絕的錯誤碼證明它在那裡。DSM 對沒有的方法回 <strong>103</strong>，對有的方法回「找不到物件」。它能作用的對象並不存在，但送出的畢竟是破壞性方法的名稱，所以先問過再做。</span>
+    </p>
+
+    <div class="alert alert--info">
+        <span class="lang-en">This is how R-1 gets answered, and it is the single most useful thing an owner of a Synology NAS can contribute to this project.</span>
+        <span class="lang-zh">R-1 就是這樣回答的，而它是一位 Synology NAS 的擁有者能為這個專案做的最有價值的一件事。</span>
+    </div>
+</section>
+
+<section class="doc-section" id="account">
+    <h2 class="section-title"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></h2>
+
+    <p>
+        <span class="lang-en">Do not give this plugin your <code>admin</code> account. And there is one thing DSM will not let you restrict, which you should know before deciding how to network the NAS: <strong>SAN Manager's API has no privilege you can grant for "manage LUNs"</strong>. There is no SAN operator role, and the per-user Application privileges list does not contain SAN Manager, so the account has to be an administrator.</span>
+        <span class="lang-zh">不要把 <code>admin</code> 帳號給這個 plugin。而且有一件事 DSM 不讓你限制，你應該在決定 NAS 的網路配置之前先知道：<strong>SAN Manager 的 API 沒有任何一個可以單獨授予的「管理 LUN」權限</strong>。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager，所以帳號必須是管理員。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">That is a limitation of DSM, not a shortcut taken here. What can still be taken away from the account is everything else — every shared folder, every application except DSM itself, and any address that is not one of your PVE nodes. A leaked credential then cannot be used to browse your files over SMB or Drive, which is the difference between an incident and a disaster.</span>
+        <span class="lang-zh">這是 DSM 的限制，不是這裡便宜行事。仍然可以從那個帳號拿掉的是其他一切——每一個共用資料夾、除 DSM 以外的每一個應用程式，以及任何不屬於你的 PVE 節點的位址。這樣一組洩漏的憑證就無法用來透過 SMB 或 Drive 翻你的檔案，而那是「一次事故」和「一場災難」的差別。</span>
+    </p>
+
+    <p>
+        <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
+    </p>
+</section>
+
+<section class="doc-section" id="requirements">
+    <h2 class="section-title"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></h2>
+
+    <div class="table-wrap">
+    <table>
+        <tbody>
+        <tr>
+            <td><strong>DSM</strong></td>
+            <td><span class="lang-en">7.x. Dual-controller DSM UC is <strong>refused</strong>, not approximated</span><span class="lang-zh">7.x。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
+            <td><span class="lang-en"><strong>Btrfs.</strong> Snapshots exist only for a thin LUN on Btrfs, so an ext4 volume is refused when the storage is added rather than failing at the first snapshot</span><span class="lang-zh"><strong>Btrfs。</strong>快照只存在於 Btrfs 上的精簡 LUN，所以 ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
+            <td><span class="lang-en">One with iSCSI target support. 512 LUNs and 256 targets per NAS are the product ceilings, and one VM disk is one LUN</span><span class="lang-zh">支援 iSCSI target 的機型。產品上限是每台 512 個 LUN、256 個 target，而一顆 VM 磁碟就是一個 LUN</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
+            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused — DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕——DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
+        </tr>
+        <tr>
+            <td><strong>Proxmox VE</strong></td>
+            <td><span class="lang-en">8.x / 9.x. The storage API version is negotiated against the node, never hardcoded</span><span class="lang-zh">8.x／9.x。儲存 API 版本是對節點協商出來的，從不寫死</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+</section>
+
+<section class="doc-section" id="roadmap">
+    <h2 class="section-title"><span class="lang-en">Roadmap</span><span class="lang-zh">開發階段</span></h2>
+
+    <div class="module-list">
+        <div class="module-item">
+            <div class="module-item__name">0.1.x <span class="status-badge status-badge--supported"><span class="lang-en">current</span><span class="lang-zh">目前</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">Specification, project rules, the read-only probe. Closing the register against hardware</span><span class="lang-zh">規格、專案規則、唯讀探索工具。在實機上把登記簿問完</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">0.2.0 – 0.3.0</div>
+            <div class="module-item__desc"><span class="lang-en">The API layer — sessions, discovery, JSON parameters, error codes, portal failover — then LUN and target handling, with the iSCSI, multipath and WWID-tracking layers ported from the related projects rather than rewritten</span><span class="lang-zh">API 層——工作階段、探索、JSON 參數、錯誤碼、portal 換手——然後是 LUN 與 target 處理，而 iSCSI、multipath、WWID 追蹤三層從相關專案移植而非重寫</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">0.4.0 – 0.6.0</div>
+            <div class="module-item__desc"><span class="lang-en">The plugin itself: read-only paths first, then provisioning and the volume lifecycle, then snapshots, clones and resize</span><span class="lang-zh">plugin 本體：先唯讀路徑，再配置與磁碟區生命週期，再快照、複本與擴充</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">0.7.0</div>
+            <div class="module-item__desc"><span class="lang-en">Rollback, if R-1 has been answered by then — or documented as unsupported, honestly</span><span class="lang-zh">倒回，前提是 R-1 屆時已有答案——否則就誠實記載為不支援</span></div>
+        </div>
+        <div class="module-item">
+            <div class="module-item__name">1.0.0</div>
+            <div class="module-item__desc"><span class="lang-en">A hardware test pass across multiple nodes, with failure injection. Every 0.x before it is a prerelease</span><span class="lang-zh">跨多節點的實機測試全過，含故障注入。在它之前的每一個 0.x 都是預發行版</span></div>
+        </div>
+    </div>
+</section>
+
+<section class="doc-section doc-section--accent" id="contribute">
+    <h2 class="section-title"><span class="lang-en">How to help</span><span class="lang-zh">如何協助</span></h2>
+
+    <p>
+        <span class="lang-en">The most valuable contribution is a run of the probe against <strong>a model or DSM version other than a DS918+ on 7.1.1</strong>. Synology's API is not a stable published contract, so a second data point is worth more than any amount of reasoning about the first.</span>
+        <span class="lang-zh">最有價值的貢獻是在<strong>不是 DS918+、不是 7.1.1</strong> 的機型或 DSM 版本上跑一次探索工具。Synology 的 API 不是一份穩定公開的契約，所以第二個資料點比對第一個做任何推論都有價值。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">Particularly wanted:</span>
+        <span class="lang-zh">特別想要的：</span>
+    </p>
+
+    <ul>
+        <li><span class="lang-en"><strong>R-1</strong> — the output of <code>--probe-methods</code> on any DSM</span><span class="lang-zh"><strong>R-1</strong>——任何 DSM 上 <code>--probe-methods</code> 的輸出</span></li>
+        <li><span class="lang-en">A LUN's uuid together with its WWID from a host that has it attached, to test the derivation rule against a second sample</span><span class="lang-zh">一顆 LUN 的 uuid，加上在掛著它的主機上讀到的 WWID，用第二個樣本檢驗那條衍生規則</span></li>
+        <li><span class="lang-en">Whether a non-administrator account can reach the SAN APIs at all</span><span class="lang-zh">非管理員帳號到底能不能呼叫 SAN API</span></li>
+        <li><span class="lang-en">Anything the probe reports that contradicts this page</span><span class="lang-zh">探索工具回報的任何與本頁矛盾的內容</span></li>
+    </ul>
+</section>
+
+<section class="doc-section" id="related">
+    <h2 class="section-title"><span class="lang-en">Related projects</span><span class="lang-zh">相關專案</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Proxmox VE storage plugins for other arrays, sharing the host-side layer and the operational rules this one inherits.</span>
+        <span class="lang-zh">其他陣列的 Proxmox VE 儲存 plugin，與本專案共用主機端的架構與它繼承的維運規則。</span>
+    </p>
+
+    <div class="card-grid">
+        <a class="card" href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc" target="_blank" rel="noopener">
+            <div class="card__icon">DE</div>
+            <div class="card__title">jt-pve-storage-dellemc</div>
+            <div class="card__desc">PowerStore · PowerVault ME · PowerFlex · Unity XT</div>
+        </a>
+        <a class="card" href="https://github.com/jasoncheng7115/jt-pve-storage-netapp" target="_blank" rel="noopener">
+            <div class="card__icon">NA</div>
+            <div class="card__title">jt-pve-storage-netapp</div>
+            <div class="card__desc">NetApp ONTAP</div>
+        </a>
+        <a class="card" href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage" target="_blank" rel="noopener">
+            <div class="card__icon">PS</div>
+            <div class="card__title">jt-pve-storage-purestorage</div>
+            <div class="card__desc">Pure Storage FlashArray</div>
+        </a>
+    </div>
+</section>
+
+</div>
+
+<footer class="footer">
+    <div class="footer__inner">
+        <div class="footer__center">
+            <p>
+                <span class="lang-en">MIT License · Copyright &copy; 2026 Jason Cheng (Jason Tools)</span>
+                <span class="lang-zh">MIT 授權 · Copyright &copy; 2026 Jason Cheng (Jason Tools)</span>
+            </p>
+            <p>
+                <span class="lang-en">Not affiliated with or endorsed by Synology Inc. Synology and DSM are trademarks of Synology Inc.</span>
+                <span class="lang-zh">與 Synology Inc. 無隸屬關係，也未經其背書。Synology 與 DSM 是 Synology Inc. 的商標。</span>
+            </p>
+        </div>
+    </div>
+</footer>
+
+</main>
+
+<script>
+// Language is a class on <html>, so both languages ship in the page and the
+// switch needs no reload and no second file to keep in step.
+function toggleLang() {
+    var html = document.documentElement;
+    var next = html.getAttribute('data-lang') === 'en' ? 'zh' : 'en';
+    html.setAttribute('data-lang', next);
+    html.setAttribute('lang', next === 'en' ? 'en' : 'zh-Hant');
+    try { localStorage.setItem('lang', next); } catch (e) {}
+}
+
+(function () {
+    try {
+        var saved = localStorage.getItem('lang');
+        if (saved) {
+            document.documentElement.setAttribute('data-lang', saved);
+            document.documentElement.setAttribute('lang', saved === 'en' ? 'en' : 'zh-Hant');
+        } else if ((navigator.language || '').toLowerCase().indexOf('zh') === 0) {
+            document.documentElement.setAttribute('data-lang', 'zh');
+            document.documentElement.setAttribute('lang', 'zh-Hant');
+        }
+    } catch (e) {}
+})();
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.querySelector('.sidebar-overlay').classList.toggle('show');
+}
+
+// Close the sidebar after following a link on a narrow screen, where it is an
+// overlay rather than a column.
+document.querySelectorAll('.sidebar__link').forEach(function (a) {
+    a.addEventListener('click', function () {
+        if (window.innerWidth <= 1024) { toggleSidebar(); }
+    });
+});
+</script>
+
+</body>
+</html>

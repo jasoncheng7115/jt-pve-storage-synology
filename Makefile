@@ -189,13 +189,18 @@ release-check: check-multipath-flush check-secrets syntax unit unit-nopve
 	if [ "$(VERSION)" != "$$tool_version" ]; then \
 		echo "  ERROR: Makefile and bin/pve-syno-api-probe disagree"; fail=1; \
 	fi; \
+	badge=$$(sed -n 's/.*hero__badge">[[:space:]]*v\([^ <]*\).*/\1/p' docs/index.html | head -1); \
+	echo "  docs site badge:  $$badge"; \
+	if [ "$$badge" != "$(VERSION)" ]; then \
+		echo "  ERROR: the Pages site badge says '$$badge'"; fail=1; \
+	fi; \
 	if [ "$$fail" = "1" ]; then \
 		echo ""; \
 		echo "A release whose files disagree about its own version is worse"; \
 		echo "than no release. Fix the above, then run this again."; \
 		exit 1; \
 	fi; \
-	echo "  OK: every file agrees on $(VERSION)"
+	echo "  OK: every file agrees on $(VERSION), including the docs site"
 
 deb:
 	dpkg-buildpackage -us -uc -b

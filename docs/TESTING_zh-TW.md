@@ -87,9 +87,9 @@ vpd_unit_sn
 在一台掛著該 LUN 的主機上讀到：
 
 ```
-scsi-360014055f81ee18d0f41d41fcd8becd8 -> sdg
+scsi-36001405a1b2c3d4d5e6fd4a7bd8c9dd0 -> sdg
 VENDOR=SYNOLOGY  MODEL=Storage
-SERIAL=5f81ee18-0f41-41fc-8bec-816622bdd576     <- 就是 LUN 的 uuid，原封不動
+SERIAL=a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d     <- 就是 LUN 的 uuid，原封不動
 ```
 
 關係是確定性的：
@@ -101,7 +101,7 @@ WWID = "3" + "6001405" + （uuid 把 "-" 換成 "d" 之後的前 25 個字元）
 `6001405` 是 Linux-IO 的 IEEE 公司識別碼，所以 Synology 的 target 是 LIO 系的——
 **但這不是原廠 LIO 的行為。** 上游的 `spc_gen_naa_6h_vendor_specific()` 用
 `hex_to_bin()` 轉換序號，非十六進位字元會被**跳過**，那樣算出來是
-`360014055f81ee180f4141fc8bec81662`——而那不是 NAS 產出的值。Synology 是把連字號
+`36001405a1b2c3d45e6f4a7b8c9d0e1f2`——而那不是 NAS 產出的值。Synology 是把連字號
 映射成 `d`，不是丟掉。**照著上游原始碼推論會得到一個很有自信的錯誤答案**，只有實機
 給了對的。
 
@@ -117,13 +117,17 @@ WWID = "3" + "6001405" + （uuid 把 "-" 換成 "d" 之後的前 25 個字元）
    回應。猜錯會讓 drop-in 靜靜地不生效，而 `no_path_retry` 不生效就代表所有路徑消失
    時會無限排隊。
 
-一個樣本不足以證明一條規則。兩顆當時未掛載的 LUN 的預測值記在這裡，等建立測試 LUN
-時對照：
+**一個樣本不足以證明一條規則。** 上面的規則精確重現了一個實測到的 WWID，這足以拿來
+當交叉核對，但不足以拿來依賴。另外兩顆 LUN 的預測值記錄在非公開的文件裡，等第一次
+掛上測試 LUN 時對照——如果規則是錯的，這一節會改，而 plugin 不論如何都會從核心讀回
+WWID。
 
-| uuid | 預測的 WWID |
-|---|---|
-| `2738c2d2-1620-494c-8363-6322ba801219` | `360014052738c2d2d1620d494cd8363d6` |
-| `01516325-653a-4f9f-b331-63db3f30a4f3` | `3600140501516325d653ad4f9fdb331d6` |
+如果你手上有掛載中的 Synology LUN，這是五秒鐘就能做的貢獻：
+
+```bash
+# uuid 從 SAN Manager 或探索工具取得；WWID 在掛著它的主機上讀
+ls -l /dev/disk/by-id/ | grep -i 6001405
+```
 
 ### `dev_attribs`——真實的鍵名
 
@@ -277,8 +281,8 @@ uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在�
 
 | 介面 | 位址 | 速度 | 狀態 |
 |---|---|---|---|
-| `ovs_eth0` | 192.168.1.118（靜態） | 1000 | connected |
-| `ovs_eth1` | 192.168.1.189（**DHCP**） | 1000 | connected |
+| `ovs_eth0` | 192.0.2.10（靜態） | 1000 | connected |
+| `ovs_eth1` | 192.0.2.11（**DHCP**） | 1000 | connected |
 
 這已經是兩條可用的路徑了。但有三件事必須先弄對：
 
@@ -297,8 +301,8 @@ uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在�
    iscsiadm -m iface -I path1 --op=new
    iscsiadm -m iface -I path1 --op=update -n iface.net_ifacename -v <網卡1>
 
-   iscsiadm -m discovery -t st -p 192.168.1.118 -I path0
-   iscsiadm -m discovery -t st -p 192.168.1.189 -I path1
+   iscsiadm -m discovery -t st -p 192.0.2.10 -I path0
+   iscsiadm -m discovery -t st -p 192.0.2.11 -I path1
    iscsiadm -m node -T <target-iqn> -I path0 --login
    iscsiadm -m node -T <target-iqn> -I path1 --login
 
@@ -315,7 +319,7 @@ uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在�
 ```bash
 nft add table inet mptest
 nft add chain inet mptest out '{ type filter hook output priority 0; }'
-nft add rule inet mptest out ip daddr 192.168.1.189 tcp dport 3260 drop
+nft add rule inet mptest out ip daddr 192.0.2.11 tcp dport 3260 drop
 
 multipath -ll        # 那條路徑必須變成 failed，而 I/O 必須繼續
 nft delete table inet mptest      # 然後它必須恢復

@@ -1,0 +1,15 @@
+jt-pve-storage-synology (0.1.0~beta1-1) unstable; urgency=low
+
+  * First packaged build. Contains no storage plugin.
+  * pve-syno-api-probe: read-only discovery of a Synology DSM's SAN Web API.
+    Discovers API paths and version ranges rather than hardcoding them, carries
+    a session both ways because the two public reference clients disagree about
+    which works, echoes the anti-CSRF token neither of them sends, and never
+    puts a credential in a URL.
+  * docs/TESTING.md: the register of what is verified against hardware and what
+    is not, with the test plan for closing the gap.
+  * docs/DSM-ACCOUNT.md: the DSM account the plugin needs, what can be taken
+    away from it, and the Auto Block behaviour that makes retrying a rejected
+    credential dangerous.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 12:00:00 +0800
