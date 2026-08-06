@@ -199,6 +199,10 @@ for my $mod (qw(Target ISCSI)) {
     package ChapAPI;
     sub new { bless { sent => [] }, shift }
     sub storeid { 'chaptest' }
+    # `ensure` now checks the target ceiling before it creates anything, so the mock
+    # has to answer `limits`. undef means "the NAS did not say", which is the
+    # documented signal to stop guarding — exactly what a fixture wants here.
+    sub limits { { luns => undef, targets => undef, snapshots_per_lun => undef } }
     # `ensure` lists first, so the listing has to be a real (empty) one or the
     # code dies before it ever reaches the CHAP block.
     sub call {

@@ -202,4 +202,79 @@ is_deeply($taken->api->{calls}, [],
 is_deeply($taken->deleted, [],
      'crucially: someone else\'s LUN of that name is NOT deleted');
 
+
+# --- the snapshot-per-LUN ceiling, and whose snapshots it counts --------------
+#
+# `max_snapshot_per_lun` is 256 on the test NAS and it is SHARED with whatever
+# schedule the owner set up in SAN Manager. So the count that matters is how many
+# snapshots exist, not how many this plugin took — and `snapshot_list` filters by
+# `taken_by` for every other purpose. Using the filtered count here would
+# under-count against the very ceiling being checked, in the direction of
+# proceeding.
+#
+# limits() read this from the NAS and nothing consumed it, for as long as the plugin
+# has existed, while CLAUDE.md named it as one of the three ceilings that bite.
+
+{
+    package SnapAPI;
+    sub new { my ($c,%o)=@_; bless { max=>$o{max}, sent=>[] }, $c }
+    sub storeid { 'snap' }
+    sub limits { { luns=>undef, targets=>undef, snapshots_per_lun=>$_[0]->{max} } }
+    sub call { my ($s,$a,$m,%p)=@_; push @{$s->{sent}},$m; return { success=>1, data=>{} } }
+    sub call_ok { my $s=shift; $s->call(@_); return { snapshot_uuid=>'new' } }
+}
+{
+    package SnapLUN;
+    our @ISA = ('PVE::Storage::Custom::Synology::LUN');
+    sub new { my ($c,%o)=@_; bless { api=>SnapAPI->new(max=>$o{max}),
+                                     mine=>$o{mine}, theirs=>$o{theirs} }, $c }
+    sub api { $_[0]->{api} }
+    sub snapshot_list {
+        my ($self, $uuid, %opt) = @_;
+        # `all` includes the owner's scheduled snapshots; the default does not.
+        my $n = $opt{all} ? $self->{mine} + $self->{theirs} : $self->{mine};
+        return [ map { { name=>"s$_", uuid=>"u$_" } } 1 .. $n ];
+    }
+}
+
+# THE POINT: 100 of ours plus 156 of the owner's IS the ceiling, even though only
+# 100 are ours.
+{
+    my $l = SnapLUN->new(max => 256, mine => 100, theirs => 156);
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'another') } or $err = $@;
+    like($err, qr/already has 256\s+snapshots/,
+         'the ceiling counts the owner\'s scheduled snapshots too');
+    like($err, qr/shared with any snapshot schedule set in SAN Manager/,
+         'and the message says so, because the operator will not expect it');
+    ok(!grep({ $_ eq 'take_snapshot' } @{ $l->api->{sent} }),
+       'nothing was sent — the refusal precedes the request');
+}
+
+# Under the ceiling it proceeds.
+{
+    my $l = SnapLUN->new(max => 256, mine => 10, theirs => 5);
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'another') } or $err = $@;
+    is($err, '', 'under the ceiling a snapshot is taken');
+}
+
+# A filtered count would have let this through — the regression this guards.
+{
+    my $l = SnapLUN->new(max => 256, mine => 10, theirs => 250);
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'another') } or $err = $@;
+    like($err, qr/already has 260\s+snapshots/,
+         'ten of ours and 250 of theirs is over the ceiling, and is refused');
+}
+
+# undef is "the NAS did not say", which is never "no limit".
+{
+    my $l = SnapLUN->new(max => undef, mine => 9999, theirs => 9999);
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'another') } or $err = $@;
+    is($err, '', 'no reported ceiling means the guard stands down, not a refusal');
+}
+
+
 done_testing();

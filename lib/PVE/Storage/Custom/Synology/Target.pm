@@ -146,6 +146,37 @@ sub build_iqn {
 # Idempotent: a target that already exists is returned, not re-created. Both a
 # duplicate-name refusal and a successful create end in the same lookup,
 # because two nodes may reach this at the same moment.
+# Refuse BEFORE the NAS does, for the target ceiling.
+#
+# Irrelevant while `shared` is the default target mode — one target per storage — and
+# that is precisely WHY it is the default: in `per-volume` mode there is a target per
+# disk, and `max_iscsitrgs` is **128** on the test NAS against a LUN ceiling of 256.
+# So per-volume mode caps the storage at half the disks the LUNs would allow, and it
+# does so by failing a target creation with a number rather than saying why.
+#
+# Like the snapshot ceiling, this was read from the NAS by `limits()` and consumed by
+# nothing, while CLAUDE.md named it as one of the three that bite.
+#
+# The count is of EVERY target on the NAS, not this storage's: the ceiling is
+# per-NAS and includes the owner's own targets.
+sub assert_room_for_target {
+    my ($self, %opt) = @_;
+
+    my $max = $self->api->limits->{targets};
+    return 1 if !defined $max;
+
+    my $have = defined $opt{count} ? $opt{count} : scalar @{ $self->list };
+    return 1 if $have < $max;
+
+    die "storage '" . $self->api->storeid . "': the NAS already has $have iSCSI"
+      . " targets, which is this model's maximum ($max). With"
+      . " syno-target-mode=per-volume each disk needs its own target, so this"
+      . " ceiling is reached at half the number of disks the LUN limit allows —"
+      . " syno-target-mode=shared uses one target for the whole storage and is the"
+      . " default for this reason. The count includes targets this storage does not"
+      . " own.\n";
+}
+
 sub ensure {
     my ($self, %opt) = @_;
 
@@ -154,12 +185,21 @@ sub ensure {
 
     # Check and create both live inside the same path deliberately: PVE runs
     # allocations in parallel and check-then-create is not atomic.
-    my $existing = $self->find_by_name($name);
+    # ONE listing, used for the lookup and for the ceiling count. `find_by_name`
+    # does its own `list`, so calling both would fetch the same data twice — the
+    # lesson the allocation path had to learn about `cluster_lock_storage`.
+    my $all = $self->list;
+    my ($existing) = grep { ($_->{name} // '') eq $name } @$all;
     if ($existing) {
         $self->ensure_multi_session($existing);
         $self->reconcile_chap($existing, %opt);
         return $existing;
     }
+
+    # Only on the create path: an existing target costs nothing and the listing
+    # above has already been fetched, so the count comes from it.
+    $self->assert_room_for_target(count => scalar @$all)
+        if !$opt{skip_limit_check};
 
     my %p = (
         name         => $name,

@@ -260,6 +260,38 @@ sub assert_room_for_lun {
       . " own, such as Virtual Machine Manager disks.\n";
 }
 
+# Refuse BEFORE the NAS does, and count the USER's snapshots too.
+#
+# `max_snapshot_per_lun` is 256 on the test NAS and it is **shared with whatever
+# schedule the owner has set up in SAN Manager**. So the number that matters is not
+# how many snapshots this plugin took — it is how many exist. `snapshot_list` filters
+# by `taken_by` for every other purpose, and using that filtered count here would
+# under-count against the very ceiling being checked, in the direction of proceeding.
+# `all => 1` is what that option is for.
+#
+# This ceiling was read from the NAS by `limits()` and then used by nothing at all,
+# for as long as the plugin has existed, while CLAUDE.md named it as one of the three
+# that bite. The same shape as `WwidState::orphans`: a documented mechanism with no
+# caller.
+sub assert_room_for_snapshot {
+    my ($self, $src_uuid, %opt) = @_;
+
+    my $max = $self->api->limits->{snapshots_per_lun};
+    # The NAS did not say. Stop guarding rather than invent a number.
+    return 1 if !defined $max;
+
+    my $have = defined $opt{count}
+             ? $opt{count}
+             : scalar @{ $self->snapshot_list($src_uuid, all => 1) };
+    return 1 if $have < $max;
+
+    die "storage '" . $self->api->storeid . "': this LUN already has $have"
+      . " snapshots, which is this model's maximum per LUN ($max). The limit is"
+      . " shared with any snapshot schedule set in SAN Manager, so some of those"
+      . " may not be Proxmox VE's — check SAN Manager. Delete snapshots to make"
+      . " room.\n";
+}
+
 # Warn while there is still time to act, once per storage rather than on every
 # allocation.
 sub warn_if_near_lun_limit {
@@ -524,6 +556,9 @@ our $TAKEN_BY = 'jt-pve-storage-synology';
 
 sub snapshot_create {
     my ($self, %opt) = @_;
+
+    $self->assert_room_for_snapshot($opt{src_uuid})
+        if !$opt{skip_limit_check};
 
     my $d = $self->api->call_ok(API_LUN, 'take_snapshot',
         src_lun_uuid      => $opt{src_uuid},
