@@ -6,7 +6,7 @@
 
 ---
 
-> ### 狀態：**plugin 可以用了。**仍然是預發行版。
+> ### 狀態：**plugin 可以用了**。仍然是預發行版。
 >
 > `pvesm add synologysan` 可以用了，而且每一個生命週期操作——配置、啟用、快照、倒回、複製、擴充、釋放、移除——都已對一台 DS918+（DSM 7.1.1）完整跑過兩輪，節點與 NAS 上都沒有留下任何東西。
 >
@@ -20,7 +20,7 @@
 
 ---
 
-> **從 0.5.3~beta1 之前的版本升級嗎？**那些版本把 DSM 密碼存放在 `/etc/pve/storage.cfg`，那裡 `www-data` 讀得到，而且 API 會回傳給任何持有 `Datastore.Audit` 的使用者。請對每個 storage 執行一次 `pvesm set <storage> --syno-password '<密碼>'`，把它搬到 `/etc/pve/priv`，並且**視為舊的值已經洩漏**——請更換該 DSM 帳號的密碼。詳細說明與 2FA 權杖的處理：[docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md)。
+> **從 0.5.3~beta1 之前的版本升級嗎**？那些版本把 DSM 密碼存放在 `/etc/pve/storage.cfg`，那裡 `www-data` 讀得到，而且 API 會回傳給任何持有 `Datastore.Audit` 的使用者。請對每個 storage 執行一次 `pvesm set <storage> --syno-password '<密碼>'`，把它搬到 `/etc/pve/priv`，並且**視為舊的值已經洩漏**——請更換該 DSM 帳號的密碼。詳細說明與 2FA 權杖的處理：[docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md)。
 
 ## 為什麼有這個專案，以及麻煩在哪裡
 
@@ -57,8 +57,8 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 
 | | |
 |---|---|
-| LUN 的 uuid 不可以變 | **它不會變。**所以 SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆 |
-| 比還原點更新的快照必須存活 | **會存活。**還原到三個之中最舊的那一個，三個都還在 |
+| LUN 的 uuid 不可以變 | **它不會變**。所以 SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆 |
+| 比還原點更新的快照必須存活 | **會存活**。還原到三個之中最舊的那一個，三個都還在 |
 | 事後必須看得出來 | `restored_time` 會記錄還原當下的 epoch 秒 |
 
 第二件正是相關專案**拒絕**越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事的 plugin，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。
@@ -68,7 +68,7 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 | | |
 |---|---|
 | DSM | **7.0 以上**，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被**拒絕**，不會假裝支援。見下——版本號只是門檻，不是判準 |
-| 儲存空間 | **Btrfs。**快照只存在於 Btrfs 上的精簡 LUN——ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗 |
+| 儲存空間 | **Btrfs**。快照只存在於 Btrfs 上的精簡 LUN——ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗 |
 | 型號 | 支援 iSCSI target 且有足夠可用空間者。產品上限是每台 512 個 LUN、256 個 target |
 | 網路 | 以 HTTPS 連到 DSM（5001）。純 HTTP 一律拒絕 |
 | 帳號 | 一個專用的 DSM 帳號——見 **[docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md)**，其中也說明了 DSM 唯一不讓你限制的那件事 |
@@ -76,7 +76,7 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 
 ### DSM 版本只是門檻，不是判準
 
-**要求 7.0 以上。**技術下限其實更低——Cinder 的 driver 一路支援到 DSM 6.0.2，而 Btrfs 精簡 LUN 的快照從 6.2 就有——所以 7.0 是刻意選的保守值，理由有四個：SAN Manager 是 7.0 才有的產品，6.x 是 iSCSI Manager；本 plugin 需要的存取控制物件只在 7.x 上見過；**Synology 自己的 CSI driver 就要求 7.0 以上**，那是 Synology 自己會拿 API 用戶端去實際跑的範圍；而 DSM 6.2 已經 EOL，不管 API 通不通，拿它跑生產儲存都不該被建議。
+**要求 7.0 以上**。技術下限其實更低——Cinder 的 driver 一路支援到 DSM 6.0.2，而 Btrfs 精簡 LUN 的快照從 6.2 就有——所以 7.0 是刻意選的保守值，理由有四個：SAN Manager 是 7.0 才有的產品，6.x 是 iSCSI Manager；本 plugin 需要的存取控制物件只在 7.x 上見過；**Synology 自己的 CSI driver 就要求 7.0 以上**，那是 Synology 自己會拿 API 用戶端去實際跑的範圍；而 DSM 6.2 已經 EOL，不管 API 通不通，拿它跑生產儲存都不該被建議。
 
 真正驗證過的只有 **7.1.1-42962 Update 9**。7.0 到那之間應該可以用，但沒試過。
 
@@ -117,7 +117,7 @@ DSM 會乾淨地拒絕——LUN 是 **18990541**、target 是 **18990542**、快
 ### 三個上限，按照會先咬到你的順序
 
 1. **LUN**——每顆 VM 磁碟一個。對一個忙碌的 storage 來說，這是真正的限制。
-2. **每顆 LUN 的快照 256 個，而且和使用者自己的排程共用額度。**一顆設了 SAN Manager 快照排程的 LUN，留給 PVE 的就更少，而「拍不出快照」不會明顯看起來和那件事有關。
+2. **每顆 LUN 的快照 256 個，而且和使用者自己的排程共用額度**。一顆設了 SAN Manager 快照排程的 LUN，留給 PVE 的就更少，而「拍不出快照」不會明顯看起來和那件事有關。
 3. **Target**，這台是 128 個。在預設的 `shared` target 模式下無關緊要，因為只用一個——而這也正是 `per-volume` 不是預設的原因：它會把 storage 卡在 128 顆磁碟，**低於** LUN 的上限。
 
 ## 高可用性與雙控制器

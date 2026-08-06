@@ -21,7 +21,8 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets check-zh critic check-release-archive \
+        check-multipath-flush check-secrets check-zh zh-normalise critic \
+        check-release-archive \
         release-check deb deb-clean clean
 
 all:
@@ -208,6 +209,13 @@ check-secrets:
 # `*text*` is English italics, and a space after full-width punctuation is an
 # un-wrapping artefact. All three were found by Jason looking at a rendered
 # page, so they are checked rather than remembered.
+# The fixer for what check-zh checks. Kept as a target so nobody re-invents the
+# ad hoc version, which manufactured 116 broken bold runs by stripping the space in
+# 「。** 只有」 — see the header of tools/zh-normalise.pl.
+zh-normalise:
+	@perl tools/zh-normalise.pl $$(ls *_zh-TW.md docs/*_zh-TW.md 2>/dev/null)
+	@perl tools/check-zh-markdown.pl
+
 check-zh:
 	@echo "Checking the Traditional Chinese documents..."
 	@perl tools/check-zh-markdown.pl

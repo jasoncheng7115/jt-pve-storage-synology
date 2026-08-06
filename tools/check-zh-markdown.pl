@@ -121,6 +121,61 @@ for my $file (@files) {
                 "full-width punctuation already separates; the space is an"
                 . " un-wrapping artefact.");
         }
+
+        # 4. A bold run that cannot close, so it renders as literal asterisks.
+        #
+        # CommonMark: a `**` run preceded by Unicode punctuation is right-flanking
+        # ONLY if it is also followed by whitespace or punctuation. A Chinese
+        # character is a letter, so 「…是錯的。**只有」 has a closer that is not
+        # right-flanking — the emphasis never ends and the reader sees the asterisks.
+        #
+        # This is rule 3's own doing, which is why the two live next to each other.
+        # Rule 3 says no space after full-width punctuation; removing the space from
+        # 「…是錯的。** 只有」 produces exactly the broken form. **116 of these had
+        # shipped** across four files before Jason spotted them on a rendered page —
+        # the fourth time this project has been caught by something invisible in a
+        # diff and obvious in a browser.
+        #
+        # The fix is to move the punctuation OUT of the emphasis:
+        # 「**…是錯的**。只有」 — the closer then follows a letter, and the
+        # punctuation is still followed directly by text, so rule 3 holds too.
+        #
+        # Runs are counted IN ORDER because an opening `**` in the same position is
+        # perfectly legal: 「，**錯誤 402**」 opens after a comma and is fine. A
+        # check that could not tell an opener from a closer reported 213 findings
+        # where there were 116.
+        # The code span's CONTENTS are replaced but its BACKTICKS are kept.
+        #
+        # Rule 3 replaces a whole span with X so the text either side does not join.
+        # Doing that here produced eleven false positives, because a backtick IS
+        # Unicode punctuation: 「…被拒絕。**`docs/…`」 has a closer that follows
+        # punctuation AND is followed by punctuation, so it is right-flanking and
+        # closes perfectly. Substituting X made the next character a word character
+        # and the rule condemned correct markup.
+        #
+        # Third time in this project that a placeholder changed the meaning of what
+        # surrounded it. The lesson is narrower than "replace, don't delete": the
+        # placeholder has to belong to the same character class as what it replaces
+        # AT THE BOUNDARIES the rule looks at.
+        my $emph_probe = $bare;
+        $emph_probe =~ s/`[^`]*`/`X`/g;
+        my @runs;
+        my $off = 0;
+        while ($emph_probe =~ /\*\*/g) { push @runs, pos($emph_probe) - 2 }
+        for my $i (0 .. $#runs) {
+            next if $i % 2 == 0;          # this one opens
+            my $pos = $runs[$i];
+            my $before = $pos > 0 ? substr($emph_probe, $pos - 1, 1) : '';
+            my $after  = length($emph_probe) > $pos + 2
+                       ? substr($emph_probe, $pos + 2, 1) : ' ';
+            next if $before !~ /$PUNCT|[\x{FF09}\x{300D}\x{300F}\x{3011}\x{300B}\x{3009}]/;
+            next if $after =~ /\s/ || $after !~ /\w/;
+            complain($file, $n,
+                "a bold run closing after '$before' cannot close",
+                "CommonMark needs a closing ** to be followed by whitespace or"
+                . " punctuation when it follows punctuation. Move the mark out:"
+                . " **…$before** becomes **…**$before");
+        }
     }
 }
 
