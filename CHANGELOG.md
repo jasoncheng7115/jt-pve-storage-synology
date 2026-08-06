@@ -6,6 +6,53 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.2.0~beta1] - 2026-08-06
+
+**The first code that talks to a NAS.** Three modules, 91 unit tests, and a full
+lifecycle driven against a DS918+ on DSM 7.1.1: create, duplicate-name refusal,
+snapshot, ownership filtering, rollback past a newer snapshot, clone, resize,
+target creation, additive mapping, surgical unmapping, and delete.
+
+There is still no PVE plugin — `synologyiscsi` cannot be added to a node yet.
+This is the layer beneath it.
+
+### Added
+
+- `Synology::API` — the transport. Discovers paths and versions from the NAS
+  instead of hardcoding them, carries the session as **both** a cookie and a
+  form parameter because the two reference clients disagree about which works,
+  echoes the anti-CSRF token neither of them sends, JSON-encodes parameters for
+  the APIs that ask for it, rotates portals on failure with the URL built
+  **after** the rotation, and **latches on a rejected credential so it never
+  retries** — DSM blocks an address for a day after three failures, and PVE
+  polls every ten seconds.
+- `Synology::LUN` — LUNs and snapshots. Never sends the types filter that hides
+  LUNs; enforces the 1 GB minimum the API does not; refuses illegal names
+  locally rather than at a NAS that sometimes creates them anyway; **looks a
+  name up after any failed create** and removes what it finds; waits out
+  `is_action_locked` with a bound and reports a timeout as "still working"
+  rather than "failed"; filters snapshots by `taken_by` so a user's own are
+  never touched; and verifies after a rollback that the LUN's uuid did not
+  change.
+- `Synology::Target` — targets and mapping. Creates every target with
+  `max_sessions = 0`, because at the default of 1 only one node can log in;
+  reads a target's IQN from the NAS rather than deriving it from the current
+  hostname; and treats `mapping_index` as a hint for finding a device, never as
+  an identity, since it is reused.
+
+### Fixed
+
+- **A lookup by id that failed was reported as "not there".** `target_id` must
+  reach DSM as a JSON string — a bare number is refused with **18990710** — and
+  the lookup's fallback searched by name only, so a lookup by id fell through to
+  "not found" and every mapping check silently answered no. Both the encoding
+  and the fallback are fixed, and both halves have regression tests. This is the
+  confusion between "could not ask" and "the answer is no" that this project
+  exists to avoid, found in its own code by driving it at hardware rather than
+  by reading it.
+- `Synology::LUN` used `JSON::encode_json` without importing JSON, working only
+  because `API.pm` happened to have loaded it.
+
 ## [0.1.4~beta1] - 2026-08-06
 
 The rest of the stage-4 write tests, including the first attach to a Proxmox VE

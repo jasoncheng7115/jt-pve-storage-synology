@@ -11,9 +11,11 @@ locally.
 
 > ### Status: specification and discovery. **There is no plugin yet.**
 >
-> This repository currently contains the development specification, the project
-> rules, and `bin/pve-syno-api-probe` — a read-only tool that asks a DSM what
-> it actually supports. The plugin itself is not written.
+> `synologyiscsi` cannot be added to a node yet. What the repository now holds
+> is the layer beneath a plugin — `Synology::API`, `::LUN` and `::Target`, with
+> 91 unit tests and a full create/snapshot/rollback/clone/map/delete lifecycle
+> driven against real hardware — plus `bin/pve-syno-api-probe`, a read-only tool
+> that asks a DSM what it actually supports.
 >
 > It is public at this stage because the discovery tool is useful on its own,
 > and because the honest register of what is and is not known about Synology's

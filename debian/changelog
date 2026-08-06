@@ -1,3 +1,15 @@
+jt-pve-storage-synology (0.2.0~beta1-1) unstable; urgency=low
+
+  * The first code that talks to a NAS: Synology::API, ::LUN and ::Target, with
+    91 unit tests and a full lifecycle driven against a DS918+ on DSM 7.1.1.
+    There is still no PVE plugin; this is the layer beneath it.
+  * Fixed a lookup by id that reported "not there" when it had actually failed:
+    target_id must be sent as a JSON string (a bare number earns 18990710), and
+    the fallback searched by name only, so every mapping check silently answered
+    no. Found by driving the code at hardware rather than by reading it.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 21:00:00 +0800
+
 jt-pve-storage-synology (0.1.4~beta1-1) unstable; urgency=low
 
   * WWID derivation confirmed on a second independent sample, against a LUN
