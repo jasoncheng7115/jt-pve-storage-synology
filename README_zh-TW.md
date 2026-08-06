@@ -69,7 +69,7 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 |---|---|
 | DSM | **7.0 以上**，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被**拒絕**，不會假裝支援。見下——版本號只是門檻，不是判準 |
 | 儲存空間 | **Btrfs**。快照只存在於 Btrfs 上的精簡 LUN——ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗 |
-| 型號 | 支援 iSCSI target 且有足夠可用空間者。產品上限是每台 512 個 LUN、256 個 target |
+| 型號 | 支援 iSCSI target 且有足夠可用空間者。**LUN 上限是看機型的，而且某些機型很小**——DS425+ 或任何 J／Value 機型公布的是 **4 個 LUN**，也就是整個 storage 只有四顆虛擬磁碟。附出處的表格：[docs/LIMITS_zh-TW.md](docs/LIMITS_zh-TW.md) |
 | 網路 | 以 HTTPS 連到 DSM（5001）。純 HTTP 一律拒絕 |
 | 帳號 | 一個專用的 DSM 帳號——見 **[docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md)**，其中也說明了 DSM 唯一不讓你限制的那件事 |
 | PVE | 8.x／9.x。儲存 API 版本是協商出來的，從不寫死 |
@@ -96,13 +96,13 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 
 **問 NAS。**`SYNO.Core.System` 的 `info`（`type=define`）會回報機型自己的上限，而兩份公開的參考實作都沒有讀它：
 
-| 鍵 | 測試機 DS918+ | 技術規格表 |
-|---|---|---|
-| `max_iscsiluns` | **256** | 512 |
-| `max_iscsitrgs` | **128** | 256 |
-| `max_snapshot_per_lun` | 256 | 256 |
+| 鍵 | 測試機 DS918+ | DS918+ 規格表 | SAN Manager 規格（整條產品線）|
+|---|---|---|---|
+| `max_iscsiluns` | **256** | 256 | 512 |
+| `max_iscsitrgs` | **128** | 128 | 256 |
+| `max_snapshot_per_lun` | 256 | *未公布* | 256 |
 
-所以一台 DS918+ 只能放行銷數字的**一半**。更大的機型會回報更大的數字；重點是這個數字是看機型的，而且 NAS 會告訴你哪一個適用。
+所以 NAS 的 API 和它自己的規格表**是一致的**；512 是整條產品線的上限，而 Synology 註明它依機型而異。更大的機型會回報更大的數字，更小的機型少到只有 **4 個**；重點是這個數字是看機型的，而且 NAS 會告訴你哪一個適用。附出處的完整表格在 [docs/LIMITS_zh-TW.md](docs/LIMITS_zh-TW.md)。
 
 ### 開到上限會怎樣
 

@@ -324,29 +324,57 @@
 <section class="doc-section" id="limits">
     <h2 class="section-title"><span class="lang-en">How many LUNs, and what happens at the ceiling</span><span class="lang-zh">最多可以切幾個 LUN，以及開到上限會怎樣</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit — and it is not the number on the specification sheet.</span>
-        <span class="lang-zh">一顆 VM 磁碟就是一個 LUN，所以這是實實在在的容量限制——而它不是技術規格表上那個數字。</span>
+        <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit — and on some models it is very small.</span>
+        <span class="lang-zh">一顆 VM 磁碟就是一個 LUN，所以這是實實在在的容量限制——而在某些機型上它非常小。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">The figure everyone quotes — <strong>512 LUNs and 256 targets</strong> — comes from Synology's <a href="https://www.synology.com/en-global/dsm/7.1/software_spec/san_manager">SAN Manager Technical Specifications</a>, which footnotes it: &ldquo;the maximum number of LUNs, targets, and snapshots varies according to models&rdquo;. It is the ceiling for the whole product line, not for your NAS.</span>
+        <span class="lang-zh">大家引用的那個數字——<strong>512 個 LUN、256 個 target</strong>——來自 Synology 的 <a href="https://www.synology.com/zh-tw/dsm/7.1/software_spec/san_manager">SAN Manager 技術規格</a>，而它自己註明：「LUN、target 與快照的最大數量會依機型而異」。那是整條產品線的上限，不是你那台 NAS 的。</span>
     </p>
 
     <div class="table-wrap">
     <table>
         <thead><tr>
-            <th><span class="lang-en">Key</span><span class="lang-zh">鍵</span></th>
-            <th><span class="lang-en">On the test DS918+</span><span class="lang-zh">測試機 DS918+</span></th>
-            <th><span class="lang-en">Specification sheet</span><span class="lang-zh">技術規格表</span></th>
+            <th><span class="lang-en">Series</span><span class="lang-zh">系列</span></th>
+            <th><span class="lang-en">Model</span><span class="lang-zh">機型</span></th>
+            <th><span class="lang-en">Max LUNs</span><span class="lang-zh">最大 LUN</span></th>
+            <th><span class="lang-en">Max targets</span><span class="lang-zh">最大 target</span></th>
         </tr></thead>
         <tbody>
-        <tr><td><code>max_iscsiluns</code></td><td><strong>256</strong></td><td>512</td></tr>
-        <tr><td><code>max_iscsitrgs</code></td><td><strong>128</strong></td><td>256</td></tr>
-        <tr><td><code>max_snapshot_per_lun</code></td><td>256</td><td>256</td></tr>
+        <tr><td>FS</td><td>FS6400, FS3600</td><td>512</td><td>256</td></tr>
+        <tr><td>FS</td><td>FS3410</td><td>256</td><td>128</td></tr>
+        <tr><td>FS</td><td>FS2500</td><td>128</td><td>64</td></tr>
+        <tr><td>SA</td><td>SA6400, SA3600</td><td>512</td><td>256</td></tr>
+        <tr><td>SA</td><td>SA3410, SA3400D</td><td>256</td><td>128</td></tr>
+        <tr><td>SA</td><td>SA3200D</td><td>128</td><td>64</td></tr>
+        <tr><td>XS+</td><td>DS3622xs+, RS4021xs+, RS3621xs+</td><td>256</td><td>128</td></tr>
+        <tr><td>XS</td><td>RS3618xs</td><td>128</td><td>64</td></tr>
+        <tr><td>Plus</td><td>DS1821+, DS923+, DS920+, <strong>DS918+</strong>, DS723+</td><td>256</td><td>128</td></tr>
+        <tr><td>Plus</td><td>DS1825+, RS2825RP+, RS1221+</td><td>128</td><td>64</td></tr>
+        <tr><td>Plus</td><td>DS425+</td><td><strong>4</strong></td><td><strong>2</strong></td></tr>
+        <tr><td>Value</td><td>DS423, DS223</td><td><strong>4</strong></td><td><strong>2</strong></td></tr>
+        <tr><td>J</td><td>DS223j, DS124</td><td><strong>4</strong></td><td><strong>2</strong></td></tr>
         </tbody>
     </table>
     </div>
 
     <p>
-        <span class="lang-en"><strong>Ask the NAS, not the datasheet.</strong> <code>SYNO.Core.System</code> <code>info</code> with <code>type=define</code> reports the model's own ceilings, and neither public reference client reads them. A DS918+ holds <strong>half</strong> the LUNs the marketing figure suggests.</span>
-        <span class="lang-zh"><strong>問 NAS，不要問規格表。</strong><code>SYNO.Core.System</code> 的 <code>info</code>（<code>type=define</code>）會回報機型自己的上限，而兩份公開的參考實作都沒有讀它。一台 DS918+ 只能放行銷數字的<strong>一半</strong>。</span>
+        <span class="lang-en">Every figure is quoted from that model's own datasheet. <strong>Three things in the table matter more than any row.</strong> The series does not predict the number. The numbers are not monotonic with generation — a <strong>DS1825+</strong> (2025) publishes 128 where the older <strong>DS1821+</strong> publishes 256. And on J, Value and some small Plus models the limit is <strong>4 LUNs</strong>: four virtual disks for the whole storage, which one VM with a system and a data disk half exhausts.</span>
+        <span class="lang-zh">每一個數字都引自該機型自己的規格表。<strong>表裡有三件事比任何單一列都重要</strong>。系列不能預測數字。數字和世代不是單調的——<strong>DS1825+</strong>（2025 年）公布 128，而更舊的 <strong>DS1821+</strong> 公布 256。而在 J、Value 和某些小型 Plus 機型上，上限是 <strong>4 個 LUN</strong>：整個 storage 只有四顆虛擬磁碟，一台有系統碟和資料碟的 VM 就用掉一半。</span>
     </p>
+
+    <div class="note">
+        <span class="lang-en"><strong>There is no discrepancy between the datasheet and the API.</strong> This project used to document one. The DS918+'s own <a href="https://global.download.synology.com/download/Document/Hardware/ProductSpec/DiskStation/18-year/DS918+/enu/Product_Spec_DS918+_enu.pdf">Product Specification</a> publishes 256 LUNs and 128 targets, and <code>SYNO.Core.System info type=define</code> on that NAS reports exactly 256 and 128. They agree; what disagreed was the documentation, which had compared a model against a line-wide figure.</span>
+        <span class="lang-zh"><strong>規格表和 API 之間沒有落差</strong>。這個專案先前記載說有。DS918+ 自己的<a href="https://global.download.synology.com/download/Document/Hardware/ProductSpec/DiskStation/18-year/DS918+/enu/Product_Spec_DS918+_enu.pdf">產品規格</a>公布 256 個 LUN、128 個 target，而該機器上的 <code>SYNO.Core.System info type=define</code> 回報的正好是 256 和 128。它們是一致的；不一致的是文件，它拿一個機型去比對產品線層級的數字。</span>
+    </div>
+
+    <p>
+        <span class="lang-en"><strong>So ask the NAS.</strong> <code>SYNO.Core.System</code> <code>info</code> with <code>type=define</code> reports the model's own ceilings, and neither public reference client reads them. The plugin reads all three — LUNs, targets, and snapshots per LUN — and refuses before the NAS does. The snapshot ceiling is <strong>shared with any schedule set in SAN Manager</strong>, so the count includes snapshots this plugin did not take. Full sourced table and every official link: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/LIMITS.md">docs/LIMITS.md</a>.</span>
+        <span class="lang-zh"><strong>所以要問 NAS</strong>。<code>SYNO.Core.System</code> 的 <code>info</code>（<code>type=define</code>）會回報機型自己的上限，而兩份公開的參考實作都沒有讀它。這個 plugin 會讀三個上限——LUN、target、每個 LUN 的快照——並且在 NAS 之前先拒絕。快照上限是<strong>和 SAN Manager 裡設定的排程共用的</strong>，所以計數包含不是這個 plugin 拍的快照。附出處的完整表格與所有官方連結：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/LIMITS_zh-TW.md">docs/LIMITS_zh-TW.md</a>。</span>
+    </p>
+
+    <a href="LIMITS.md" class="btn btn--outline"><span class="lang-en">Every model's published limits, with sources</span><span class="lang-zh">各機型公布的上限，附出處</span></a>
 
     <p>
         <span class="lang-en">At the ceiling DSM refuses cleanly — <strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots. Nothing is damaged, but the refusal reaches an operator as an allocation failure with a five-digit number in it while <code>pvesm status</code> goes on showing terabytes free, because free space is not the problem and adding disks will not fix it.</span>

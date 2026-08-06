@@ -541,9 +541,20 @@ sub take_device_token {
 
 # `SYNO.Core.System` `info` with type=define answers with 316 keys on the test
 # NAS, and among them are the model's OWN ceilings. Neither reference client
-# reads them, and they matter because they are NOT the numbers on the
-# specification sheet: that says 512 LUNs and 256 targets, while a DS918+
-# reports max_iscsiluns 256 and max_iscsitrgs 128.
+# reads them, and they matter because the number that gets quoted — 512 LUNs and
+# 256 targets — is the PRODUCT LINE's ceiling, not any particular model's.
+#
+# Synology's SAN Manager software specification states 512/256 and footnotes it:
+# "the maximum number of LUNs, targets, and snapshots varies according to models".
+# The DS918+'s own Product Specification says 256 LUNs and 128 targets, which is
+# exactly what this call reports. **The API and the datasheet agree**; an earlier
+# version of this comment called it a discrepancy, and that was wrong.
+#
+# Published per-model figures run 512/256, 256/128, 128/64 and — on J, Value and
+# some small Plus models — **4 LUNs and 2 targets**, which one VM can exhaust. The
+# figures are not monotonic with generation either: a DS1825+ publishes 128/64
+# where the older DS1821+ publishes 256/128. So there is nothing to infer from the
+# model name, and asking the NAS is the only correct approach. See docs/LIMITS.md.
 #
 # Cached for the life of the object: it is a property of the model, and the
 # health path must not fetch it every ten seconds.

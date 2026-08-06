@@ -110,7 +110,7 @@ rolled back repeatedly.
 |---|---|
 | DSM | **7.0 or later**, and only 7.1.1 has been verified. Dual-controller DSM UC is **refused**, not approximated. See below — the version is a floor, not the decision |
 | Volume | **Btrfs.** Snapshots exist only for a thin LUN on Btrfs — an ext4 volume is refused when the storage is added, rather than failing at the first snapshot |
-| Model | One with iSCSI target support and enough free space. 512 LUNs and 256 targets per NAS are the product ceilings |
+| Model | One with iSCSI target support and enough free space. **The LUN ceiling is per-model and small on some of them** — a DS425+ or any J/Value model publishes **4 LUNs**, which is four virtual disks for the whole storage. Sourced table: [docs/LIMITS.md](docs/LIMITS.md) |
 | Network | HTTPS to DSM (5001). Plain HTTP is refused |
 | Account | A dedicated DSM account — see **[docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md)**, which also explains the one thing DSM will not let you restrict |
 | PVE | 8.x / 9.x. The storage API version is negotiated, never hardcoded |
@@ -150,14 +150,16 @@ not the number on the specification sheet.
 **Ask the NAS.** `SYNO.Core.System` `info` with `type=define` reports the
 model's own ceilings, and neither public reference client reads them:
 
-| Key | On the test DS918+ | Specification sheet |
-|---|---|---|
-| `max_iscsiluns` | **256** | 512 |
-| `max_iscsitrgs` | **128** | 256 |
-| `max_snapshot_per_lun` | 256 | 256 |
+| Key | On the test DS918+ | DS918+ datasheet | SAN Manager spec (line-wide) |
+|---|---|---|---|
+| `max_iscsiluns` | **256** | 256 | 512 |
+| `max_iscsitrgs` | **128** | 128 | 256 |
+| `max_snapshot_per_lun` | 256 | *not published* | 256 |
 
-So a DS918+ holds **half** the LUNs the marketing figure suggests. Larger models
-report larger numbers; the point is that the number is per-model and the NAS
+So the NAS's API and its own datasheet **agree**; the 512 is the ceiling for the
+whole product line, which Synology footnotes as varying by model. Larger models
+report larger numbers, smaller ones report as few as **4**; the point is that the
+number is per-model and the NAS
 will tell you which one applies.
 
 ### What happens when you reach it
