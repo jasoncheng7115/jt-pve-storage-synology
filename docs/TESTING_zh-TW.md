@@ -300,6 +300,47 @@ iscsiadm -m node -T <iqn> -p <portal> --logout
 iscsiadm -m node -T <iqn> -p <portal> -o delete
 ```
 
+### 終於是真的 multipath——以及被我觸發的自動封鎖
+
+在此之前的每一次測試都是單路徑。把 NAS 的兩個位址都設為資料 portal 之後：
+
+```
+mpathl (36001405...) dm-9 SYNOLOGY,Storage
+size=1.0G features='1 queue_if_no_path' hwhandler='1 alua' wp=rw
+`-+- policy='service-time 0' prio=50 status=active
+  |- 6:0:0:1 sdc 8:32 active ready running     <- 經由 192.0.2.10
+  `- 7:0:0:1 sdd 8:48 active ready running     <- 經由 192.0.2.11
+```
+
+**故障切換，全程持續讀取。**在節點端用 `nft` 擋掉其中一個 portal：
+
+| | |
+|---|---|
+| 被擋住的路徑 | 約 15 秒內變成 `failed faulty offline` |
+| 存活的路徑 | 維持 `active ready running` |
+| **失敗的讀取** | **60 次裡 0 次** |
+| 解除封鎖後的恢復 | 約 10 秒自動恢復 |
+
+`path_checker tur`、`failback immediate`、`polling_interval 5`——drop-in 正在做它該做的事。
+
+**管理連線中斷不會把資料一起帶走。**只擋 DSM 的 5001 連接埠、放行 3260：storage 回報 `inactive`，節點上其他 storage 不受影響，`pvesm status` 只增加大約一個 `syno-status-timeout` 的時間，警告只出現**一次**而不是每次輪詢都出現，磁碟仍然可讀，而解除封鎖後它自己恢復了。
+
+#### 憑證鎖定原本沒有作用，而查出這件事的代價是一次真實的封鎖
+
+被拒絕的憑證只能試**一次**。那個鎖定原本是一個物件欄位——而 plugin 每次呼叫都建立新的 API 物件，所以它跟著物件一起消失了。三次輪詢就是三次失敗登入。
+
+它現在是 `/run` 底下的一個檔案，而且驗證過了：五次輪詢之中，只有一次真的送到 NAS，另外四次在本地就被拒絕。
+
+**但這個測試本身觸發了自動封鎖**，而這件事值得盡可能直白地記下來：
+
+```
+從被測試的節點：  登入 -> 407   （IP 被封鎖）
+從另一個節點：    登入 -> OK    （封鎖是按來源位址計算的）
+iSCSI 資料路徑：  不受影響——既有工作階段與 I/O 都繼續
+```
+
+5 分鐘內三次失敗登入，該位址被封鎖**一天**。現在保護機制是有效的；而「為什麼需要它」的示範並不是模擬。如果真的發生了：**控制台 → 安全性 → 帳號 → 自動封鎖 → 允許／封鎖清單**，把位址移除。整個過程中資料路徑都照常運作，而這正是它容易被忽略的原因。
+
 ### 名稱規則
 
 | | |

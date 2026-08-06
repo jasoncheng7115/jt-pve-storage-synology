@@ -28,12 +28,20 @@ package PVE::Storage::Custom::Synology::API;
 use strict;
 use warnings;
 
+use Fcntl qw(O_WRONLY O_CREAT O_EXCL);
 use JSON qw(decode_json encode_json);
 use LWP::UserAgent;
 use HTTP::Request::Common qw(POST);
 use Time::HiRes qw(time);
 
 use constant {
+    # Where the credential latch lives. It has to be a FILE: the latch was an
+    # instance field, and the plugin builds a new API object for every call, so
+    # it died with the object. pvestatd polls every ten seconds — three polls
+    # would have been three failed logins and a one-day block, which is exactly
+    # what the latch exists to prevent. It protected nothing until it persisted.
+    LATCH_DIR         => '/run/jt-pve-storage-synology',
+
     DEFAULT_PORT      => 5001,
     DEFAULT_TIMEOUT   => 30,
     STATUS_TIMEOUT    => 5,
@@ -133,6 +141,55 @@ sub new {
 }
 
 sub storeid { return $_[0]->{storeid} }
+
+# ---------------------------------------------------------------------------
+# The credential latch, which must outlive one process
+# ---------------------------------------------------------------------------
+#
+# Under /run rather than /var/lib deliberately: a reboot is a legitimate reason
+# to try again, and an operator who has fixed the account should not have to know
+# about a file. A configuration change clears it explicitly (on_update_hook).
+
+sub _latch_file {
+    my ($self) = @_;
+    (my $safe = $self->{storeid}) =~ s/[^A-Za-z0-9_.-]/_/g;
+    $safe =~ s/\A\.+//;
+    return undef if !length $safe;
+    return LATCH_DIR . "/$safe.credential-refused";
+}
+
+sub _read_latch {
+    my ($self) = @_;
+    my $f = $self->_latch_file or return undef;
+    open(my $fh, '<', $f) or return undef;
+    my $why = <$fh> // '';
+    close($fh);
+    chomp $why;
+    return length($why) ? $why : 'a previous credential failure';
+}
+
+sub _write_latch {
+    my ($self, $why) = @_;
+    my $f = $self->_latch_file or return;
+    mkdir LATCH_DIR, 0700 if !-d LATCH_DIR;
+    if (open(my $fh, '>', $f)) {
+        print $fh "$why\n";
+        close($fh);
+    }
+    return;
+}
+
+# Called when the configuration changes: the operator has had a chance to fix it.
+sub clear_credential_latch {
+    my ($class_or_self, $storeid) = @_;
+    $storeid = $class_or_self->{storeid} if ref $class_or_self;
+    return if !defined $storeid;
+    (my $safe = $storeid) =~ s/[^A-Za-z0-9_.-]/_/g;
+    $safe =~ s/\A\.+//;
+    return if !length $safe;
+    unlink LATCH_DIR . "/$safe.credential-refused";
+    return;
+}
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -329,6 +386,9 @@ sub login {
     my ($self) = @_;
     return 1 if defined $self->{sid};
 
+    # Read from disk, not from this object: the object is new on every call.
+    $self->{credential_refused} //= $self->_read_latch;
+
     if (my $why = $self->{credential_refused}) {
         # Latched. Retrying is what trips Auto Block and locks this node out of
         # the NAS for a day.
@@ -382,6 +442,9 @@ sub login {
             # Never rotate and never retry on a bad credential: the next portal
             # is usually the same NAS, and each attempt counts towards a block.
             $self->{credential_refused} = error_text($code);
+            # Persisted, so the NEXT poll does not spend another of the three
+            # attempts DSM allows before it blocks this address for a day.
+            $self->_write_latch(error_text($code));
             my $hint = '';
             $hint = " Re-run with the account's one-time code (syno-otp)."
                 if defined $code && ($code == 403 || $code == 402);

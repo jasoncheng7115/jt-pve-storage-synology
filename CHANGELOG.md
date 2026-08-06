@@ -6,6 +6,41 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.5.1~beta1] - 2026-08-06
+
+**Real multipath, and a defect that a real block exposed.** Both of the NAS's
+addresses configured as data portals — the first genuinely multipathed test, with
+failover injected under load.
+
+### Fixed
+
+- **A rejected credential was retried on every poll, not once.** The latch that
+  stops repeated failed logins was an instance field, and the plugin builds a new
+  API object per call — so it died with the object. Three polls meant three failed
+  logins, which is DSM's Auto Block threshold. It is now a file under `/run`,
+  cleared by `on_update_hook` because a configuration change is the operator
+  having had a chance to fix things. Verified across five polls: one login
+  attempt reached the NAS, four were refused locally.
+
+  Finding this cost a real block on the test cluster's node, which is the
+  clearest evidence for the guard that there could be: the blocked node got
+  **407 (IP blocked)** while another node logged in normally and the iSCSI data
+  path went on working throughout — the reason an operator can miss it entirely.
+  Clearing it is Control Panel → Security → Account → Auto Block →
+  Allow/Block List.
+
+### Verified
+
+- **Two paths, and failover with zero I/O loss.** Blocking one portal at the
+  node: the path went `failed faulty offline` within ~15 s, the survivor stayed
+  `active ready running`, **0 of 60 reads failed**, and the path was reinstated
+  automatically about 10 s after unblocking.
+- **A management outage does not take the data with it.** Blocking DSM's port
+  5001 while leaving 3260 alone: the storage reported `inactive`, other storages
+  on the node were unaffected, `pvesm status` grew by about one
+  `syno-status-timeout`, the warning appeared once rather than per poll, the disk
+  stayed readable, and it recovered by itself.
+
 ## [0.5.0~beta1] - 2026-08-07
 
 **Two nodes, and live migration with 3 ms downtime.** Verified on a two-node

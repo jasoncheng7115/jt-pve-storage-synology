@@ -448,6 +448,62 @@ iscsiadm -m node -T <iqn> -p <portal> --logout
 iscsiadm -m node -T <iqn> -p <portal> -o delete
 ```
 
+### Real multipath, at last — and Auto Block, which I triggered
+
+Everything before this was single-path. With both of the NAS's addresses as data
+portals:
+
+```
+mpathl (36001405...) dm-9 SYNOLOGY,Storage
+size=1.0G features='1 queue_if_no_path' hwhandler='1 alua' wp=rw
+`-+- policy='service-time 0' prio=50 status=active
+  |- 6:0:0:1 sdc 8:32 active ready running     <- via 192.0.2.10
+  `- 7:0:0:1 sdd 8:48 active ready running     <- via 192.0.2.11
+```
+
+**Failover, with continuous reads running throughout.** One portal was blocked at
+the node with `nft`:
+
+| | |
+|---|---|
+| The blocked path | `failed faulty offline` within ~15 s |
+| The surviving path | stayed `active ready running` |
+| **Reads that failed** | **0 of 60** |
+| Recovery after unblocking | reinstated automatically in ~10 s |
+
+`path_checker tur`, `failback immediate` and `polling_interval 5` — the drop-in
+doing exactly what it is for.
+
+**A management outage does not take the data with it.** Blocking only DSM's port
+5001 and leaving 3260 alone: the storage reported `inactive`, the other storages
+on the node were unaffected, `pvesm status` grew by about one
+`syno-status-timeout` and no more, the warning appeared **once** rather than on
+every poll, the disk stayed readable, and it recovered by itself when unblocked.
+
+#### The credential latch did not work, and finding out cost a real block
+
+A rejected credential must be tried **once**. The latch was an instance field —
+and the plugin builds a new API object for every call, so it died with the
+object. Three polls would have been three failed logins.
+
+It is now a file under `/run`, and verified: across five polls, exactly one
+attempt reached the NAS and the other four refused locally.
+
+**But the test itself tripped Auto Block**, and that is worth recording as
+plainly as possible:
+
+```
+from the tested node:  login -> 407   (IP blocked)
+from another node:      login -> OK   (the block is per source address)
+the iSCSI data path:    unaffected — existing sessions and I/O continued
+```
+
+Three failed logins in five minutes blocks that address for **a day**. The
+protection now works; the demonstration of why it is needed was not a
+simulation. If it happens: **Control Panel → Security → Account → Auto Block →
+Allow/Block List**, and remove the address. The data path keeps working
+throughout, which is exactly what makes it easy to miss.
+
 ### Name rules
 
 | | |

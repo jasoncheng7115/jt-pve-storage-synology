@@ -1,3 +1,12 @@
+jt-pve-storage-synology (0.5.1~beta1-1) unstable; urgency=low
+
+  * Fix the credential latch: it was per-object and so did not survive a poll,
+    which meant a rejected credential was retried until DSM's Auto Block fired.
+  * Verified two-portal multipath: failover with zero I/O loss, and a management
+    outage that leaves the data path alone.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 12:00:00 +0800
+
 jt-pve-storage-synology (0.5.0~beta1-1) unstable; urgency=low
 
   * Verified on a two-node cluster: two DSM sessions on one account coexist,
