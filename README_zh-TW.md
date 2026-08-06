@@ -2,7 +2,7 @@
 
 透過 iSCSI 連接 Synology NAS 的 Proxmox VE 儲存 plugin。**一顆 VM 磁碟就是 NAS 上一個精簡配置 LUN**，所以 DSM 自己的快照、複本與容量都作用在操作者心裡想的那個單位上——沒有 LVM 夾層，也不把一個共用 LUN 在本機切開。
 
-[English](README.md) · [繁體中文](README_zh-TW.md)
+[English](README.md) · [繁體中文](README_zh-TW.md) · **[文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh)**
 
 ---
 
@@ -12,7 +12,7 @@
 >
 > 在這個階段就公開，是因為探索工具本身就有用；也因為在任何人信任一個建立在 Synology SAN API 上的 plugin 之前，那份「哪些知道、哪些不知道」的誠實登記簿值得先讀一遍。
 >
-> **現在不要把正式資料放上來。** 現在也還沒有東西可以放。
+> **現在不要把正式資料放上來。**現在也還沒有東西可以放。
 
 ---
 
@@ -51,8 +51,8 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 
 | | |
 |---|---|
-| LUN 的 uuid 不可以變 | **它不會變。** 所以 SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆 |
-| 比還原點更新的快照必須存活 | **會存活。** 還原到三個之中最舊的那一個，三個都還在 |
+| LUN 的 uuid 不可以變 | **它不會變。**所以 SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆 |
+| 比還原點更新的快照必須存活 | **會存活。**還原到三個之中最舊的那一個，三個都還在 |
 | 事後必須看得出來 | `restored_time` 會記錄還原當下的 epoch 秒 |
 
 第二件正是相關專案**拒絕**越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事的 plugin，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。
@@ -62,7 +62,7 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 | | |
 |---|---|
 | DSM | **7.0 以上**，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被**拒絕**，不會假裝支援。見下——版本號只是門檻，不是判準 |
-| 儲存空間 | **Btrfs。** 快照只存在於 Btrfs 上的精簡 LUN——ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗 |
+| 儲存空間 | **Btrfs。**快照只存在於 Btrfs 上的精簡 LUN——ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗 |
 | 型號 | 支援 iSCSI target 且有足夠可用空間者。產品上限是每台 512 個 LUN、256 個 target |
 | 網路 | 以 HTTPS 連到 DSM（5001）。純 HTTP 一律拒絕 |
 | 帳號 | 一個專用的 DSM 帳號——見 **[docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md)**，其中也說明了 DSM 唯一不讓你限制的那件事 |
@@ -70,7 +70,7 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 
 ### DSM 版本只是門檻，不是判準
 
-**要求 7.0 以上。** 技術下限其實更低——Cinder 的 driver 一路支援到 DSM 6.0.2，而 Btrfs 精簡 LUN 的快照從 6.2 就有——所以 7.0 是刻意選的保守值，理由有四個：SAN Manager 是 7.0 才有的產品，6.x 是 iSCSI Manager；本 plugin 需要的存取控制物件只在 7.x 上見過；**Synology 自己的 CSI driver 就要求 7.0 以上**，那是 Synology 自己會拿 API 用戶端去實際跑的範圍；而 DSM 6.2 已經 EOL，不管 API 通不通，拿它跑生產儲存都不該被建議。
+**要求 7.0 以上。**技術下限其實更低——Cinder 的 driver 一路支援到 DSM 6.0.2，而 Btrfs 精簡 LUN 的快照從 6.2 就有——所以 7.0 是刻意選的保守值，理由有四個：SAN Manager 是 7.0 才有的產品，6.x 是 iSCSI Manager；本 plugin 需要的存取控制物件只在 7.x 上見過；**Synology 自己的 CSI driver 就要求 7.0 以上**，那是 Synology 自己會拿 API 用戶端去實際跑的範圍；而 DSM 6.2 已經 EOL，不管 API 通不通，拿它跑生產儲存都不該被建議。
 
 真正驗證過的只有 **7.1.1-42962 Update 9**。7.0 到那之間應該可以用，但沒試過。
 
@@ -84,14 +84,44 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 
 所以一台跑 7.2 的入門機仍然可能不能用，而只讀版本號的檢查不會說出原因。plugin 會四項全查，並指出是哪一項不過。
 
+## 最多可以切幾個 LUN，以及開到上限會怎樣
+
+一顆 VM 磁碟就是一個 LUN，所以 LUN 的上限是實實在在的容量限制——而它不是技術規格表上那個數字。
+
+**問 NAS。**`SYNO.Core.System` 的 `info`（`type=define`）會回報機型自己的上限，而兩份公開的參考實作都沒有讀它：
+
+| 鍵 | 測試機 DS918+ | 技術規格表 |
+|---|---|---|
+| `max_iscsiluns` | **256** | 512 |
+| `max_iscsitrgs` | **128** | 256 |
+| `max_snapshot_per_lun` | 256 | 256 |
+
+所以一台 DS918+ 只能放行銷數字的**一半**。更大的機型會回報更大的數字；重點是這個數字是看機型的，而且 NAS 會告訴你哪一個適用。
+
+### 開到上限會怎樣
+
+DSM 會乾淨地拒絕——LUN 是 **18990541**、target 是 **18990542**、快照是 **18990543**。什麼都不會壞。但那個拒絕到操作者眼前是「配置失敗」加一個五位數字，而 `pvesm status` 還繼續顯示好幾 TB 可用——因為可用空間不是問題所在，加硬碟也解決不了。
+
+### 所以 plugin 會先拒絕
+
+在請 NAS 建立任何東西之前，它會把 LUN 數量和 `max_iscsiluns` 比對，然後用一句說得出真正原因的話拒絕：NAS 已經放到這個機型的 LUN 上限，唯一的解法是刪掉一些。剩下不到十六個時它也會警告一次，那時候還來得及規劃。
+
+**這個數量包含不屬於這個 storage 的 LUN**——擁有者自己的 LUN、以及任何 Virtual Machine Manager 的虛擬磁碟，全都吃同一個上限。這就是本 plugin 從不送 Synology 自己那份型態過濾條件的第二個理由：那個過濾條件藏起來的正是這些物件，所以任何相信它的用戶端，會在它正在檢查的那個上限上少算。
+
+### 三個上限，按照會先咬到你的順序
+
+1. **LUN**——每顆 VM 磁碟一個。對一個忙碌的 storage 來說，這是真正的限制。
+2. **每顆 LUN 的快照 256 個，而且和使用者自己的排程共用額度。**一顆設了 SAN Manager 快照排程的 LUN，留給 PVE 的就更少，而「拍不出快照」不會明顯看起來和那件事有關。
+3. **Target**，這台是 128 個。在預設的 `shared` target 模式下無關緊要，因為只用一個——而這也正是 `per-volume` 不是預設的原因：它會把 storage 卡在 128 顆磁碟，**低於** LUN 的上限。
+
 ## 高可用性與雙控制器
 
 Synology 有兩種都被叫做「HA」的架構，但它們是兩個不同的問題、有不同的答案。**兩種都支援。**
 
-| | **Synology HA（SHA）** | **UC／SA 雙控制器** |
+| | **Synology HA（SHA）**| **UC／SA 雙控制器** |
 |---|---|---|
 | 架構 | 兩台機箱，主／備 | 一個機箱兩個控制器 |
-| 偵測方式 | — | `firmware_ver` 含 `DSM UC` |
+| 偵測方式 | —| `firmware_ver` 含 `DSM UC` |
 | 管理位址 | **一個浮動的叢集 IP** | **每個控制器各一個，沒有浮動位址** |
 | 設定方式 | `--syno-portal <叢集 IP>` | `--syno-portal <控制器 A>,<控制器 B>` |
 | 最接近的類比 | Pure Storage 的 `vir0` | PowerVault ME 的兩個控制器位址 |
@@ -139,9 +169,9 @@ bin/pve-syno-api-probe --host 192.0.2.10 --user pve-storage
 
 其他陣列的 Proxmox VE 儲存 plugin，與本專案共用主機端的架構與它繼承的維運規則：
 
-- [jt-pve-storage-dellemc](https://github.com/jasoncheng7115/jt-pve-storage-dellemc) — Dell EMC PowerStore、PowerVault ME、PowerFlex、Unity XT
-- [jt-pve-storage-netapp](https://github.com/jasoncheng7115/jt-pve-storage-netapp) — NetApp ONTAP
-- [jt-pve-storage-purestorage](https://github.com/jasoncheng7115/jt-pve-storage-purestorage) — Pure Storage FlashArray
+- [jt-pve-storage-dellemc](https://github.com/jasoncheng7115/jt-pve-storage-dellemc) —Dell EMC PowerStore、PowerVault ME、PowerFlex、Unity XT
+- [jt-pve-storage-netapp](https://github.com/jasoncheng7115/jt-pve-storage-netapp) —NetApp ONTAP
+- [jt-pve-storage-purestorage](https://github.com/jasoncheng7115/jt-pve-storage-purestorage) —Pure Storage FlashArray
 
 ## 授權
 

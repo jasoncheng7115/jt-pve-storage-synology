@@ -20,6 +20,15 @@
 use strict;
 use warnings;
 
+# WITHOUT THIS the literal 。 、 —— in the character class below are BYTES, while
+# the input is decoded to characters — so the pattern can never match and the
+# check passes on files that are full of the artefact it looks for. Rule 1 was
+# unaffected only because it spells its ranges as \x{...} escapes, which is
+# exactly the kind of partial success that makes a broken guard look like a
+# working one. Jason found the artefact on a rendered page while this script
+# was reporting OK.
+use utf8;
+
 # The findings quote Chinese characters back at the reader, so the handle has to
 # be told. Without this every message arrives with a "Wide character" warning
 # attached, which is noise on top of a real finding.
@@ -86,7 +95,7 @@ for my $file (@files) {
 
         # 2. Italic emphasis.
         my $probe = $bare;
-        $probe =~ s/`[^`]*`//g;          # code spans are not emphasis
+        $probe =~ s/`[^`]*`/X/g;         # replaced, not deleted — see rule 3
         $probe =~ s/\*\*//g;             # bold is fine
         if ($probe =~ /\*([^*\s][^*]{0,60})\*/) {
             complain($file, $n, "italic emphasis '*$1*'",
@@ -94,7 +103,20 @@ for my $file (@files) {
         }
 
         # 3. A space after full-width punctuation.
-        if ($bare =~ /($PUNCT) (\S)/) {
+        #
+        # Emphasis markers are stripped FIRST. 「程式碼。** 下面」 renders with a
+        # visible space just as 「程式碼。 下面」 does, but the ** sits between the
+        # two and the first version of this check looked straight past it —
+        # which is how Jason found the artefact on a rendered page again.
+        my $punct_probe = $bare;
+        $punct_probe =~ s/\*\*//g;
+        # A code span is replaced, NOT deleted. Deleting it joined the text on
+        # either side and manufactured the very pattern being looked for:
+        # 「、`::Target` 附」 became 「、 附」, a space after 、 that is not in the
+        # source. A guard that invents findings is worse than one that misses
+        # them, because the fix for a phantom is to damage real text.
+        $punct_probe =~ s/`[^`]*`/X/g;
+        if ($punct_probe =~ /($PUNCT) (\S)/) {
             complain($file, $n, "a space after the full-width '$1'",
                 "full-width punctuation already separates; the space is an"
                 . " un-wrapping artefact.");

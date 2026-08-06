@@ -6,6 +6,47 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.3.0~beta1] - 2026-08-06
+
+### Added
+
+- `Synology::ISCSI`. **`iscsiadm -m discovery` is never used**: a SendTargets
+  discovery creates a node record for *every* target on the NAS, including the
+  owner's own and one a Proxmox Backup Server was already using, and on a node
+  with `node.startup = automatic` those would be logged in to at boot. Node
+  records are created directly, one target and one portal at a time.
+- **The per-model ceilings, read from the NAS instead of the datasheet.**
+  `SYNO.Core.System info type=define` reports `max_iscsiluns` **256** and
+  `max_iscsitrgs` **128** on a DS918+ where the specification sheet says 512 and
+  256. Neither public reference client reads them.
+- The plugin now refuses to create a LUN **before** the NAS does, with a message
+  that names the real reason — at the ceiling DSM answers 18990541, which reaches
+  an operator as an allocation failure while `pvesm status` shows terabytes free.
+  It warns once while sixteen remain. The count includes LUNs this storage does
+  not own, which is the second reason it never sends the types filter that hides
+  Virtual Machine Manager disks.
+- The node-side modules verified against hardware: a LUN attached to a Proxmox VE
+  node, the device confirmed by the kernel's WWID (a **third** independent
+  confirmation of the derivation), resized, then detached — with the node checked
+  back to its exact prior state.
+
+### Fixed
+
+- **`make check-zh` was passing on 62 real artefacts.** It had no `use utf8;`, so
+  the literal 。 and 、 in its character class were bytes while the input was
+  decoded characters. Rule 1 worked regardless because it spells its ranges as
+  `\x{...}` escapes — the partial success that made a broken guard look like a
+  working one. All 62 corrected.
+- The same guard then began *manufacturing* findings: deleting a code span joined
+  the text either side and produced a space after full-width punctuation that was
+  not in the source. Code spans are replaced, not deleted.
+- The guard now also sees past emphasis markers: 「程式碼。** 下面」 renders with a
+  visible space exactly as 「程式碼。 下面」 does.
+- `docs/TESTING.md` still said no write test had been run and no plugin code
+  existed. Both had stopped being true.
+- Both READMEs now link to the documentation site, the Chinese one to its Chinese
+  version — the language is in the URL, so a link can carry it.
+
 ## [0.2.2~beta1] - 2026-08-06
 
 ### Fixed

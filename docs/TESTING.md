@@ -34,10 +34,16 @@ see "How a session is carried" below.
 | Model | DS918+ |
 | DSM | 7.1.1-42962 Update 9 |
 | Volume | `/volume1`, **Btrfs**, 14301.5 GiB total |
-| Note | A **production** NAS, also running Virtual Machine Manager. Read-only probing only, so far |
+| Reported ceilings | **`max_iscsiluns` 256, `max_iscsitrgs` 128**, `max_snapshot_per_lun` 256 — the model's own numbers, not the 512/256 on the specification sheet |
+| Target implementation | `iscsi_target_type` = `lio4x` |
+| Note | A **production** NAS, also running Virtual Machine Manager. Write tests were run on a dedicated `pvetest-` prefix with the owner's agreement; every object created was deleted and the NAS confirmed back to its original contents |
 
-**No write test has been run yet. No plugin code exists yet.** Everything in
-the "verified" table below was established read-only.
+**What has been run:** read-only probing, write tests on a dedicated name
+prefix, and one attach of a LUN to a Proxmox VE node — which is where the WWID
+derivation and the multipath behaviour below come from. The module layer
+(`Synology::API`, `::LUN`, `::Target`, `::Naming`, `::Multipath`, `::Command`,
+`::ISCSI`) has been driven end to end against this hardware. **The PVE plugin
+itself is not written**, so nothing here has been exercised through `pvesm`.
 
 ---
 

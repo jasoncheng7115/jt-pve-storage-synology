@@ -1,3 +1,15 @@
+jt-pve-storage-synology (0.3.0~beta1-1) unstable; urgency=low
+
+  * Synology::ISCSI, which never uses iscsiadm discovery: that creates node
+    records for every target on the NAS, including ones already in use.
+  * Read the per-model ceilings from the NAS: a DS918+ reports 256 LUNs and 128
+    targets where the datasheet says 512 and 256. Refuse a create before the NAS
+    does, with a message that names the reason.
+  * make check-zh had no use utf8, so it passed on 62 real artefacts; then its
+    code-span handling manufactured findings. Both fixed, all 62 corrected.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 23:30:00 +0800
+
 jt-pve-storage-synology (0.2.2~beta1-1) unstable; urgency=low
 
   * Fix stray spaces inside every Traditional Chinese sentence: GitHub renders a

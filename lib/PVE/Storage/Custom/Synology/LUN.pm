@@ -224,8 +224,53 @@ sub _dev_attribs {
     return encode_json(\@a);
 }
 
+# Refuse BEFORE the NAS does, so the message names the real reason.
+#
+# At the ceiling DSM answers 18990541, which reaches an operator as an
+# allocation failure with a number in it. What they need to be told is that the
+# NAS holds its model's maximum number of LUNs — because no amount of free space
+# will fix it, and `pvesm status` will happily go on showing terabytes free.
+#
+# The count is of EVERY LUN on the NAS, not just this storage's: the ceiling is
+# per-NAS and includes the owner's own LUNs and any Virtual Machine Manager
+# disks. Which is the second reason never to send the types filter — it hides
+# exactly those, so a client trusting it would under-count against the ceiling
+# it is checking.
+sub assert_room_for_lun {
+    my ($self, %opt) = @_;
+
+    my $max = $self->api->limits->{luns};
+    # The NAS did not say. Stop guarding rather than invent a number.
+    return 1 if !defined $max;
+
+    my $have = scalar @{ $self->list };
+    return 1 if $have < $max;
+
+    die "storage '" . $self->api->storeid . "': the NAS already holds $have"
+      . " LUNs, which is this model's maximum ($max). Free space is not the"
+      . " problem and adding capacity will not help — delete LUNs, or use a"
+      . " second NAS. Note that the count includes LUNs this storage does not"
+      . " own, such as Virtual Machine Manager disks.\n";
+}
+
+# Warn while there is still time to act, once per storage rather than on every
+# allocation.
+sub warn_if_near_lun_limit {
+    my ($self, %opt) = @_;
+    my $max = $self->api->limits->{luns} or return;
+    my $have = scalar @{ $self->list };
+    my $left = $max - $have;
+    return if $left > ($opt{margin} // 16);
+    return if $self->{warned_lun_limit};
+    $self->{warned_lun_limit} = 1;
+    warn "storage '" . $self->api->storeid . "': $have of $max LUNs used on"
+       . " this NAS — $left left. One VM disk is one LUN.\n";
+}
+
 sub create {
     my ($self, %opt) = @_;
+
+    $self->assert_room_for_lun if !$opt{skip_limit_check};
 
     my $name     = $opt{name};
     my $size     = $opt{size};

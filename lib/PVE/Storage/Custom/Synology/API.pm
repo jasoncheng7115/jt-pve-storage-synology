@@ -425,6 +425,54 @@ sub take_device_token {
 }
 
 # ---------------------------------------------------------------------------
+# What this model can do, and how much of it
+# ---------------------------------------------------------------------------
+
+# `SYNO.Core.System` `info` with type=define answers with 316 keys on the test
+# NAS, and among them are the model's OWN ceilings. Neither reference client
+# reads them, and they matter because they are NOT the numbers on the
+# specification sheet: that says 512 LUNs and 256 targets, while a DS918+
+# reports max_iscsiluns 256 and max_iscsitrgs 128.
+#
+# Cached for the life of the object: it is a property of the model, and the
+# health path must not fetch it every ten seconds.
+sub system_define {
+    my ($self) = @_;
+    return $self->{define} if $self->{define};
+
+    my $r = $self->call('SYNO.Core.System', 'info', type => 'define');
+    return {} if !$r->{success} || ref $r->{data} ne 'HASH';
+
+    $self->{define} = $r->{data};
+    return $self->{define};
+}
+
+# The ceilings, as this model reports them. undef for one it does not report —
+# and undef must not be read as "no limit": it means "this NAS did not say", so
+# a caller can only stop guarding, never conclude there is room.
+sub limits {
+    my ($self) = @_;
+    my $d = $self->system_define;
+
+    my %l;
+    for my $pair ([ luns => 'max_iscsiluns' ],
+                  [ targets => 'max_iscsitrgs' ],
+                  [ snapshots_per_lun => 'max_snapshot_per_lun' ]) {
+        my $v = $d->{ $pair->[1] };
+        $l{ $pair->[0] } = (defined $v && $v =~ /\A\d+\z/ && $v > 0) ? int($v) : undef;
+    }
+    return \%l;
+}
+
+# The capability gates. A model can run DSM 7.2 and still not support what this
+# plugin needs, and a version check would not say why.
+sub supports {
+    my ($self, $what) = @_;
+    my $d = $self->system_define;
+    return ($d->{$what} // '') eq 'yes' ? 1 : 0;
+}
+
+# ---------------------------------------------------------------------------
 # Calls
 # ---------------------------------------------------------------------------
 

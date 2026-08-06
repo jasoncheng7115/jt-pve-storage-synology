@@ -63,4 +63,37 @@ is($L->MIN_SIZE, 1024**3, 'the 1 GB minimum is enforced here because the API doe
 cmp_ok($L->MAX_NAME, '<', 255, 'the name limit stays well clear of the refused-but-created boundary');
 cmp_ok($L->LOCK_WAIT_DEFAULT, '>', 20, "the lock wait exceeds the CSI driver's 20s, which is too short for a large clone");
 
+# --- the per-model ceiling --------------------------------------------------
+# A DS918+ reports max_iscsiluns 256, not the 512 on the specification sheet.
+# The plugin refuses before the NAS does, so the message names the real reason
+# rather than arriving as error 18990541.
+{
+    package FakeAPI;
+    sub new { my ($c,%o)=@_; bless {%o}, $c }
+    sub storeid { 'syno1' }
+    sub limits { $_[0]->{limits} }
+    sub call { my $s=shift; return { success => 1, data => { luns => $s->{luns} } } }
+}
+my $at_limit = PVE::Storage::Custom::Synology::LUN->new(
+    FakeAPI->new(limits => { luns => 3 },
+                 luns => [ map { { uuid => "u$_", name => "n$_" } } 1..3 ]));
+eval { $at_limit->assert_room_for_lun };
+like($@, qr/maximum \(3\)/, 'at the ceiling the refusal names the model maximum');
+like($@, qr/Free space is not the problem/,
+     'and says free space will not help, because pvesm status will show plenty');
+like($@, qr/Virtual Machine Manager/,
+     "and warns the count includes LUNs this storage does not own");
+
+my $room = PVE::Storage::Custom::Synology::LUN->new(
+    FakeAPI->new(limits => { luns => 10 },
+                 luns => [ map { { uuid => "u$_", name => "n$_" } } 1..3 ]));
+ok($room->assert_room_for_lun, 'below the ceiling it proceeds');
+
+# A NAS that does not report a ceiling must not have one invented for it.
+my $unknown = PVE::Storage::Custom::Synology::LUN->new(
+    FakeAPI->new(limits => { luns => undef },
+                 luns => [ map { { uuid => "u$_", name => "n$_" } } 1..999 ]));
+ok($unknown->assert_room_for_lun,
+   'an unreported ceiling stops the guard rather than becoming a guessed number');
+
 done_testing();

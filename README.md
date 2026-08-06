@@ -5,7 +5,7 @@ thin LUN on the NAS, so DSM's own snapshots, clones and capacity act on the
 unit an operator actually thinks about — no LVM layer, no shared LUN carved up
 locally.
 
-[English](README.md) · [繁體中文](README_zh-TW.md)
+[English](README.md) · [繁體中文](README_zh-TW.md) · **[Documentation site](https://jasoncheng7115.github.io/jt-pve-storage-synology/)**
 
 ---
 
@@ -124,6 +124,55 @@ matters more than the number:
 So an entry-level NAS running 7.2 may still be unusable, and a check that only
 read the version would not say why. The plugin gates on all four and names the
 one that failed.
+
+## How many LUNs, and what happens at the ceiling
+
+One VM disk is one LUN, so the LUN ceiling is a real capacity limit — and it is
+not the number on the specification sheet.
+
+**Ask the NAS.** `SYNO.Core.System` `info` with `type=define` reports the
+model's own ceilings, and neither public reference client reads them:
+
+| Key | On the test DS918+ | Specification sheet |
+|---|---|---|
+| `max_iscsiluns` | **256** | 512 |
+| `max_iscsitrgs` | **128** | 256 |
+| `max_snapshot_per_lun` | 256 | 256 |
+
+So a DS918+ holds **half** the LUNs the marketing figure suggests. Larger models
+report larger numbers; the point is that the number is per-model and the NAS
+will tell you which one applies.
+
+### What happens when you reach it
+
+DSM refuses cleanly — **18990541** for LUNs, **18990542** for targets,
+**18990543** for snapshots. Nothing is damaged. But the refusal reaches an
+operator as an allocation failure with a five-digit number in it, while
+`pvesm status` goes on showing terabytes free, because free space is not the
+problem and adding disks will not fix it.
+
+### So the plugin refuses first
+
+Before it asks the NAS to create anything it compares the LUN count against
+`max_iscsiluns` and refuses with a message that names the real reason: the NAS
+holds its model's maximum number of LUNs, deleting is the only remedy. It also
+warns once when fewer than sixteen remain, while there is still time to plan.
+
+**The count includes LUNs this storage does not own** — the owner's own LUNs and
+any Virtual Machine Manager virtual disks all consume the same ceiling. That is
+the second reason this plugin never sends the types filter Synology's own client
+sends: that filter hides exactly those objects, so a client trusting it would
+under-count against the very ceiling it was checking.
+
+### The three ceilings, in the order they will bite
+
+1. **LUNs** — one per VM disk. The real limit for a busy storage.
+2. **Snapshots per LUN**, 256, **shared with the user's own schedule.** A LUN
+   with a SAN Manager snapshot schedule on it has fewer left for PVE, and
+   "cannot take a snapshot" will not obviously be about that.
+3. **Targets**, 128 here. Irrelevant in the default `shared` target mode, which
+   uses one — and the reason `per-volume` is not the default, since it would cap
+   the storage at 128 disks, *below* the LUN ceiling.
 
 ## High availability and dual controllers
 
