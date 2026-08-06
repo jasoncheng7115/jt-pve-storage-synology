@@ -6,6 +6,47 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.4.1~beta1] - 2026-08-07
+
+A real VM was booted from a Synology LUN, and a rollback was verified **at the
+block level**: a written pattern, snapshotted, overwritten with zeros, rolled
+back, and the original sha256 came back. Twice — the second time with no manual
+cache handling at all.
+
+### Added
+
+- **Host cache symmetry.** A snapshot flushes the device first, so it records what
+  the guest believes it wrote. A rollback flushes first *and* invalidates
+  afterwards — the second was demonstrated directly: reading the device straight
+  after a successful rollback returned the **old** bytes until the cache was
+  dropped.
+- **An in-use check**, ported with its three-valued contract intact: 1, 0, or
+  **undef**, and `free_image` and `volume_snapshot_rollback` refuse on undef.
+  Verified against a real booted VM — both refused while QEMU held the disk, with
+  a message naming `fuser -vm`.
+- `volume_size_info`, `volume_export` and `volume_import`, answered from the NAS.
+  Export and import have been round-tripped byte-identical through `pvesm`.
+- `rename_snapshot`, `get_subdir` and `prune_backups` refuse with something an
+  operator can act on, rather than reaching a base implementation that would
+  produce a message about a path.
+- `t/07-imports.t` — `perl -c` compiles a call to an undefined subroutine without
+  a word, and one such call reached a running VM.
+
+### Fixed
+
+- **`qm destroy` silently leaked its LUN, every time.** `path()` must return
+  `($path, $vmid, $vtype)` — the owner as the second element. Returning the leaf
+  name made PVE's own check read `"vm-9999-disk-0" != 9999`, so it returned early
+  and **never called `vdisk_free`**. Nothing failed; a numeric warning was the
+  only trace.
+- **`qm create` with an existing volume died before it started.** The base
+  `volume_size_info` runs `qemu-img info` on `filesystem_path`, which a block
+  storage has none of — and the error named `filesystem_path` rather than the
+  cause. Found by a sweep of the base class for methods whose *default* reaches
+  `filesystem_path` or `$scfg->{path}`; five were unhandled.
+- The ported in-use check called `dirname()` with no `use File::Basename`, and a
+  second port had copied `_untaint_device_path` but not `_untaint_device_name`.
+
 ## [0.4.0~beta1] - 2026-08-07
 
 **The plugin works.** `pvesm add synologysan` registers, and every lifecycle

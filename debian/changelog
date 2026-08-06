@@ -1,3 +1,19 @@
+jt-pve-storage-synology (0.4.1~beta1-1) unstable; urgency=low
+
+  * A real VM booted from a Synology LUN, and a rollback was verified at the
+    block level: pattern written, snapshotted, zeroed, rolled back, original
+    sha256 returned.
+  * qm destroy silently leaked its LUN every time: path() must return the OWNER
+    as its second element, and returning the leaf name made PVE's check read
+    "vm-9999-disk-0" != 9999 and skip vdisk_free entirely.
+  * qm create with an existing volume died before starting: the base
+    volume_size_info reaches filesystem_path. A sweep of the base class found
+    five such methods; volume_export was refusing every disk move.
+  * Host cache symmetry for snapshot and rollback, and an in-use check with its
+    three-valued contract, verified against a booted VM.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 02:00:00 +0800
+
 jt-pve-storage-synology (0.4.0~beta1-1) unstable; urgency=low
 
   * The plugin works: pvesm add synologysan registers, and add/alloc/activate/

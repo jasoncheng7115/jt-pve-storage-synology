@@ -420,7 +420,8 @@ sub path {
     die "a Synology LUN cannot be addressed at a snapshot: roll back to it, or"
       . " clone it into a new disk.\n" if defined $snapname;
 
-    my ($vtype, $leaf) = $class->parse_volname($volname);
+    # $vmid, not the leaf name: the second element is the OWNER.
+    my ($vtype, $leaf, $vmid) = $class->parse_volname($volname);
     my $api  = $class->_api($storeid, $scfg);
     my $lun  = $class->_lun($api);
     my $name = PVE::Storage::Custom::Synology::Naming::lun_name($storeid, $volname);
@@ -433,7 +434,43 @@ sub path {
     my $path = PVE::Storage::Custom::Synology::Multipath::dm_uuid_path($wwid)
         or die "storage '$storeid': could not derive a device path for '$name'\n";
 
-    return wantarray ? ($path, $leaf, $vtype) : $path;
+    # ($path, $vmid, $vtype) — what RBDPlugin and ZFSPoolPlugin return, and what
+    # PVE actually consumes. `qm destroy` calls path() in list context and
+    # compares the second element against the VM id NUMERICALLY:
+    #
+    #     return if !$path || !$owner || ($owner != $vmid);
+    #
+    # Returning the leaf name there made that comparison "vm-9999-disk-0" != 9999,
+    # so PVE returned early and never called vdisk_free — every `qm destroy`
+    # silently LEAKED its LUN, with nothing but a numeric warning to show for it.
+    return wantarray ? ($path, $vmid, $vtype) : $path;
+}
+
+# The base implementation runs `qemu-img info` on filesystem_path, which cannot
+# exist here — so without this override `qm create` with an EXISTING volume dies
+# before it starts, and the message points at filesystem_path rather than at the
+# real cause. Found by running `qm create --scsi0 <existing volid>`; the stack
+# named PVE::Storage::Plugin::volume_size_info.
+#
+# Answered from the NAS, which is the authority on a LUN's size anyway.
+sub volume_size_info {
+    my ($class, $scfg, $storeid, $volname, $timeout) = @_;
+
+    my $api = $class->_api($storeid, $scfg);
+    my $lun = $class->_lun($api);
+    my $name = PVE::Storage::Custom::Synology::Naming::lun_name($storeid, $volname);
+    my $obj = eval { $lun->get($name) };
+    my $err = $@;
+    eval { $api->logout };
+
+    die "storage '$storeid': could not read the size of '$name' — $err" if $err;
+    die "storage '$storeid': there is no LUN named '$name' on the NAS\n" if !$obj;
+
+    my $size = $obj->{size};
+    # ($size, $format, $used, $parent, $ctime). `used` comes from
+    # allocated_size, which over-reports for a reflink — it is the closest thing
+    # the NAS offers and PVE only displays it.
+    return wantarray ? ($size, 'raw', $obj->{allocated_size}, undef, undef) : $size;
 }
 
 # LVM and RBD override these; the base answers () unless $scfg->{path} is set,
@@ -441,6 +478,95 @@ sub path {
 # export`/`import` and remote migration before any plugin code runs.
 sub volume_export_formats { return ('raw+size') }
 sub volume_import_formats { return ('raw+size') }
+
+# The base implementation is gated on `$scfg->{path}`, which a block storage
+# never sets — so it would refuse every export while `volume_export_formats`
+# above promises `raw+size`. That mismatch breaks a disk move to another storage
+# type with a message about a format rather than about a path, which is the kind
+# of error nobody can act on.
+#
+# Found by a systematic sweep of the base class for methods that reach
+# `filesystem_path` or `$scfg->{path}`, prompted by volume_size_info doing
+# exactly this.
+sub volume_export {
+    my ($class, $scfg, $storeid, $fh, $volname, $format, $snapshot,
+        $base_snapshot, $with_snapshots) = @_;
+
+    die "storage '$storeid': only raw+size can be exported (asked for"
+      . " '$format')\n" if $format ne 'raw+size';
+    die "storage '$storeid': a Synology LUN cannot be exported together with"
+      . " its snapshots\n" if $with_snapshots;
+    die "storage '$storeid': exporting from a snapshot is not supported — roll"
+      . " back to it, or clone it into a disk of its own first\n"
+        if defined $snapshot || defined $base_snapshot;
+
+    my $path = $class->path($scfg, $volname, $storeid);
+    my $size = $class->volume_size_info($scfg, $storeid, $volname);
+
+    PVE::Storage::Plugin::write_common_header($fh, $size);
+    run_command([ 'dd', "if=$path", 'bs=4k', 'status=none' ],
+        output => '>&' . fileno($fh));
+    return;
+}
+
+sub volume_import {
+    my ($class, $scfg, $storeid, $fh, $volname, $format, $snapshot,
+        $base_snapshot, $with_snapshots, $allow_rename) = @_;
+
+    die "storage '$storeid': only raw+size can be imported (offered"
+      . " '$format')\n" if $format ne 'raw+size';
+    die "storage '$storeid': a Synology LUN cannot be imported together with"
+      . " its snapshots\n" if $with_snapshots;
+
+    my ($vtype, $leaf, $vmid) = $class->parse_volname($volname);
+    my $size = PVE::Storage::Plugin::read_common_header($fh);
+
+    # The disk has to exist before anything can be written into it, and it is
+    # created at the size the stream declares — rounded UP, never down: a volume
+    # smaller than the source gets filled and then fails.
+    my $name = $class->alloc_image($storeid, $scfg, $vmid, 'raw', $leaf,
+        int(($size + 1023) / 1024));
+
+    my $ok = eval {
+        $class->activate_volume($storeid, $scfg, $name);
+        my $path = $class->path($scfg, $name, $storeid);
+        run_command([ 'dd', "of=$path", 'bs=4k', 'conv=fsync', 'status=none' ],
+            input => '<&' . fileno($fh));
+        1;
+    };
+    if (!$ok) {
+        my $err = $@;
+        # Cleanup on failure: a half-written disk PVE does not know about is
+        # worse than a failed import.
+        eval { $class->free_image($storeid, $scfg, $name, 0) };
+        die "storage '$storeid': import of '$name' failed and it was removed"
+          . " again: $err";
+    }
+
+    return "$storeid:$name";
+}
+
+# Refused rather than left to a base implementation that would reach for a
+# filesystem path. DSM has no rename for a snapshot, and pretending otherwise
+# would lose the mapping between what PVE lists and what the NAS holds.
+sub rename_snapshot {
+    my ($class, $scfg, $storeid, $volname, $source_snap, $target_snap) = @_;
+    die "storage '$storeid': a Synology LUN snapshot cannot be renamed.\n";
+}
+
+# Neither is meaningful for a block storage, and both would otherwise reach for
+# `$scfg->{path}` and produce an error about a directory.
+sub get_subdir {
+    my ($class, $scfg, $vtype) = @_;
+    # No storeid is passed to this one, so the message stays generic rather than
+    # inventing a name for the storage.
+    die "a Synology LUN storage has no directories, so '$vtype' has no path.\n";
+}
+
+sub prune_backups {
+    my ($class, $scfg, $storeid, $keep, $vmid, $type, $dryrun, $logfunc) = @_;
+    die "storage '$storeid': this storage holds disks, not backups.\n";
+}
 
 # PVE::LXC::Config freezes a container's mountpoints only when this is true, and
 # a container's root is mounted on this host while the NAS snapshots it.
@@ -676,6 +802,13 @@ sub free_image {
     my $uuid = $obj->{uuid};
     my $wwid = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($uuid);
 
+    # A destructive path must not proceed on "could not tell". is_device_in_use
+    # answers 1 / 0 / undef, and undef means something inside it could not
+    # establish an answer — most importantly `fuser`, which is the only check
+    # that sees a running QEMU holding the device open with no mount and no
+    # holder. Verified against a real VM booted from a Synology LUN.
+    $class->_assert_not_in_use($storeid, $wwid, 'delete');
+
     # The slave list is captured BEFORE anything is torn down: once the map is
     # flushed there is nothing left to ask which sd devices belonged to it.
     my $slaves = PVE::Storage::Custom::Synology::Multipath::slaves_of_map($wwid);
@@ -830,6 +963,29 @@ sub deactivate_volume {
     return 1;
 }
 
+# Refuse a destructive operation unless the device is provably unused.
+sub _assert_not_in_use {
+    my ($class, $storeid, $wwid, $what) = @_;
+    return if !defined $wwid;
+
+    my $path = PVE::Storage::Custom::Synology::Multipath::device_path_for_wwid($wwid);
+    # No device on this node means nothing here is using it.
+    return if !defined $path;
+
+    my $in_use = PVE::Storage::Custom::Synology::Multipath::is_device_in_use($path);
+
+    die "storage '$storeid': refusing to $what this disk — could not establish"
+      . " whether anything on this node is using $path. That is not the same as"
+      . " 'nothing is', and this operation destroys data. Check with"
+      . " 'fuser -vm $path' and try again.\n" if !defined $in_use;
+
+    die "storage '$storeid': refusing to $what this disk — $path is IN USE on"
+      . " this node. Stop whatever is using it first ('fuser -vm $path' will"
+      . " say what).\n" if $in_use;
+
+    return;
+}
+
 # Remove the local device for one WWID. One named map, never a node-wide flush.
 sub _detach_local {
     my ($class, $storeid, $scfg, $wwid) = @_;
@@ -891,6 +1047,11 @@ sub volume_snapshot {
     my $name = PVE::Storage::Custom::Synology::Naming::lun_name($storeid, $volname);
     my $obj = $lun->get($name) or die "storage '$storeid': no LUN '$name'\n";
 
+    # Flush BEFORE the snapshot, or it records what reached the NAS rather than
+    # what the guest believes it wrote.
+    my $wwid = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($obj->{uuid});
+    PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+
     $lun->snapshot_create(
         src_uuid    => $obj->{uuid},
         name        => PVE::Storage::Custom::Synology::Naming::snapshot_name($snap),
@@ -929,9 +1090,28 @@ sub volume_snapshot_rollback {
     die "storage '$storeid': '$name' has no snapshot named '$snap' taken by this"
       . " plugin\n" if !$found;
 
+    my $wwid = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($obj->{uuid});
+
+    # A rollback OVERWRITES the disk, so it is as destructive as a delete and
+    # takes the same guard. PVE stops a rollback on a running VM at a higher
+    # level, but a plugin that relied on that would be trusting a caller it does
+    # not control.
+    $class->_assert_not_in_use($storeid, $wwid, 'roll back');
+
+    # FLUSH BEFORE. Dirty pages written back after the NAS has restored the
+    # snapshot would land pre-rollback content on top of it, and the result looks
+    # like a rollback that half worked.
+    PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+
     # LUN::snapshot_rollback verifies afterwards that the uuid did not change —
     # if it ever does, the device identity moved underneath every node.
     $lun->snapshot_rollback(src_uuid => $obj->{uuid}, snapshot_uuid => $found->{uuid});
+
+    # INVALIDATE AFTER. Demonstrated on this project: reading the device straight
+    # after a successful rollback returned the OLD bytes until the cache was
+    # dropped. Without this a guest goes on seeing pre-rollback data from cache.
+    PVE::Storage::Custom::Synology::Multipath::invalidate_device_cache($wwid);
+
     eval { $api->logout };
     return 1;
 }

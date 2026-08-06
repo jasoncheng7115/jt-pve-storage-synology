@@ -4,6 +4,24 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.4.1~beta1] - 2026-08-07
+
+一台真正的 VM 從 Synology LUN 開機了，而倒回也在**區塊層面**得到驗證：寫入一段內容、拍快照、用零覆寫、倒回，原本的 sha256 回來了。做了兩次——第二次完全沒有手動處理快取。
+
+### 新增
+
+- **主機快取對稱性。**快照前先 flush，所以它記錄的是客體認為自己寫下的內容。倒回前 flush、倒回後**失效**——後者是直接示範出來的：在一次成功的倒回之後立刻讀取裝置，回來的是**舊**的位元組，直到快取被丟掉為止。
+- **使用中檢查**，移植時保留了它的三值契約：1、0、或 **undef**，而 `free_image` 與 `volume_snapshot_rollback` 遇到 undef 一律拒絕。對著一台真的開機中的 VM 驗證過——QEMU 握著磁碟時兩者都拒絕，訊息指出用 `fuser -vm` 查。
+- `volume_size_info`、`volume_export`、`volume_import`，全部由 NAS 回答。匯出與匯入已透過 `pvesm` 完成位元組完全相同的往返。
+- `rename_snapshot`、`get_subdir`、`prune_backups` 會用操作者能據以行動的訊息拒絕，而不是落到基底實作、產生一個關於路徑的訊息。
+- `t/07-imports.t`——`perl -c` 對呼叫未定義副程式一聲不響，而那樣的一個呼叫曾經一路撐到一台開機中的 VM。
+
+### 修正
+
+- **`qm destroy` 每一次都默默漏掉它的 LUN。**`path()` 必須回傳 `($path, $vmid, $vtype)`——第二個元素是擁有者。回傳葉節點名稱會讓 PVE 自己的檢查變成 `"vm-9999-disk-0" != 9999`，於是它提早返回、**從來沒有呼叫 `vdisk_free`**。沒有任何東西失敗，唯一的痕跡是一句數值警告。
+- **`qm create` 掛上既有磁碟時還沒開始就死了。**基底的 `volume_size_info` 會對 `filesystem_path` 執行 `qemu-img info`，而區塊儲存沒有那種路徑——而且錯誤訊息指的是 `filesystem_path`，不是真正的原因。這是靠掃描基底類別、找出**預設實作**會去碰 `filesystem_path` 或 `$scfg->{path}` 的方法找到的；有五個沒有處理。
+- 移植過來的使用中檢查呼叫了 `dirname()` 卻沒有 `use File::Basename`，而另一處只複製了 `_untaint_device_path`、沒有複製 `_untaint_device_name`。
+
 ## [0.4.0~beta1] - 2026-08-07
 
 **plugin 可以用了。**`pvesm add synologysan` 註冊成功，而且每一個生命週期操作都已對一台 DS918+（DSM 7.1.1）完整跑過——跑了兩輪，節點與 NAS 上都沒有留下任何東西：

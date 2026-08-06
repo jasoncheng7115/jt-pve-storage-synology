@@ -36,6 +36,13 @@ package PVE::Storage::Custom::Synology::Multipath;
 use strict;
 use warnings;
 
+# File::Basename is imported explicitly. The ported in-use check calls dirname
+# and basename, `perl -c` compiles a call to an undefined subroutine without
+# complaint, and the failure surfaced only when a real VM held the device —
+# where it failed SAFE, refusing the delete, but for entirely the wrong reason.
+# t/07-imports.t exists because of this.
+use File::Basename qw(basename dirname);
+
 use PVE::Storage::Custom::Synology::Command qw(
     run_cmd is_block_device sysfs_read_with_timeout
 );
@@ -354,6 +361,248 @@ sub flush_map {
     return 0 if $failure;
     return ($rc // 0) == 0 ? 1 : 0;
 }
+
+# Host cache symmetry, which the related projects had to learn the hard way.
+#
+# **Flush BEFORE a snapshot**, or the snapshot records what is on the NAS rather
+# than what the guest believes it wrote.
+#
+# **Flush BEFORE a rollback and invalidate AFTER**, and the first of those is the
+# one that is easy to leave out: dirty pages written back after the NAS has
+# restored the snapshot land pre-rollback content on top of it, and the result
+# looks like a rollback that half worked. The second was demonstrated on this
+# project directly — reading the device straight after a successful rollback
+# returned the OLD bytes until the cache was invalidated, so a caller that
+# checked its own work would have concluded the rollback had failed.
+sub flush_device_cache {
+    _not_a_method($_[0]);
+    my ($wwid) = @_;
+    my $path = device_path_for_wwid($wwid) or return 0;
+    eval { run_cmd([ 'blockdev', '--flushbufs', $path ],
+                   timeout => 30, allow_nonzero => 1) };
+    return $@ ? 0 : 1;
+}
+
+# Drop what the host has cached for ONE device. Not `/proc/sys/vm/drop_caches`,
+# which throws away every cache on the node including other storages'.
+sub invalidate_device_cache {
+    _not_a_method($_[0]);
+    my ($wwid) = @_;
+    my $path = device_path_for_wwid($wwid) or return 0;
+
+    # BLKFLSBUF via blockdev discards the buffer cache for this device only.
+    eval { run_cmd([ 'blockdev', '--flushbufs', $path ],
+                   timeout => 30, allow_nonzero => 1) };
+
+    # And re-read the partition table, which is what makes the kernel drop its
+    # cached view of the contents. Harmless on a device with no partitions.
+    eval { run_cmd([ 'blockdev', '--rereadpt', $path ],
+                   timeout => 30, allow_nonzero => 1) };
+    return 1;
+}
+
+# fuser lives in different places on different distributions, and a hardcoded
+# path that does not exist makes the check return undef forever — which is safe,
+# but means every delete refuses and nothing works.
+sub _fuser {
+    for my $p ('/bin/fuser', '/usr/bin/fuser', '/sbin/fuser') {
+        return $p if -x $p;
+    }
+    return 'fuser';
+}
+
+# ---------------------------------------------------------------------------
+# Is anything using this device?
+# ---------------------------------------------------------------------------
+#
+# PORTED from jt-pve-storage-dellemc, where its absence was a defect and its
+# every-check-can-fail behaviour was a second one. The contract is what matters:
+#
+#   **1 / 0 / undef**, and the destructive paths refuse on undef.
+#
+# Every check inside can fail without proving anything — the stat can time out,
+# sysfs can be unreadable, `fuser` can be killed by its own timeout. And `fuser`
+# is the only one that sees a running QEMU, which holds the device open with no
+# mount and no holder: if it did not run, nothing else has ruled that out.
+#
+# Verified on this project with a real VM booted from a Synology LUN: fuser
+# reported the kvm process holding /dev/dm-9.
+
+sub _resolve_block_device_name {
+    my ($device) = @_;
+    return undef unless defined $device;
+
+    if (-l $device) {
+        my $target = readlink($device);
+        if (defined $target) {
+            if ($target !~ m|^/|) {
+                $target = dirname($device) . "/$target";
+            }
+            while ($target =~ s|/[^/]+/\.\./|/|g) { }
+            $device = $target;
+        }
+    }
+
+    return _untaint_device_name(basename($device));
+}
+
+sub _read_tables {
+    my $mounts = sysfs_read_with_timeout('/proc/mounts', 5);
+    my $swaps  = sysfs_read_with_timeout('/proc/swaps', 5);
+    return ($mounts, $swaps);
+}
+
+# A dm name that belongs to a partition of a multipath map rather than to
+# something stacked on it. Kernel and kpartx spell these several ways
+# depending on configuration:
+#   <wwid>-part1, <wwid>p1, <wwid>1, <alias>-part1, sdf1
+
+sub _dm_name_of {
+    my ($kernel_name) = @_;
+    my $file = "/sys/block/$kernel_name/dm/name";
+    return '' unless -r $file;
+    my $name = sysfs_read_with_timeout($file, 3) // '';
+    chomp $name;
+    return $name;
+}
+
+# Is the device mounted, used as swap, held by something, or open by a
+# process?
+#
+# Partition devices created from the guest's own partition table are the one
+# exception: they exist on every VM disk that has an OS installed, nothing on
+# the host uses them, and cleanup_lun_devices removes them. They only count as
+# in-use when they have holders of their own (host LVM having auto-activated a
+# VG from inside the guest disk) or are themselves mounted or in use as swap.
+# 1 = in use, 0 = confirmed not in use, undef = COULD NOT TELL.
+#
+# The third answer matters. Two destructive paths ask this question — a delete
+# and a rollback — and for them "cannot tell" has to mean "do not". Reading an
+# unknown as "free" is how a volume gets unmapped and deleted underneath a
+# running VM, or rolled back while the guest is writing to it.
+#
+# Every check below can fail without proving anything: is_block_device can
+# time out, sysfs can be unreadable, fuser can be killed by its own timeout.
+# Those return undef. Only reaching the end with nothing found returns 0.
+#
+# Callers written as `if (is_device_in_use($d))` keep their old behaviour,
+# because undef is false. The ones that must not are explicit about it.
+
+sub _is_partition_dm_name {
+    my ($dm_name) = @_;
+    return 0 unless defined $dm_name && length $dm_name;
+    return 1 if $dm_name =~ /part\d+$/;
+    return 1 if $dm_name =~ /^[0-9a-f]{20,}p?\d+$/;
+    return 1 if $dm_name =~ /^sd[a-z]+\d+$/;
+    return 0;
+}
+
+# A name read out of /sys or from a path is used only AFTER the match returns
+# it — the captured value, never the one that went in. It is the taint
+# discipline and the correctness check in one, and it makes a wrong pattern fail
+# as "nothing found" in one place rather than in three.
+#
+# This one was missed by the port: the code called it while only its sibling had
+# been copied across, and `perl -c` said nothing. t/07-imports.t found it.
+sub _untaint_device_name {
+    my ($name) = @_;
+    return undef unless defined $name;
+    return $1 if $name =~ /^([a-zA-Z0-9_\-]+)$/;
+    return undef;
+}
+
+sub _untaint_device_path {
+    my ($path) = @_;
+    return undef unless defined $path;
+    return $1 if $path =~ m|^(/dev/[a-zA-Z0-9_\-/\.]+)$|;
+    return undef;
+}
+
+sub is_device_in_use {
+    my ($device, %opts) = @_;
+
+    return 0 unless $device;
+
+    my $is_block = is_block_device($device);
+
+    # A path that is not there, or is not a block device, is definitely not in
+    # use — stat on a missing path fails immediately and touches no driver.
+    # Only a stat that never came back leaves the question open.
+    return undef unless defined $is_block;
+    return 0 unless $is_block;
+
+    my $dev_name = _resolve_block_device_name($device);
+    return undef unless $dev_name;
+
+    my ($mounts, $swaps) = _read_tables();
+
+    for my $table ($mounts, $swaps) {
+        next unless $table;
+        for my $line (split /\n/, $table) {
+            return 1 if $line =~ /^\Q$device\E\s/;
+            return 1 if $line =~ m|^/dev/\Q$dev_name\E\s|;
+        }
+    }
+
+    # Holders must be checked on the resolved kernel name (dm-N). Checking the
+    # /dev/mapper name instead silently finds nothing, and free_image would
+    # then delete a volume that host LVM is actively using.
+    my $holders_dir = "/sys/block/$dev_name/holders";
+    if (-d $holders_dir) {
+        opendir(my $dh, $holders_dir) or return undef;
+        my @holders = grep { !/^\./ } readdir($dh);
+        closedir($dh);
+
+        for my $h (@holders) {
+            my $dm_name = _dm_name_of($h);
+
+            # Anything that is not a partition (LVM LV, dm-crypt, MD) means
+            # the device is genuinely in use.
+            return 1 unless _is_partition_dm_name($dm_name);
+
+            # A partition with its own holders means something is stacked on
+            # it, e.g. a VG activated from inside the guest disk.
+            if (opendir(my $sdh, "/sys/block/$h/holders")) {
+                my @sub = grep { !/^\./ } readdir($sdh);
+                closedir($sdh);
+                return 1 if @sub;
+            }
+
+            # /proc/mounts records whichever path was used to mount, so check
+            # both spellings.
+            my $part_dev    = "/dev/$h";
+            my $part_mapper = length($dm_name) ? "/dev/mapper/$dm_name" : '';
+            for my $table ($mounts, $swaps) {
+                next unless $table;
+                return 1 if $table =~ /^\Q$part_dev\E\s/m;
+                return 1 if $part_mapper && $table =~ /^\Q$part_mapper\E\s/m;
+            }
+        }
+    }
+
+    my $safe_device = _untaint_device_path($device);
+    return undef unless $safe_device;
+
+    my (undef, undef, $exit) = eval {
+        run_cmd([ _fuser(), '-s', $safe_device],
+            timeout => 10, allow_nonzero => 1, ignore_errors => 1);
+    };
+    my $fuser_error = $@;
+
+    # fuser is the only check here that sees a process holding the device
+    # open with no mount and no holder — which is exactly what a running QEMU
+    # looks like. If it could not run, nothing above it has ruled that out.
+    return undef if $fuser_error || !defined $exit;
+
+    return 1 if $exit == 0;
+
+    return 0;
+}
+
+# Explain WHY a device is in use, for the error message free_image raises.
+# "Device is still in use" on its own leaves the operator with nowhere to go;
+# in practice the cause is usually host LVM having auto-activated a volume
+# group that lives inside the guest disk, which is fixable but not guessable.
 
 # Is the map gone? Confirmed, not assumed.
 sub map_is_gone {
