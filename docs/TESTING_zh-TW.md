@@ -265,7 +265,7 @@ bin/pve-syno-api-probe --host <nas> --user <帳號> --probe-methods
 
 它會探測哪些快照還原方法名稱存在，做法是指名一個 NAS 從未發出過的 LUN 與快照
 uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在那裡。之所以要明確開啟，是
-因為送出的畢竟是破壞性方法的名稱，即使它們能作用的對象並不存在。**R-1 就是這樣
+因為送出的畢竟是破壞性方法的名稱，即使它們能動到的東西並不存在。**R-1 就是這樣
 回答的。**
 
 ### 階段 4——寫入，在沒有人在意的儲存空間上
@@ -296,7 +296,7 @@ uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在�
 ### 階段 5b——只有一台 NAS 要怎麼測 multipath
 
 **Synology 的 multipath 和雙控制器無關。** 單控制器機型是靠**多個網路 portal**
-提供多重路徑的，而一台有兩張網卡的 NAS 就足以做出真正的雙路徑 map。
+提供多重路徑的，而一台有兩張網路卡的 NAS 就足以做出真正的雙路徑 map。
 
 測試機上從 `SYNO.Core.Network.Interface` 讀到的：
 
@@ -313,14 +313,14 @@ uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在�
    就是會消失的路徑。給它靜態位址，或在 DHCP 上做永久保留。
 3. **這裡兩個位址在同一個子網路，而這是最麻煩的一點。** Linux 會很自然地把兩個
    工作階段都從路由表偏好的那張介面送出去，於是你得到的是「兩個工作階段走同一條
-   物理線路」，一個看起來有冗餘但其實沒有的 map。要明確把每個工作階段綁到各自的
+   物理線路」，一個看起來有備援但其實沒有的 map。要明確把每個工作階段綁到各自的
    介面上：
 
    ```bash
    iscsiadm -m iface -I path0 --op=new
-   iscsiadm -m iface -I path0 --op=update -n iface.net_ifacename -v <網卡0>
+   iscsiadm -m iface -I path0 --op=update -n iface.net_ifacename -v <網路卡0>
    iscsiadm -m iface -I path1 --op=new
-   iscsiadm -m iface -I path1 --op=update -n iface.net_ifacename -v <網卡1>
+   iscsiadm -m iface -I path1 --op=update -n iface.net_ifacename -v <網路卡1>
 
    iscsiadm -m discovery -t st -p 192.0.2.10 -I path0
    iscsiadm -m discovery -t st -p 192.0.2.11 -I path1
@@ -332,7 +332,7 @@ uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在�
 
    分成兩個子網路或兩個 VLAN 是更乾淨的做法，交換器允許的話值得這樣做。DSM 也可以
    在同一個物理連接埠上建 VLAN 子介面，那會在一條線上產生兩個 portal 位址——足以
-   把每一條程式路徑都跑過，但顯然不是真正的冗餘。
+   把每一條程式路徑都跑過，但顯然不是真正的備援。
 
 **不動 NAS 就能測故障切換。** 從節點端把其中一個 portal 擋掉，然後觀察 map，
 不要拔線也不要去停用 NAS 的介面：
@@ -350,7 +350,7 @@ nft delete table inet mptest      # 然後它必須恢復
 所以**所有**路徑都斷掉時是失敗而不是無限排隊；以及 plugin 在中斷期間所做的任何事
 都沒有動到其他 storage 的 map。
 
-**如果第二條路徑真的做不到**——單網卡機型——那就直說，不要假裝。單路徑的 map 仍然
+**如果第二條路徑真的做不到**——單網路卡機型——那就直說，不要假裝。單路徑的 map 仍然
 會跑到 map 建立、WWID 釘定、擴充與 flush，但故障切換的路徑就是沒有測過，而這件事
 應該寫在這份文件裡，不是寫在發行說明裡。
 

@@ -319,7 +319,7 @@
 
     <p>
         <span class="lang-en">It names a LUN and snapshot uuid the NAS has never issued, so a method that exists can only refuse — and the refusal code proves it is there. DSM answers <strong>103</strong> for a method it does not have, and an object-not-found code for one it does. Nothing it could act on is real, but the names being sent are destructive ones, so it asks first.</span>
-        <span class="lang-zh">它指名一個 NAS 從未發出過的 LUN 與快照 uuid，所以存在的方法只能拒絕——而拒絕的錯誤碼證明它在那裡。DSM 對沒有的方法回 <strong>103</strong>，對有的方法回「找不到物件」。它能作用的對象並不存在，但送出的畢竟是破壞性方法的名稱，所以先問過再做。</span>
+        <span class="lang-zh">它指名一個 NAS 從未發出過的 LUN 與快照 uuid，所以存在的方法只能拒絕——而拒絕的錯誤碼證明它在那裡。DSM 對沒有的方法回 <strong>103</strong>，對有的方法回「找不到物件」。它能動到的東西並不存在，但送出的畢竟是破壞性方法的名稱，所以先問過再做。</span>
     </p>
 
     <div class="alert alert--info">
@@ -354,7 +354,7 @@
         <tbody>
         <tr>
             <td><strong>DSM</strong></td>
-            <td><span class="lang-en">7.x. Dual-controller DSM UC is <strong>refused</strong>, not approximated</span><span class="lang-zh">7.x。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援</span></td>
+            <td><span class="lang-en"><strong>7.0 or later</strong>, and only 7.1.1 verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> — an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
         </tr>
         <tr>
             <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
@@ -391,7 +391,7 @@
         </div>
         <div class="module-item">
             <div class="module-item__name">0.4.0 – 0.6.0</div>
-            <div class="module-item__desc"><span class="lang-en">The plugin itself: read-only paths first, then provisioning and the volume lifecycle, then snapshots, clones and resize</span><span class="lang-zh">plugin 本體：先唯讀路徑，再配置與磁碟區生命週期，再快照、複本與擴充</span></div>
+            <div class="module-item__desc"><span class="lang-en">The plugin itself: read-only paths first, then provisioning and the volume lifecycle, then snapshots, clones and resize</span><span class="lang-zh">plugin 本體：先唯讀路徑，再配置與磁碟的生命週期，再快照、複本與擴充</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">0.7.0</div>

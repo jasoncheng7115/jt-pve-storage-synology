@@ -90,12 +90,39 @@ nobody minds losing.
 
 | | |
 |---|---|
-| DSM | 7.x. Dual-controller DSM UC is **refused**, not approximated |
+| DSM | **7.0 or later**, and only 7.1.1 has been verified. Dual-controller DSM UC is **refused**, not approximated. See below — the version is a floor, not the decision |
 | Volume | **Btrfs.** Snapshots exist only for a thin LUN on Btrfs — an ext4 volume is refused when the storage is added, rather than failing at the first snapshot |
 | Model | One with iSCSI target support and enough free space. 512 LUNs and 256 targets per NAS are the product ceilings |
 | Network | HTTPS to DSM (5001). Plain HTTP is refused |
 | Account | A dedicated DSM account — see **[docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md)**, which also explains the one thing DSM will not let you restrict |
 | PVE | 8.x / 9.x. The storage API version is negotiated, never hardcoded |
+
+### The DSM version is a floor, not the decision
+
+**7.0 is required.** The technical floor is lower — Cinder's driver works back
+to DSM 6.0.2, and snapshots on a Btrfs thin LUN exist from 6.2 — so 7.0 is a
+deliberately conservative choice, for four reasons: SAN Manager is the 7.0
+product where 6.x had iSCSI Manager; the access-control object this plugin needs
+has only been seen on 7.x; **Synology's own CSI driver requires 7.0 or above**,
+which makes that the range Synology itself exercises with an API client; and
+DSM 6.2 is end of life, so recommending it for production storage would be
+wrong regardless of whether the API works.
+
+Only **7.1.1-42962 Update 9** has actually been verified. Between 7.0 and that,
+the plugin should work and has not been tried.
+
+**But passing the version check does not mean a NAS can be used**, and this
+matters more than the number:
+
+| What actually decides | Why it beats a version number |
+|---|---|
+| `support_iscsi_target`, `supportsnapshot`, `support_storage_mgr` from `SYNO.Core.System` | These describe the **model**, not the OS release |
+| Whether `SYNO.API.Info` advertises the APIs needed | The test NAS runs 7.1.1 and has no NVMe-of API at all. No version number shows that |
+| Whether the volume is **Btrfs** | A stricter constraint than the DSM version: **Btrfs support is model-dependent**, and an entry-level model without it can never snapshot, on any DSM release |
+
+So an entry-level NAS running 7.2 may still be unusable, and a check that only
+read the version would not say why. The plugin gates on all four and names the
+one that failed.
 
 ## The discovery tool
 
