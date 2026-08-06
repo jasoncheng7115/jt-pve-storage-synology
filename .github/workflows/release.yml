@@ -46,7 +46,7 @@ jobs:
           fi
 
       - name: Checks
-        run: make check-multipath-flush check-secrets syntax unit
+        run: make check-multipath-flush check-secrets check-zh syntax unit
 
       - name: Build
         run: dpkg-buildpackage -us -uc -b

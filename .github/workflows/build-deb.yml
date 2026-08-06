@@ -36,6 +36,12 @@ jobs:
       - name: Forbid credentials in URLs
         run: make check-secrets
 
+      # Three ways a Traditional Chinese document renders wrongly while looking
+      # correct in an editor. It was missing here, and v0.3.0~beta1 shipped a
+      # Chinese italic because of it.
+      - name: Traditional Chinese typography
+        run: make check-zh
+
       - name: Perl syntax
         run: make syntax
 
