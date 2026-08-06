@@ -1,15 +1,33 @@
+/* Colour: Synology's own brand palette.
+ *
+ * Taken from Synology's production stylesheet rather than from a brand-guide
+ * screenshot or a guess: #0067e6 occurs 72 times in it and #2e3742 35 times,
+ * which makes them the primary blue and the dark neutral. #0050bf, #107bff and
+ * #c9d5e2 are from the same ramp.
+ *
+ * Every value below was contrast-checked before use, and two of Synology's own
+ * accents were rejected for it: #5bc0de and #33d49b sit near 2:1 as text and
+ * cannot carry a label. White on #0067e6 is 5.14:1, on the hover #0050bf
+ * 7.24:1, and white on the lightest hero stop is 8.44:1.
+ *
+ * The layout and class vocabulary are shared with the related projects
+ * (dellemc, netapp, purestorage) so the sites read as one family; only the
+ * accent differs. Note that the hero gradient and the glows were hardcoded in
+ * the shared stylesheet rather than tokenised, so changing the tokens alone
+ * left a violet hero behind — they are set explicitly below.
+ */
 /* ============================================================
    jt-pve-storage-dellemc Documentation
    Design: Dell Blue, documentation-focused, no gimmicks
    ============================================================ */
 
 :root {
-    --navy: #14374e;
-    --navy-mid: #1c5670;
-    --indigo: #0e7490;
-    --indigo-hover: #155e75;
-    --indigo-light: #7dd3e8;
-    --indigo-subtle: rgba(14, 116, 144, 0.07);
+    --navy: #2e3742;
+    --navy-mid: #0050bf;
+    --indigo: #0067e6;
+    --indigo-hover: #0050bf;
+    --indigo-light: #c9d5e2;
+    --indigo-subtle: rgba(0, 103, 230, 0.07);
 
     --text: #1e293b;
     --text-secondary: #475569;
@@ -192,7 +210,7 @@ img { max-width: 100%; height: auto; display: block; }
    Hero
    ============================================================ */
 .hero {
-    background: linear-gradient(160deg, #131029 0%, #1a1040 45%, #0f1d3a 100%);
+    background: linear-gradient(160deg, #1a2430 0%, #0b4a9e 45%, #08305f 100%);
     position: relative; overflow: hidden;
     padding: 72px var(--section-px) 64px;
     color: #fff;
@@ -208,21 +226,21 @@ img { max-width: 100%; height: auto; display: block; }
 .hero__glow {
     position: absolute; top: -180px; right: -80px;
     width: 420px; height: 420px;
-    background: radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(0,103,230,0.16) 0%, transparent 65%);
     pointer-events: none;
 }
 .hero__glow-left {
     position: absolute; bottom: -120px; left: -100px;
     width: 380px; height: 380px;
-    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(16,123,255,0.10) 0%, transparent 65%);
     pointer-events: none;
 }
 .hero__content { position: relative; max-width: 720px; }
 
 .hero__badge {
     display: inline-flex; align-items: center;
-    background: rgba(79,70,229,0.18);
-    border: 1px solid rgba(79,70,229,0.25);
+    background: rgba(0,103,230,0.20);
+    border: 1px solid rgba(0,103,230,0.32);
     color: var(--indigo-light);
     padding: 3px 12px; border-radius: 100px;
     font-size: 0.75rem; font-weight: 600;
@@ -266,11 +284,11 @@ img { max-width: 100%; height: auto; display: block; }
 }
 .btn--primary {
     background: var(--indigo); color: #fff;
-    box-shadow: 0 1px 3px rgba(79,70,229,0.3);
+    box-shadow: 0 1px 3px rgba(0,103,230,0.30);
 }
 .btn--primary:hover {
     background: var(--indigo-hover); color: #fff;
-    box-shadow: 0 2px 8px rgba(79,70,229,0.35);
+    box-shadow: 0 2px 8px rgba(0,103,230,0.35);
 }
 .btn--outline {
     background: transparent; color: rgba(255,255,255,0.9);
@@ -389,9 +407,9 @@ img { max-width: 100%; height: auto; display: block; }
 }
 .card__icon svg { flex-shrink: 0; }
 
-.card:nth-child(3n+1) .card__icon { background: rgba(79,70,229,0.08);  color: var(--indigo); }
-.card:nth-child(3n+2) .card__icon { background: rgba(14,165,233,0.08); color: #0284c7; }
-.card:nth-child(3n)   .card__icon { background: rgba(139,92,246,0.08); color: #7c3aed; }
+.card:nth-child(3n+1) .card__icon { background: rgba(0,103,230,0.08); color: #0067e6; }
+.card:nth-child(3n+2) .card__icon { background: rgba(0,80,191,0.08);  color: #0050bf; }
+.card:nth-child(3n)   .card__icon { background: rgba(46,55,66,0.08);  color: #2e3742; }
 
 .card__title {
     font-size: 0.88rem; font-weight: 600;
