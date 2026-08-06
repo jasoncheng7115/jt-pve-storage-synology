@@ -1,3 +1,18 @@
+jt-pve-storage-synology (0.5.0~beta1-1) unstable; urgency=low
+
+  * Verified on a two-node cluster: two DSM sessions on one account coexist,
+    two iSCSI sessions on one target, offline migration in 2s and LIVE migration
+    with 3ms downtime, data intact throughout.
+  * find_multipaths is a per-node policy and decides whether a map exists at all.
+    The plugin now makes the map exist with multipath -a <wwid> and fails the
+    activation if it cannot, rather than returning a path to nothing.
+  * debian/control describes what the package contains and depends on proxmox-ve,
+    open-iscsi and multipath-tools.
+  * Documented: removing a shared storage leaves other nodes' sessions behind,
+    because on_delete_hook runs on one node only.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 02:40:00 +0800
+
 jt-pve-storage-synology (0.4.1~beta1-1) unstable; urgency=low
 
   * A real VM booted from a Synology LUN, and a rollback was verified at the

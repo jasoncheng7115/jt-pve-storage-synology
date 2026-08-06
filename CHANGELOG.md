@@ -6,6 +6,45 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.5.0~beta1] - 2026-08-07
+
+**Two nodes, and live migration with 3 ms downtime.** Verified on a two-node
+cluster running different kernels, with the same LUN attached to both.
+
+### Added
+
+- **The plugin no longer hopes a multipath map exists.** `find_multipaths` is a
+  per-node policy: one test node had `no` and built a map for every device, the
+  other had `yes` and builds one only for a device with two or more paths — so a
+  single-portal LUN got **no map at all**, and the path this plugin hands out
+  pointed at nothing while the session was up. `ensure_map` now appends the one
+  WWID with `multipath -a`, asks for the map, and **fails the activation** rather
+  than letting a VM start against a path that is not there.
+- `debian/control` now describes what the package actually contains, and depends
+  on `proxmox-ve`, `open-iscsi` and `multipath-tools` rather than merely
+  recommending them.
+
+### Verified on a two-node cluster
+
+- **Two DSM sessions on one account, from two addresses, at once** — the last of
+  the register's cluster questions, answered in a real cluster: they coexist and
+  nothing is evicted.
+- Two iSCSI sessions on one target with `max_sessions = 0`, both listed by the
+  NAS; both nodes reading the same bytes; `shared` forced to 1.
+- Offline migration in 2 s with no disk copy. **Live migration with 3 ms
+  downtime**, the source node releasing the device as the destination took it.
+- Data intact across two migrations, and a snapshot taken while the VM was live
+  then rolled back with the data correct.
+
+### Documented
+
+- **Removing a shared storage leaves the other nodes' sessions behind.**
+  `on_delete_hook` runs on one node and the others are never told, because the
+  storage is gone from the configuration before PVE would deactivate it there.
+  That is PVE's shape rather than something the plugin can fix, so the procedure
+  is documented — disable, wait, then remove — along with the per-node cleanup
+  commands.
+
 ## [0.4.1~beta1] - 2026-08-07
 
 A real VM was booted from a Synology LUN, and a rollback was verified **at the

@@ -309,6 +309,57 @@ sub slaves_of_map {
 # Acting on ONE map
 # ---------------------------------------------------------------------------
 
+# Make sure a map EXISTS for this WWID, whatever the node's policy is.
+#
+# This is not optional and it is not tuning. `find_multipaths` decides whether
+# multipath will build a map for a device at all, and it is a per-node setting an
+# administrator chose:
+#
+#   * `no`/`off`  — a map for every device. The first test node had this, so
+#                   everything worked and the dependency was invisible.
+#   * `yes`/`on`  — a map ONLY for a device with two or more paths, or one whose
+#                   WWID is already in /etc/multipath/wwids. The second node had
+#                   this, and with a single portal there was no map at all: the
+#                   session was up, the by-path device was there, and the path
+#                   this plugin hands out pointed at nothing.
+#
+# `multipath -a <wwid>` is the documented way to say "accept this one device",
+# and it appends exactly one WWID to /etc/multipath/wwids. Never `-A` (adds
+# every device it can find) and never `-w`/`-W`, which REWRITE that file and
+# would drop other vendors' entries.
+sub ensure_map {
+    _not_a_method($_[0]);
+    my ($wwid, $dev, %opt) = @_;
+    return 0 if !defined $wwid;
+
+    # Already there: nothing to do, and this is the common path.
+    return 1 if device_path_for_wwid($wwid);
+
+    # One WWID, appended. This is what makes find_multipaths=yes build a map for
+    # a single-path device.
+    eval { run_cmd([ 'multipath', '-a', lc $wwid ],
+                   timeout => 20, allow_nonzero => 1) };
+
+    # And ask for the map now rather than waiting for a udev event that may not
+    # come. Named by WWID, so it cannot touch another device.
+    eval { run_cmd([ 'multipath', lc $wwid ],
+                   timeout => 30, allow_nonzero => 1) };
+
+    # If the device node is known, claiming its path is the other half: it is
+    # what attaches a path to an existing map.
+    if (defined $dev) {
+        my ($sd) = $dev =~ m{([^/]+)\z};
+        claim_path($sd) if defined $sd;
+    }
+
+    my $deadline = time + ($opt{timeout} // 15);
+    while (time <= $deadline) {
+        return 1 if device_path_for_wwid($wwid);
+        select(undef, undef, undef, 0.25);
+    }
+    return 0;
+}
+
 sub claim_path {
     _not_a_method($_[0]);
     my ($sd) = @_;

@@ -256,6 +256,50 @@ scsi_id -g -u       3600140513a3cd1edf296d4d4bdb712da     <- 完全相同
 - 對 `SYNO.Core.User` `create` 傳 `expired=now`，會產生一個存在但無法登入的帳號。症狀是一個看起來像權限問題的 402——一個被猜出來的參數，默默建立了一個壞掉的帳號。
 - `SYNO.Core.User` `set` 帶 `expired=never` **回報成功、卻什麼都沒改。**又一個不能照字面相信的 API 回應。
 
+### 兩個節點，以及一個屬於 PVE 架構而非缺陷的限制
+
+在一個兩節點叢集上驗證（`pc-pve1` 核心 7.0.2、`pc-pve2` 核心 7.0.14，所以不是彼此的複製品）：
+
+| | |
+|---|---|
+| 兩個節點都回報 storage `active`，容量完全相同 | 是 |
+| `shared` 被強制為 1，而且不會出現在 `storage.cfg` 裡 | 是 |
+| **同一帳號、兩個 IP、兩個 DSM 工作階段同時存在** | 是——R-13 在真實叢集裡得到解答：它們並存，沒有任何一個被擠掉 |
+| `max_sessions = 0` 的同一個 target 上兩個 iSCSI 工作階段 | 是，NAS 兩個都列出來 |
+| 兩個節點從同一顆 LUN 讀到相同的位元組 | 是 |
+| 離線遷移 | 2 秒，沒有複製磁碟 |
+| **線上遷移** | **停機 3 毫秒**，而且來源節點在目的節點接手時釋放了裝置 |
+| 兩次遷移之後資料完好 | 是，sha256 相同 |
+| VM 執行中拍快照，之後倒回 | 是，資料正確 |
+
+#### `find_multipaths` 是逐節點的政策，而它決定 map 存不存在
+
+這是只有第二個節點才能產生的發現。`pc-pve1` 是 `find_multipaths no`，所以 multipath 為每個裝置都建 map，一切正常。`pc-pve2` 是 `find_multipaths yes`，那**只**會為「有兩條以上路徑」或「WWID 已經在 `/etc/multipath/wwids` 裡」的裝置建 map。單一 portal 的情況下因此**完全沒有 map**——工作階段是通的、by-path 裝置在那裡，而這個 plugin 交出去的路徑指向不存在的東西。
+
+所以 plugin 不再期望 map 會自己出現。它會執行 `multipath -a <wwid>`，那會在那個檔案裡剛好附加一個 WWID，然後按 WWID 要求建立 map，而如果它仍然沒有出現就**讓啟用失敗**，而不是讓一台 VM 對著一個不存在的路徑開機。絕不用 `multipath -A`，也絕不用 `-w`／`-W`——那會重寫整個檔案，把其他廠商的條目一起丟掉。
+
+#### 移除共用 storage 會在其他節點留下工作階段
+
+`on_delete_hook` 只在**一個**節點上執行——就是打 `pvesm remove` 的那個。它會移除 target 並釋放那個節點的工作階段。其他節點永遠不會被通知，因為 storage 一旦從設定裡消失，PVE 就沒有理由在那裡為它呼叫 `deactivate_storage`。
+
+留下來的是一個死掉的工作階段和一個失敗的 map，指向一個已經不存在的 target。無害，但會累積。**要乾淨地移除一個 storage：**
+
+```bash
+pvesm set <storage> --disable 1     # 每個節點會在下一次輪詢時停用
+# 等到所有節點的 storage 都變成 inactive，然後：
+pvesm remove <storage>
+```
+
+如果還是留下了，在那個節點上：
+
+```bash
+multipathd disablequeueing map <map>
+dmsetup message <map> 0 fail_if_no_path
+multipath -f /dev/mapper/<map>
+iscsiadm -m node -T <iqn> -p <portal> --logout
+iscsiadm -m node -T <iqn> -p <portal> -o delete
+```
+
 ### 名稱規則
 
 | | |

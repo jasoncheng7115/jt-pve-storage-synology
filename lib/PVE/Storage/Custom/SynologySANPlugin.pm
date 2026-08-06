@@ -926,6 +926,11 @@ sub activate_volume {
             next;
         }
 
+        # The map has to be made to exist, not hoped for: on a node with
+        # `find_multipaths yes` a single-path device gets NO map, and the path
+        # this plugin returns would point at nothing. Found by adding a second
+        # node whose policy differed from the first's.
+        PVE::Storage::Custom::Synology::Multipath::ensure_map($wwid, $dev);
         PVE::Storage::Custom::Synology::Multipath::claim_path($dev);
         $found = $dev;
     }
@@ -935,12 +940,14 @@ sub activate_volume {
 
     $class->_state($storeid)->track($wwid, $volname);
 
-    # Wait for the map itself, which is what path() hands out.
-    my $deadline = time + 20;
-    while (time <= $deadline) {
-        last if PVE::Storage::Custom::Synology::Multipath::device_path_for_wwid($wwid);
-        select(undef, undef, undef, 0.25);
-    }
+    # The map is what path() hands out, so its absence is a failure and not a
+    # detail — a VM would be started against a path that is not there.
+    die "storage '$storeid': the device for '$name' is present but multipath"
+      . " built no map for it. Check `find_multipaths` in"
+      . " /etc/multipath.conf on this node, and that"
+      . " /etc/multipath/wwids contains $wwid.\n"
+        if !PVE::Storage::Custom::Synology::Multipath::ensure_map($wwid, $found,
+               timeout => 20);
 
     return 1;
 }

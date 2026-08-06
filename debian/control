@@ -9,24 +9,32 @@ Homepage: https://github.com/jasoncheng7115/jt-pve-storage-synology
 Package: jt-pve-storage-synology
 Architecture: all
 Depends: ${misc:Depends},
+         proxmox-ve (>= 8.0) | pve-manager (>= 8.0),
+         open-iscsi,
+         multipath-tools,
          libwww-perl,
          liblwp-protocol-https-perl,
          libjson-perl,
          liburi-perl
-Recommends: open-iscsi, multipath-tools, sg3-utils, psmisc, lsscsi
-Description: Synology NAS storage plugin for Proxmox VE (discovery stage)
+Recommends: sg3-utils, psmisc, lsscsi
+Description: Synology NAS storage plugin for Proxmox VE
  A Proxmox VE custom storage plugin for Synology NAS over iSCSI, in which one
  VM disk is one thin LUN on the NAS, so DSM's own snapshots and clones act on
  the unit an operator thinks about — no LVM layer and no shared LUN carved up
  locally.
  .
- THIS PACKAGE DOES NOT YET CONTAIN THE PLUGIN. Synology publishes no
- specification for the SAN Manager Web API, so the project is establishing the
- facts first. What ships here is pve-syno-api-probe, a read-only tool that asks
- a DSM what it actually supports and reports which questions remain open. It
- creates nothing and deletes nothing, and is safe to run against a production
- NAS.
+ Registers the storage type "synologysan". Allocation, activation, snapshots,
+ rollback, clones, resize, export/import and live migration have been verified
+ against real hardware, and a rollback has been checked at the block level.
  .
- Because the plugin itself is absent, this package does not depend on
- proxmox-ve: the probe is useful from any Debian host that can reach a DSM. The
- dependency will be added with the plugin.
+ Every 0.x release is a prerelease. Synology publishes no specification for the
+ SAN Manager Web API, so everything array-facing was established by reading
+ Synology's own CSI driver against OpenStack Cinder's and then measuring a real
+ NAS. See /usr/share/doc/jt-pve-storage-synology/TESTING.md for exactly what has
+ been verified and what has not.
+ .
+ Also ships pve-syno-api-probe, a read-only tool that asks a DSM what it
+ supports. It creates nothing and deletes nothing, and is safe against a
+ production NAS.
+ .
+ The plugin must be installed on every node of the cluster.

@@ -389,6 +389,65 @@ Two incidental findings from that attempt, both worth keeping:
 - `SYNO.Core.User` `set` with `expired=never` **reported success and changed
   nothing.** Another API answer that cannot be taken at face value.
 
+### Two nodes, and one limitation that is PVE's shape rather than a bug
+
+Verified on a two-node cluster (`pc-pve1` on kernel 7.0.2, `pc-pve2` on 7.0.14,
+so not a clone of each other):
+
+| | |
+|---|---|
+| Both nodes report the storage `active` with identical capacity | yes |
+| `shared` is forced to 1 without appearing in `storage.cfg` | yes |
+| **Two DSM sessions on one account, from two IPs, at once** | yes — R-13 answered in a real cluster: they coexist, nothing is evicted |
+| Two iSCSI sessions on one target with `max_sessions = 0` | yes, both listed by the NAS |
+| Both nodes read the same bytes from the same LUN | yes |
+| Offline migration | 2 s, no disk copy |
+| **Live migration** | **3 ms downtime**, and the source node released the device as the destination took it |
+| Data intact after two migrations | yes, same sha256 |
+| Snapshot taken while the VM was live, then rolled back | yes, data correct |
+
+#### `find_multipaths` is a per-node policy, and it decides whether a map exists
+
+This is the finding that only a second node could produce. `pc-pve1` had
+`find_multipaths no`, so multipath built a map for every device and everything
+worked. `pc-pve2` had `find_multipaths yes`, which builds a map **only** for a
+device with two or more paths, or one whose WWID is already in
+`/etc/multipath/wwids`. With a single portal there was therefore **no map at
+all** — session up, by-path device present, and the path this plugin hands out
+pointing at nothing.
+
+So the plugin no longer hopes for a map. It runs `multipath -a <wwid>`, which
+appends exactly one WWID to that file, then asks for the map by WWID, and
+**fails the activation** if it still does not appear rather than starting a VM
+against a path that is not there. Never `multipath -A`, and never `-w`/`-W`,
+which rewrite the file and would drop other vendors' entries.
+
+#### Removing a shared storage leaves the other nodes' sessions behind
+
+`on_delete_hook` runs on **one** node — the one where `pvesm remove` was typed.
+It removes the target and releases that node's session. The other nodes are never
+told, because once the storage is gone from the configuration PVE has no reason
+to call `deactivate_storage` for it there.
+
+The leftover is a dead session and a failed map pointing at a target that no
+longer exists. Harmless, but it accumulates. **To remove a storage cleanly:**
+
+```bash
+pvesm set <storage> --disable 1     # each node deactivates on its next poll
+# wait for the storages to go inactive everywhere, then:
+pvesm remove <storage>
+```
+
+If one is left behind, on that node:
+
+```bash
+multipathd disablequeueing map <map>
+dmsetup message <map> 0 fail_if_no_path
+multipath -f /dev/mapper/<map>
+iscsiadm -m node -T <iqn> -p <portal> --logout
+iscsiadm -m node -T <iqn> -p <portal> -o delete
+```
+
 ### Name rules
 
 | | |
