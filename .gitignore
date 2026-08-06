@@ -1,0 +1,23 @@
+*.deb
+!releases/*.deb
+*.changes
+*.buildinfo
+*.substvars
+debian/.debhelper/
+debian/jt-pve-storage-synology/
+debian/debhelper-build-stamp
+debian/files
+debian/*.log
+.claude/
+.nopve-stub/
+ref/
+
+# Probe output can carry a NAS's IQNs, serial number and device token. None of
+# that belongs in a public repository.
+probe-*.json
+probe-*.txt
+
+# Internal documents - must not be published. The related projects keep the
+# equivalents out of their repositories too.
+jt-pve-storage-synology.md
+CLAUDE.md

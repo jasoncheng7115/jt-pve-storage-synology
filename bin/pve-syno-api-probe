@@ -1,0 +1,709 @@
+#!/usr/bin/perl
+
+# pve-syno-api-probe — read-only discovery of a Synology DSM's SAN Web API.
+#
+# Synology publishes no complete specification for the SAN Manager Web API.
+# Everything this project knows about it was read from two implementations —
+# Synology's own CSI driver and OpenStack Cinder's Synology driver — and the
+# two disagree about which methods exist, which parameters they take, and how
+# parameters are encoded. Neither implements a snapshot rollback at all.
+#
+# So the facts have to come off a real NAS, and this tool is how. It asks a
+# DSM what it supports and prints it, and it never writes anything: no LUN is
+# created, resized, renamed, mapped, cloned, snapshotted or deleted, and no
+# target is touched. It is safe against a production NAS, which is what it was
+# written for.
+#
+# The one thing that needs saying out loud: --probe-methods sends candidate
+# method names WITH NO PARAMETERS, to tell "no such method" (DSM error 103)
+# apart from "method exists, your parameters are wrong" (101). A rollback with
+# no snapshot to roll back to cannot roll anything back — but it is still a
+# call to a destructive method, so it is behind its own flag and off by
+# default.
+
+use strict;
+use warnings;
+
+use Getopt::Long qw(:config no_ignore_case bundling);
+use JSON;
+use LWP::UserAgent;
+use HTTP::Request::Common qw(POST);
+
+# Term::ReadKey is not installed on a stock Proxmox VE node and this tool has
+# to run there, so echo is turned off with stty and put back in an END block —
+# a die between the two would otherwise leave the operator's terminal silent.
+sub read_password {
+    my ($prompt) = @_;
+    print STDERR $prompt;
+    my $restore = 0;
+    if (-t STDIN) {
+        $restore = (system('stty', '-echo') == 0);
+    }
+    my $answer = <STDIN>;
+    if ($restore) {
+        system('stty', 'echo');
+        print STDERR "\n";
+    }
+    $answer //= '';
+    chomp $answer;
+    return $answer;
+}
+
+my $VERSION = '0.1.0~beta1';
+
+my $host;
+my $port;
+my $user;
+my $pass = $ENV{SYNO_PASSWORD};
+my $otp;
+my $device_id;
+my $https        = 1;
+my $verify       = 0;
+my $timeout      = 15;
+my $probe_methods = 0;
+my $show_luns     = 1;
+my $json_out      = 0;
+my $help          = 0;
+
+GetOptions(
+    'host|H=s'      => \$host,
+    'port|p=i'      => \$port,
+    'user|u=s'      => \$user,
+    'password=s'    => \$pass,
+    'otp=s'         => \$otp,
+    'device-id=s'   => \$device_id,
+    'https!'        => \$https,
+    'verify!'       => \$verify,
+    'timeout=i'     => \$timeout,
+    'probe-methods' => \$probe_methods,
+    'luns!'         => \$show_luns,
+    'json'          => \$json_out,
+    'help|h'        => \$help,
+) or usage(1);
+
+usage(0) if $help;
+usage(1) if !$host || !$user;
+
+$port //= $https ? 5001 : 5000;
+
+# A password on the command line is visible in ps output and lands in the
+# shell history. Prompting is the default; --password and SYNO_PASSWORD are
+# there for scripts that already have it.
+if (!defined $pass) {
+    $pass = read_password("DSM password for $user\@$host: ");
+}
+
+die "a password is required\n" if $pass eq '';
+
+if (!$https) {
+    warn <<'EOM';
+WARNING: --no-https sends the DSM password over plain HTTP. DSM's own clients
+         encrypt it with a server-supplied RSA key in that case; this tool does
+         not, because this project will not support plain HTTP. Use it only on
+         a network you would send the password over anyway.
+EOM
+}
+
+# ---------------------------------------------------------------------------
+# Transport
+# ---------------------------------------------------------------------------
+
+my $scheme = $https ? 'https' : 'http';
+my $base   = "$scheme://$host:$port";
+
+my %ssl_opts = $https && !$verify
+    ? (ssl_opts => { verify_hostname => 0, SSL_verify_mode => 0 })
+    : ();
+
+my $ua = LWP::UserAgent->new(
+    timeout => $timeout,
+    agent   => "pve-syno-api-probe/$VERSION",
+    %ssl_opts,
+);
+# A redirect to a login page is an answer, not a place to resend credentials.
+$ua->max_redirect(0);
+
+my $sid;
+my %api_info;    # api name => { path, minVersion, maxVersion, requestFormat }
+
+# Every call is a POST with a form body. DSM accepts GET with the parameters in
+# the query string — Synology's CSI driver logs in that way — but that writes
+# the password into the NAS's own access log and into any proxy between here
+# and it.
+sub call {
+    my ($api, $method, $version, $params, %opt) = @_;
+
+    my $path = $opt{cgi} // ($api_info{$api} ? $api_info{$api}{path} : 'entry.cgi');
+
+    my %form = (
+        api     => $api,
+        method  => $method,
+        version => $version,
+        %{ $params // {} },
+    );
+    $form{_sid} = $sid if defined $sid && !$opt{no_sid};
+
+    # An API whose requestFormat is JSON wants every parameter JSON-encoded —
+    # a string quoted, a number bare. This is why Synology's CSI driver wraps
+    # names in strconv.Quote and its numbers not at all; it is not decoration.
+    # The NAS says which APIs those are, so ask it rather than deciding here.
+    my $json_params = exists $opt{json_params}
+        ? $opt{json_params}
+        : (($api_info{$api}{requestFormat} // '') eq 'JSON' ? 1 : 0);
+
+    if ($json_params) {
+        for my $k (keys %form) {
+            next if $k =~ /^(?:api|method|version|_sid)\z/;
+            next if ref $form{$k};
+            $form{$k} = encode_json_scalar($form{$k});
+        }
+    }
+
+    my $res = $ua->request(POST "$base/webapi/$path", [ %form ]);
+
+    my $out = {
+        http    => $res->code,
+        success => 0,
+        error   => undef,
+        data    => undef,
+    };
+
+    if (!$res->is_success && $res->code != 302) {
+        $out->{transport} = $res->status_line;
+        return $out;
+    }
+
+    # decoded_content returns characters; decode_json wants bytes, and DSM
+    # answers text/* often enough that the charset guess turns every byte
+    # above 0x7F into a wide character. Ask for the bytes.
+    my $body = $res->decoded_content(charset => 'none');
+    my $json = eval { decode_json($body) };
+    if (!$json) {
+        $out->{transport} = 'response is not JSON: ' . snippet($body);
+        return $out;
+    }
+
+    $out->{success} = $json->{success} ? 1 : 0;
+    $out->{error}   = $json->{error}{code} if ref $json->{error};
+    $out->{data}    = $json->{data};
+
+    return $out;
+}
+
+sub encode_json_scalar {
+    my ($v) = @_;
+    return $v if $v =~ /\A-?(?:0|[1-9][0-9]*)\z/;    # a plain integer
+    return $v if $v =~ /\A[\[\{]/;                   # already JSON
+    my $s = encode_json([$v]);
+    $s =~ s/\A\[//; $s =~ s/\]\z//;
+    return $s;
+}
+
+sub snippet {
+    my ($s) = @_;
+    $s //= '';
+    $s =~ s/\s+/ /g;
+    return length($s) > 120 ? substr($s, 0, 120) . '...' : $s;
+}
+
+# DSM's common error codes. Anything above 18990000 is SAN Manager's own.
+my %COMMON_ERR = (
+    100 => 'unknown error',
+    101 => 'invalid parameter',
+    102 => 'API does not exist',
+    103 => 'method does not exist',
+    104 => 'version not supported',
+    105 => 'insufficient permission',
+    106 => 'session timeout',
+    107 => 'session interrupted by a duplicate login',
+    119 => 'SID not found',
+    400 => 'invalid credentials',
+    402 => 'account disabled, or 2-factor authentication required',
+    403 => 'one-time password required',
+    404 => 'one-time password rejected',
+);
+
+my %ISCSI_ERR = (
+    18990002 => 'out of free space',
+    18990500 => 'bad LUN type',
+    18990505 => 'bad LUN UUID',
+    18990531 => 'no such LUN',
+    18990532 => 'no such snapshot',
+    18990538 => 'duplicate LUN name',
+    18990541 => 'LUN count limit reached',
+    18990542 => 'target count limit reached',
+    18990543 => 'snapshot count limit reached',
+    18990744 => 'duplicate target name',
+);
+
+sub err_text {
+    my ($code) = @_;
+    return 'no error' if !defined $code;
+    my $t = $COMMON_ERR{$code} // $ISCSI_ERR{$code} // 'undocumented';
+    return "$code ($t)";
+}
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+my %report;
+
+sub say_head {
+    my ($t) = @_;
+    return if $json_out;
+    print "\n$t\n", '-' x length($t), "\n";
+}
+
+sub say_line {
+    my ($fmt, @args) = @_;
+    return if $json_out;
+    printf "$fmt\n", @args;
+}
+
+# ---------------------------------------------------------------------------
+# 1. API discovery
+# ---------------------------------------------------------------------------
+
+say_head('API discovery (SYNO.API.Info, query=all)');
+
+{
+    my $r = call('SYNO.API.Info', 'query', 1, { query => 'all' },
+        cgi => 'query.cgi', no_sid => 1);
+
+    if (!$r->{success}) {
+        my $why = $r->{transport} // err_text($r->{error});
+        die "SYNO.API.Info refused: $why\n"
+          . "Nothing else can be trusted without it — every version this tool\n"
+          . "would send would be a guess. Check the host, the port and --https.\n";
+    }
+
+    %api_info = %{ $r->{data} };
+    $report{api_count} = scalar keys %api_info;
+    say_line('  %d APIs advertised', $report{api_count});
+
+    my @interesting = sort grep {
+        /^SYNO\.Core\.ISCSI\.|^SYNO\.San\.|^SYNO\.Core\.Storage\.
+        |^SYNO\.API\.(?:Auth|Encryption)\z|^SYNO\.Core\.System\z
+        |^SYNO\.Core\.Network\.Interface\z/x
+    } keys %api_info;
+
+    for my $api (@interesting) {
+        my $i = $api_info{$api};
+        say_line('  %-44s v%s-%s  %-14s %s',
+            $api,
+            $i->{minVersion} // '?',
+            $i->{maxVersion} // '?',
+            $i->{path}       // '?',
+            $i->{requestFormat} ? "requestFormat=$i->{requestFormat}" : '');
+        $report{apis}{$api} = $i;
+    }
+
+    # The APIs this project needs, and whether they are there at all.
+    for my $need (qw(
+        SYNO.API.Auth
+        SYNO.Core.ISCSI.LUN
+        SYNO.Core.ISCSI.Target
+        SYNO.Core.ISCSI.Node
+        SYNO.Core.Storage.Volume
+        SYNO.Core.System
+    )) {
+        say_line('  %-44s %s', $need, $api_info{$need} ? 'present' : '*** ABSENT ***');
+        $report{required}{$need} = $api_info{$need} ? 1 : 0;
+    }
+}
+
+my $lun_json_params =
+    ($api_info{'SYNO.Core.ISCSI.LUN'}{requestFormat} // '') eq 'JSON' ? 1 : 0;
+
+# ---------------------------------------------------------------------------
+# 2. Login
+# ---------------------------------------------------------------------------
+
+say_head('Authentication (SYNO.API.Auth)');
+
+{
+    my $auth_max = $api_info{'SYNO.API.Auth'}{maxVersion} // 6;
+    my $auth_ver = $auth_max >= 6 ? 6 : $auth_max;
+
+    my %p = (
+        account => $user,
+        passwd  => $pass,
+        session => 'dsm',
+        format  => 'sid',
+    );
+    if (defined $device_id) {
+        $p{device_id} = $device_id;
+    } elsif (defined $otp) {
+        $p{otp_code}            = $otp;
+        $p{enable_device_token} = 'yes';
+    }
+
+    # Both reference clients post the login to auth.cgi. DSM 7 advertises
+    # SYNO.API.Auth on entry.cgi, so use the path the NAS gave and keep
+    # auth.cgi only as the fallback for a DSM that did not say.
+    my $auth_cgi = $api_info{'SYNO.API.Auth'}{path} // 'auth.cgi';
+
+    my $r = call('SYNO.API.Auth', 'login', $auth_ver, \%p,
+        cgi => $auth_cgi, no_sid => 1);
+
+    if (!$r->{success}) {
+        my $why = $r->{transport} // err_text($r->{error});
+        die "login failed: $why\n"
+          . (defined $r->{error} && $r->{error} == 403
+              ? "This account has 2-factor authentication on. Re-run with --otp <code>;\n"
+              . "the tool will report the device token DSM issues, and that token can be\n"
+              . "used with --device-id afterwards instead of a code.\n"
+              : '');
+    }
+
+    $sid = $r->{data}{sid};
+    say_line('  login OK (SYNO.API.Auth v%d on %s, session=dsm, format=sid)',
+        $auth_ver, $auth_cgi);
+    $report{auth_version} = $auth_ver;
+    $report{auth_path}    = $auth_cgi;
+
+    if ($r->{data}{did}) {
+        say_line('  device token issued: %s', $r->{data}{did});
+        say_line('  Keep it. With --device-id it logs in without a one-time code.');
+        $report{device_token} = $r->{data}{did};
+    }
+}
+
+# Log out on the way out whatever happens, so the probe leaves no session
+# behind on a production NAS.
+END {
+    if ($sid) {
+        local $@;
+        eval {
+            call('SYNO.API.Auth', 'logout', 1, { session => 'dsm' },
+                cgi => $report{auth_path} // 'auth.cgi');
+        };
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 3. Identity and capability gates
+# ---------------------------------------------------------------------------
+
+say_head('System');
+
+for my $type (qw(firmware define network)) {
+    my $r = call('SYNO.Core.System', 'info', 1, { type => $type });
+    if (!$r->{success}) {
+        say_line('  info type=%-9s refused: %s', $type, $r->{transport} // err_text($r->{error}));
+        next;
+    }
+    my $d = $r->{data};
+    if ($type eq 'firmware') {
+        say_line('  model            %s', $d->{model}        // '?');
+        say_line('  firmware_ver     %s', $d->{firmware_ver} // '?');
+        $report{system}{model}        = $d->{model};
+        $report{system}{firmware_ver} = $d->{firmware_ver};
+    } elsif ($type eq 'network') {
+        say_line('  hostname         %s', $d->{hostname} // '?');
+        $report{system}{hostname} = $d->{hostname};
+    } else {
+        # The gates Cinder's driver checks before it will use a NAS at all.
+        for my $k (qw(support_iscsi_target supportsnapshot support_vaai
+                      support_storage_mgr support_nvmeof usbstation)) {
+            next if !exists $d->{$k};
+            say_line('  %-16s %s', $k, $d->{$k});
+            $report{system}{$k} = $d->{$k};
+        }
+    }
+}
+
+{
+    my $r = call('SYNO.Core.ISCSI.Node', 'list', 1, {});
+    if ($r->{success} && ref $r->{data}{nodes} eq 'ARRAY' && @{ $r->{data}{nodes} }) {
+        my $uuid = $r->{data}{nodes}[0]{uuid};
+        say_line('  node uuid        %s', $uuid // '?');
+        say_line('                   (the NAS\'s own identity — this is what a storage');
+        say_line('                    should be pinned to, not the address it answers on)');
+        $report{node_uuid} = $uuid;
+    } else {
+        say_line('  SYNO.Core.ISCSI.Node list refused: %s',
+            $r->{transport} // err_text($r->{error}));
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 4. DSM volumes — where a LUN can live
+# ---------------------------------------------------------------------------
+
+say_head('DSM volumes (SYNO.Core.Storage.Volume)');
+say_line('  A thin LUN only supports snapshot and restore on a Btrfs volume.');
+say_line('  fs_type is therefore a hard requirement, not a preference.');
+say_line('');
+
+{
+    my $r = call('SYNO.Core.Storage.Volume', 'list', 1,
+        { offset => 0, limit => -1, location => 'all' });
+
+    if (!$r->{success}) {
+        say_line('  refused: %s', $r->{transport} // err_text($r->{error}));
+    } else {
+        my $vols = $r->{data}{volumes} // [];
+        say_line('  %-12s %-8s %-10s %10s %10s %s',
+            'volume_path', 'fs_type', 'status', 'total GiB', 'free GiB', 'readonly');
+        for my $v (@$vols) {
+            say_line('  %-12s %-8s %-10s %10.1f %10.1f %s',
+                $v->{volume_path}    // '?',
+                $v->{fs_type}        // '?',
+                $v->{status}         // '?',
+                ($v->{size_total_byte} // 0) / 1024 ** 3,
+                ($v->{size_free_byte}  // 0) / 1024 ** 3,
+                (defined $v->{readonly} ? ($v->{readonly} ? 'yes' : 'no') : '?'));
+            push @{ $report{volumes} }, $v;
+        }
+        my @btrfs = grep { ($_->{fs_type} // '') eq 'btrfs' } @$vols;
+        say_line('');
+        say_line('  usable for this plugin (Btrfs): %s',
+            @btrfs ? join(' ', map { $_->{volume_path} } @btrfs) : 'NONE');
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 5. LUNs and targets as they are now
+# ---------------------------------------------------------------------------
+
+if ($show_luns) {
+    say_head('LUNs (SYNO.Core.ISCSI.LUN list)');
+
+    my $r = call('SYNO.Core.ISCSI.LUN', 'list',
+        $api_info{'SYNO.Core.ISCSI.LUN'}{maxVersion} // 1,
+        {
+            types => '["BLOCK","FILE","THIN","ADV","SINK","CINDER","CINDER_BLUN","CINDER_BLUN_THICK","BLUN","BLUN_THICK","BLUN_SINK","BLUN_THICK_SINK"]',
+            additional => '["allocated_size","status","flashcache_status","is_action_locked"]',
+        },
+        json_params => 0,
+    );
+
+    if (!$r->{success}) {
+        say_line('  refused: %s', $r->{transport} // err_text($r->{error}));
+        say_line('  Retrying with every parameter JSON-encoded, which is what');
+        say_line('  requestFormat=JSON asks for...');
+        $r = call('SYNO.Core.ISCSI.LUN', 'list',
+            $api_info{'SYNO.Core.ISCSI.LUN'}{maxVersion} // 1,
+            { additional => '["allocated_size","status","is_action_locked"]' },
+            json_params => 1);
+        say_line('  %s', $r->{success} ? 'that worked — parameters must be JSON-encoded'
+                                       : 'also refused: ' . ($r->{transport} // err_text($r->{error})));
+    }
+
+    if ($r->{success}) {
+        my $luns = $r->{data}{luns} // [];
+        say_line('  %d LUNs', scalar @$luns);
+        say_line('  %-30s %-5s %-10s %10s %-8s %s',
+            'name', 'type', 'location', 'GiB', 'status', 'uuid');
+        for my $l (@$luns) {
+            say_line('  %-30s %-5s %-10s %10.1f %-8s %s',
+                $l->{name}     // '?',
+                $l->{type}     // '?',
+                $l->{location} // '?',
+                ($l->{size} // 0) / 1024 ** 3,
+                $l->{status}   // '?',
+                $l->{uuid}     // '?');
+        }
+        $report{lun_count} = scalar @$luns;
+        $report{lun_sample_keys} = [ sort keys %{ $luns->[0] // {} } ];
+        say_line('');
+        say_line('  fields a LUN row actually carries: %s',
+            join(', ', @{ $report{lun_sample_keys} })) if @$luns;
+    }
+
+    say_head('Targets (SYNO.Core.ISCSI.Target list)');
+
+    my $t = call('SYNO.Core.ISCSI.Target', 'list',
+        $api_info{'SYNO.Core.ISCSI.Target'}{maxVersion} // 1,
+        { additional => '["mapped_lun","connected_sessions"]' });
+
+    if (!$t->{success}) {
+        say_line('  refused: %s', $t->{transport} // err_text($t->{error}));
+    } else {
+        my $trgs = $t->{data}{targets} // [];
+        say_line('  %d targets', scalar @$trgs);
+        for my $x (@$trgs) {
+            say_line('  id=%-4s max_sessions=%-4s %s',
+                $x->{target_id} // '?', $x->{max_sessions} // '?', $x->{iqn} // '?');
+            say_line('       name=%s status=%s mapped_luns=%d sessions=%d',
+                $x->{name} // '?', $x->{status} // '?',
+                scalar @{ $x->{mapped_luns} // [] },
+                scalar @{ $x->{connected_sessions} // [] });
+            for my $m (@{ $x->{mapped_luns} // [] }) {
+                say_line('       lun %s at mapping_index %s',
+                    $m->{lun_uuid} // '?', $m->{mapping_index} // '?');
+            }
+        }
+        $report{target_count} = scalar @$trgs;
+        $report{target_sample_keys} = [ sort keys %{ $trgs->[0] // {} } ];
+        say_line('');
+        say_line('  max_sessions must be 0 (unlimited) for a target a whole PVE');
+        say_line('  cluster logs in to. A target left at 1 admits one node.');
+    }
+
+    # Neither Synology's CSI driver nor OpenStack Cinder's driver knows this
+    # object exists, and it is the one that decides whether a target is open to
+    # every initiator on the network or only to the nodes of one cluster. For a
+    # storage several PVE nodes share, that is the difference between access
+    # control and none.
+    say_head('Initiators / access control (SYNO.Core.ISCSI.Host)');
+
+    if (!$api_info{'SYNO.Core.ISCSI.Host'}) {
+        say_line('  this DSM does not advertise the API');
+    } else {
+        my $h = call('SYNO.Core.ISCSI.Host', 'list', 1, {});
+        if (!$h->{success}) {
+            say_line('  list refused: %s', $h->{transport} // err_text($h->{error}));
+            say_line('  The method may not be called "list". What this object is');
+            say_line('  named and what it takes is the first thing to settle for');
+            say_line('  a shared storage.');
+        } else {
+            $report{iscsi_host} = $h->{data};
+            say_line('  %s', JSON->new->canonical->encode($h->{data}));
+            say_line('');
+            say_line('  Read the keys above against SAN Manager\'s own screen: the');
+            say_line('  product calls this access control by IQN, with initiators');
+            say_line('  grouped.');
+        }
+    }
+
+    say_head('Storage pools (SYNO.Core.Storage.Pool)');
+
+    if (!$api_info{'SYNO.Core.Storage.Pool'}) {
+        say_line('  this DSM does not advertise the API');
+    } else {
+        my $p = call('SYNO.Core.Storage.Pool', 'list', 1, {});
+        if (!$p->{success}) {
+            say_line('  list refused: %s', $p->{transport} // err_text($p->{error}));
+        } else {
+            my $pools = $p->{data}{pools} // $p->{data};
+            $report{pools} = $pools;
+            if (ref $pools eq 'ARRAY') {
+                for my $x (@$pools) {
+                    say_line('  id=%s status=%s raid=%s size=%s',
+                        $x->{id} // '?', $x->{status} // '?',
+                        (ref $x->{pool_path} ? '?' : ($x->{raid_type} // '?')),
+                        $x->{size_total} // '?');
+                }
+            } else {
+                say_line('  %s', snippet(JSON->new->canonical->encode($pools)));
+            }
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 6. Method existence — the open questions
+# ---------------------------------------------------------------------------
+
+say_head('Method existence');
+
+my @CANDIDATES = (
+    # The one operation with no reference implementation anywhere: rolling a
+    # LUN back onto one of its own snapshots. SAN Manager's UI calls it
+    # Restore, so the method is there under some name; these are the names it
+    # could plausibly have.
+    [ 'SYNO.Core.ISCSI.LUN' => 'restore_snapshot'  ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'rollback_snapshot' ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'revert_snapshot'   ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'snapshot_restore'  ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'snapshot_rollback' ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'restore'           ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'rollback'          ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'revert'            ],
+    [ 'SYNO.Core.ISCSI.LUN' => 'restore_from_snapshot' ],
+);
+
+if (!$probe_methods) {
+    say_line('  skipped. --probe-methods asks the NAS which of these exist:');
+    say_line('    %s', join(', ', map { "$_->[1]" } @CANDIDATES));
+    say_line('');
+    say_line('  It sends each one with NO PARAMETERS and reads the error code:');
+    say_line('    103 = no such method          101 = it exists, parameters wrong');
+    say_line('  A restore with no snapshot named cannot restore anything, but');
+    say_line('  these are destructive methods, so the flag is opt-in.');
+} else {
+    say_line('  Sending each candidate with no parameters. 103 = absent,');
+    say_line('  101 = present. Nothing can act: no object is named.');
+    say_line('');
+    for my $c (@CANDIDATES) {
+        my ($api, $method) = @$c;
+        next if !$api_info{$api};
+        my $r = call($api, $method, $api_info{$api}{maxVersion} // 1, {});
+        my $code = $r->{error};
+        my $verdict =
+            $r->{success}                    ? 'SUCCEEDED WITH NO PARAMETERS — investigate'
+          : !defined $code                   ? 'no error code: ' . ($r->{transport} // '?')
+          : $code == 103                     ? 'absent'
+          : $code == 102                     ? 'API absent'
+          : $code == 104                     ? 'version not supported'
+          : $code == 105                     ? 'no permission for this account'
+          : 'PRESENT (' . err_text($code) . ')';
+        say_line('  %-24s %s', $method, $verdict);
+        $report{methods}{"$api.$method"} = { code => $code, verdict => $verdict };
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 7. What this run settled, and what it did not
+# ---------------------------------------------------------------------------
+
+say_head('Register');
+
+my @btrfs = grep { ($_->{fs_type} // '') eq 'btrfs' } @{ $report{volumes} // [] };
+
+say_line('  settled by this run:');
+say_line('    - the API set and every version range this NAS accepts');
+say_line('    - the account can%s read LUNs and targets',
+    defined $report{lun_count} ? '' : 'NOT');
+say_line('    - %d Btrfs volume(s), so thin LUNs with snapshots are%s possible',
+    scalar @btrfs, @btrfs ? '' : ' NOT');
+say_line('    - %s',
+    $report{node_uuid} ? 'the NAS reports a node uuid to pin a storage to'
+                       : 'no node uuid could be read');
+say_line('');
+say_line('  NOT settled — these need a write, on a volume nobody minds:');
+say_line('    - LUN name length limit and legal characters');
+say_line('    - size granularity: create an odd size, read back what was made');
+say_line('    - whether unmap_target replaces a LUN\'s target list or adds to it');
+say_line('    - what the SCSI WWID of a Synology LUN is, and how it relates');
+say_line('      to the LUN uuid (this decides how a node finds its device)');
+say_line('    - whether a LUN with snapshots refuses to be deleted');
+say_line('    - whether clone_snapshot is thin or a full copy');
+say_line('    - how long is_action_locked stays set, and on which operations');
+
+if ($json_out) {
+    print JSON->new->canonical->pretty->encode(\%report);
+}
+
+exit 0;
+
+sub usage {
+    my ($code) = @_;
+    print STDERR <<"EOM";
+pve-syno-api-probe $VERSION — read-only discovery of a Synology DSM SAN API
+
+  pve-syno-api-probe --host <ip> --user <account> [options]
+
+  -H, --host <ip>        DSM address (required)
+  -p, --port <n>         default 5001 with https, 5000 without
+  -u, --user <account>   DSM account (required)
+      --password <pw>    default: prompt. SYNO_PASSWORD is also read.
+      --otp <code>       one-time code, for an account with 2FA
+      --device-id <tok>  device token from an earlier --otp login
+      --no-https         plain HTTP (sends the password in the clear)
+      --verify           verify the TLS certificate (DSM ships a self-signed
+                         one, so this is off by default)
+      --timeout <s>      per-request timeout, default 15
+      --probe-methods    ask which snapshot-restore method names exist
+      --no-luns          skip the LUN and target listings
+      --json             also print the findings as JSON
+  -h, --help             this
+
+Nothing this tool does changes the NAS, with the single exception described
+under --probe-methods, which is off unless asked for.
+EOM
+    exit $code;
+}
