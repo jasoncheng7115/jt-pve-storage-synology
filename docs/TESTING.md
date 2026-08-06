@@ -504,6 +504,10 @@ simulation. If it happens: **Control Panel → Security → Account → Auto Blo
 Allow/Block List**, and remove the address. The data path keeps working
 throughout, which is exactly what makes it easy to miss.
 
+**Removing the entry restores access immediately** — confirmed by a single login
+from the blocked node afterwards, which succeeded. There is no need to wait out
+`expire_day`, and no restart of anything on the NAS or the node is involved.
+
 ### Name rules
 
 | | |
@@ -585,6 +589,73 @@ then compared against existing targets.
 There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
+
+### The hardware run of this session's own changes, which found four more
+
+The credential move, the session release, the shrink refusal and the feature
+correction had all been unit-tested and none had been driven against the NAS. The
+first minute of doing so found a release-blocker.
+
+**`pvesm add` could not work at all in 0.5.3~beta1 or 0.5.4~beta1.**
+
+```
+# pvesm add synologysan pvesyno --syno-password '...' ...
+missing value for required option 'syno-password'
+```
+
+`extract_sensitive_params` removes every sensitive property from the parameters
+**before** `check_config` validates them — PVE does them in that order. So by the
+time the required-option check ran, the password it was looking for had already
+been taken out. A sensitive property must be declared `optional => 1`, and the
+plugin enforces its presence itself; PVE's own CIFS plugin does exactly this. No
+unit test could have caught it, because the fault is in the interaction between
+two PVE stages.
+
+**CHAP was applied only when the target was created.** Measured: `pvesm set
+--syno-chap-username` succeeded, the next activation refused nothing, and the
+target still reported `auth_type=0` on the NAS. An operator adding CHAP to an
+existing storage got no error and no access control — worse than the empty-secret
+fault it was found next to, because there is nothing at all to notice. `ensure`
+now reconciles CHAP against what the array reports, and the update hook pushes the
+secret to **every** target the storage owns, because in `per-volume` mode there is
+one per disk.
+
+**A CHAP username with no secret was accepted and merely warned about.** Refusal
+must precede the state change, so it is refused now — and `pvesm set` leaves the
+configuration untouched.
+
+**Validating against `$scfg` in the update hook is wrong.** PVE applies `$delete`
+*after* the hook returns, so `$scfg` still holds a property the operator is
+removing while the credential store has already honoured the deletion.
+`pvesm set --delete syno-chap-username,syno-chap-password` refused itself. The
+hook now computes the effective configuration — current, minus deletions, plus new
+values — which is what PVE will write.
+
+Then everything else was re-verified end to end: allocate, activate, a
+block-level rollback (`sha256` before = after, with an 8 MiB random pattern zeroed
+in between), a clone from the snapshot, twelve consecutive failed operations to
+exercise the `DESTROY` logout with no session exhaustion, free, disable, remove.
+**The NAS ended with its original four LUNs and three targets and no `pve-`
+anything**, and the node with no map, no session, no node record and no drop-in.
+
+#### `multipath -w` reports success and does nothing
+
+Found while checking the one leftover: `/etc/multipath/wwids` keeps a line per LUN
+ever attached, and nothing removes it.
+
+| | Documented | Measured |
+|---|---|---|
+| `multipath -w <wwid>` | "Remove the WWID for the specified device from the WWIDs file" | prints `wwid '<...>' removed` and **changes nothing** with multipathd running. The file's mtime moved and its content did not |
+| `multipathd del wwid <wwid>` | — | `fail` |
+| `multipath -W` | "Reset the WWIDs file to only include the current multipath devices" | **not run and never will be.** The test node's file holds 334 entries, **319 of them NetApp's** |
+
+So the plugin does not remove them, deliberately, and does not claim to. That is
+the third external tool in this project to report success for work it did not do,
+after DSM's refused-but-created create and the plugin's own silent shrink.
+
+The residue is harmless for a checkable reason rather than by hope: a WWID is
+derived from the LUN's uuid, so a stale entry can only ever match the LUN it came
+from, which is deleted. It is not a route to the wrong disk.
 
 ### The audit's third pass: a fix that broke CHAP, and a claim nobody had measured
 

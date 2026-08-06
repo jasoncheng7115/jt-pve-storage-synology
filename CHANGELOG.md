@@ -6,6 +6,61 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.5.5~beta1] - 2026-08-06
+
+**0.5.3~beta1 and 0.5.4~beta1 could not be used. `pvesm add` failed outright.**
+Upgrade past them.
+
+### Fixed
+
+- **`pvesm add` failed with "missing value for required option 'syno-password'"
+  for a password that was supplied.** `extract_sensitive_params` removes every
+  sensitive property from the parameters *before* `check_config` validates them —
+  PVE does them in that order — so the required-option check was looking for
+  something already taken out. A sensitive property must be declared
+  `optional => 1`, with the plugin enforcing its presence itself; PVE's own CIFS
+  plugin does exactly this. No unit test could have caught it: the fault is in the
+  interaction between two PVE stages, and it was found in the first minute of
+  running the thing.
+- **CHAP was applied only when the target was created.** Adding CHAP to a storage
+  whose target already existed gave no error and no access control — the target
+  kept `auth_type=0` on the NAS while the configuration said otherwise. Measured on
+  hardware. `Target::ensure` now reconciles CHAP against what the array reports,
+  and the update hook pushes the secret to **every** target the storage owns,
+  because in `per-volume` mode there is one per disk. The array never returns a
+  password, so a changed secret can only be pushed, never compared.
+- **A CHAP username with no secret was accepted with a warning.** Refused now,
+  before anything is written, and `pvesm set` leaves the configuration untouched.
+- **`pvesm set --delete syno-chap-username,syno-chap-password` refused itself.**
+  PVE applies deletions *after* the hook returns, so `$scfg` still held the
+  username while the credential store had already dropped the secret. The hook now
+  computes the effective configuration — current, minus deletions, plus new values.
+- **An unrelated `pvesm set --disable 1` reported "CHAP REMOVED from 1 target(s)"**
+  for a storage that had no CHAP and lost none. The reconcile now skips a target
+  the array already reports as having none.
+
+### Verified on hardware
+
+Every change in 0.5.2–0.5.5 driven against the DS918+: the password absent from
+`storage.cfg` and present in `/etc/pve/priv/storage/pvesyno.syno` (0600, `www-data`
+denied), the API returning no credential key, allocate, activate, a block-level
+rollback (`sha256` before = after, with an 8 MiB random pattern zeroed in between),
+a clone from a snapshot, `copy` correctly refused for a snapshot while `clone` is
+allowed, the shrink refusal, the pre-existence refusal, twelve consecutive failed
+operations with no session exhaustion, then free, disable and remove — **ending with
+the NAS on its original four LUNs and three targets and nothing `pve-` left, and
+the node with no map, session, node record or drop-in.**
+
+### Documented, not fixed
+
+`multipath -w <wwid>` prints `wwid '<...>' removed` and **changes nothing** while
+multipathd is running; `multipathd del wwid` answers `fail`. So the WWIDs this
+plugin appends to `/etc/multipath/wwids` are not removed on detach, and nothing
+claims they are. `-W` would work and is never used: the test node's file holds 334
+entries, 319 of them another storage's. The residue is one line per LUN ever
+attached and cannot mislead, because a WWID is derived from the LUN's uuid and so
+can only ever match the LUN it came from.
+
 ## [0.5.4~beta1] - 2026-08-06
 
 **A third audit pass, and two of its three findings are about the second one.**

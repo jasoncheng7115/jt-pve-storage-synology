@@ -234,4 +234,61 @@ for my $mod (qw(Target ISCSI)) {
 }
 
 
+# --- the release-blocker: a sensitive property must NOT be required ---------
+#
+# PVE strips sensitive properties from the parameters BEFORE check_config
+# validates them (API2/Storage/Config.pm does them in that order). So declaring
+# one `optional => 0` makes PVE reject the add for a value that WAS supplied:
+#
+#   # pvesm add synologysan pvesyno --syno-password '...' ...
+#   missing value for required option 'syno-password'
+#
+# 0.5.3~beta1 and 0.5.4~beta1 could not be used at all. No unit test could have
+# caught it — the fault is in the interaction between two PVE stages — so this
+# one checks the declaration that makes it impossible, and on_add_hook's own
+# enforcement that replaces PVE's.
+
+# Matched on the one-line `options` form specifically. A looser pattern hit the
+# property DESCRIPTION block instead, which has no `optional` key at all — so the
+# first version of this assertion failed against correct code.
+my ($optval) = $src =~ /'syno-password'\s+=>\s+\{\s*optional\s*=>\s*(\d)\s*\}/;
+ok(defined $optval, 'syno-password has an entry in the options list');
+is($optval, '1',
+   'and is OPTIONAL to PVE, which cannot validate what it never sees');
+
+like($src, qr/syno-password is required/,
+     'the plugin enforces its presence itself instead');
+
+for my $prop (qw(syno-chap-password syno-otp syno-device-id)) {
+    my ($v) = $src =~ /'\Q$prop\E'\s+=>\s+\{\s*optional\s*=>\s*(\d)\s*\}/;
+    is($v, '1', "$prop is optional too, for the same reason");
+}
+
+# --- the update hook must validate the EFFECTIVE config, not $scfg ----------
+#
+# PVE applies $delete AFTER the hook returns, so $scfg still holds a property the
+# operator is removing while the credential store has already honoured it.
+# `pvesm set --delete syno-chap-username,syno-chap-password` refused itself.
+like($src, qr/my %effective = %\$scfg;/,
+     'the update hook builds the effective config');
+like($src, qr/delete \$effective\{\$_\} for \@\{ \$delete/,
+     'applying the deletions, which PVE has not applied yet');
+
+# --- CHAP on a target that already exists ----------------------------------
+{
+    my $tm = do {
+        open(my $fh, '<', 'lib/PVE/Storage/Custom/Synology/Target.pm') or BAIL_OUT('no Target');
+        local $/; <$fh>;
+    };
+    like($tm, qr/sub reconcile_chap/,
+         'Target reconciles CHAP on an existing target, not only on creation');
+    like($tm, qr/sub set_chap/, 'and has a writer the update hook can call directly');
+
+    # The early-return path must reach the reconcile, which is the whole bug.
+    my ($ensure) = $tm =~ /\nsub ensure \{(.*?)\n\}/s;
+    like($ensure, qr/reconcile_chap/,
+         'ensure calls it on the path that returns an existing target — the path'
+       . ' that used to skip CHAP entirely');
+}
+
 done_testing();

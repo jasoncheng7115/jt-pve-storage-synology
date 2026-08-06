@@ -331,7 +331,20 @@ sub options {
     return {
         'syno-portal'         => { fixed => 1 },
         'syno-username'       => { fixed => 1 },
-        'syno-password'       => { optional => 0 },
+        # OPTIONAL, and that is not a relaxation.
+        #
+        # `extract_sensitive_params` removes every sensitive property from the
+        # parameters BEFORE `check_config` validates them (API2/Storage/Config.pm
+        # does them in that order). So by the time PVE checks whether a required
+        # option is present, this one is already gone — and `pvesm add` failed with
+        # "missing value for required option 'syno-password'" for a password that
+        # had been supplied on the command line. The plugin could not be added at
+        # all. PVE's own CIFS plugin declares its password optional for exactly
+        # this reason.
+        #
+        # PVE cannot validate what it never sees, so on_add_hook does it: it
+        # refuses a missing password itself, with a message that says which option.
+        'syno-password'       => { optional => 1 },
         'syno-location'       => { fixed => 1 },
         'syno-port'           => { optional => 1 },
         'syno-otp'            => { optional => 1 },
@@ -458,6 +471,8 @@ sub on_add_hook {
     die "storage '$storeid': syno-password is required\n"
         if !defined $creds{password} || !length $creds{password};
 
+    $class->_assert_chap_pair($storeid, $scfg, \%creds);
+
     # A storage id that folds onto another one's prefix is indistinguishable
     # from it on the NAS: each would list the other's disks and the ownership
     # gate would pass for both. It cannot be fixed in a name, so it is refused
@@ -567,8 +582,22 @@ sub on_update_hook_full {
     # caller after this returns, so deleting here is what actually removes it.
     delete $scfg->{$_} for qw(syno-password syno-chap-password syno-otp syno-device-id);
 
-    my %merged = (%$scfg, %{ $opts // {} });
-    $class->_revalidate($storeid, \%merged, $creds);
+    # THE EFFECTIVE CONFIGURATION, which is not $scfg.
+    #
+    # PVE applies $delete AFTER this hook returns — its own comment says so, so
+    # that the hook sees the unmodified current configuration. $scfg therefore
+    # still holds a property the operator is removing, while `_update_creds` has
+    # already honoured the deletion. Validating against $scfg made
+    # `pvesm set --delete syno-chap-username,syno-chap-password` refuse itself:
+    # the username still looked present and its secret had already gone.
+    #
+    # Found by running it. The order is: start from the current config, apply the
+    # deletions, then overlay the new values — the same result PVE will write.
+    my %effective = %$scfg;
+    delete $effective{$_} for @{ $delete // [] };
+    %effective = (%effective, %{ $opts // {} });
+
+    $class->_revalidate($storeid, \%effective, $creds);
     return;
 }
 
@@ -606,8 +635,32 @@ sub _update_creds {
     return $creds;
 }
 
+# A CHAP username with no secret is a configuration that cannot work, so it is
+# refused before anything is written rather than warned about afterwards.
+#
+# The first version of the reconcile loop only warned: `pvesm set
+# --syno-chap-username` succeeded, the target kept no CHAP, and the configuration
+# was left claiming access control that did not exist. Refusal must precede every
+# state change — the same rule the activate_storage path follows.
+sub _assert_chap_pair {
+    my ($class, $storeid, $scfg, $creds) = @_;
+    my $user = $scfg->{'syno-chap-username'};
+    return if !defined $user || !length $user;
+
+    my $secret = $creds->{'chap-password'};
+    die "storage '$storeid': syno-chap-username is set to '$user' but no CHAP"
+      . " secret is stored. Set both together:\n"
+      . "    pvesm set $storeid --syno-chap-username $user --syno-chap-password <secret>\n"
+      . " or remove the username with --delete syno-chap-username. A target with"
+      . " an empty secret accepts anyone while reporting that CHAP is on.\n"
+        if !defined $secret || !length $secret;
+    return;
+}
+
 sub _revalidate {
     my ($class, $storeid, $scfg, $creds) = @_;
+
+    $class->_assert_chap_pair($storeid, $scfg, $creds);
 
     my $api = $class->_api($storeid, $scfg, creds => $creds);
     PVE::Storage::Custom::Synology::Health::assert_usable($api,
@@ -616,6 +669,58 @@ sub _revalidate {
         $creds->{'device-id'} = $token;
         delete $creds->{otp};
     }
+    # Push the CHAP settings unconditionally, because this is the one moment a
+    # CHANGED secret is knowable: the NAS never returns a password, so
+    # `reconcile_chap` on the hot path can only compare `auth_type` and `user`.
+    # Only for a target that already exists — one that does not will get the
+    # settings when it is created.
+    #
+    # EVERY target this storage owns, not just the shared one. In `per-volume`
+    # mode there is a target per disk, and a version of this that only looked at
+    # the shared name would have left them all on the old secret without saying
+    # so. This is an operator-initiated path, so a call per target is the right
+    # trade — it is `status()` that may not do this, not `pvesm set`.
+    {
+        my $prefix = eval { PVE::Storage::Custom::Synology::Naming::prefix_for($storeid) };
+        my $tgt    = $class->_tgt($api);
+        my $targets = defined $prefix ? eval { $tgt->list } : undef;
+        my $n = 0;
+        my $want_user = $scfg->{'syno-chap-username'};
+        my $want_on   = defined $want_user && length $want_user ? 1 : 0;
+
+        for my $t (@{ $targets // [] }) {
+            my $name = $t->{name} // '';
+            next if index($name, "$prefix-tgt") != 0;
+
+            # When CHAP is configured, write unconditionally: the secret may have
+            # changed and the NAS never returns one to compare against.
+            #
+            # When it is NOT configured, the array's own answer is enough — so skip
+            # a target that already reports no CHAP. Without this, EVERY update
+            # wrote to every target and said so: `pvesm set --disable 1` printed
+            # "CHAP REMOVED from 1 target(s)" for a storage that had no CHAP and
+            # lost none. Reporting something that did not happen is the same fault
+            # as reporting success for an operation that was declined, and this one
+            # was on an unrelated command.
+            next if !$want_on && !($t->{auth_type} // 0);
+
+            eval {
+                $tgt->set_chap($t->{target_id}, $want_user, $creds->{'chap-password'});
+                $n++;
+            };
+            warn "storage '$storeid': could not update CHAP on target"
+               . " '$name': $@" if $@;
+        }
+        # Both directions are reported. Turning access control OFF especially:
+        # the operator asked for it, but "it happened on the NAS too" is the part
+        # they cannot see from the configuration.
+        if ($n) {
+            print defined $scfg->{'syno-chap-username'}
+                ? "storage '$storeid': CHAP updated on $n target(s).\n"
+                : "storage '$storeid': CHAP REMOVED from $n target(s) on the NAS.\n";
+        }
+    }
+
     $api->logout;
 
     # After the checks, as in on_add_hook.

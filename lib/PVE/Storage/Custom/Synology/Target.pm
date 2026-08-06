@@ -157,6 +157,7 @@ sub ensure {
     my $existing = $self->find_by_name($name);
     if ($existing) {
         $self->ensure_multi_session($existing);
+        $self->reconcile_chap($existing, %opt);
         return $existing;
     }
 
@@ -217,6 +218,84 @@ sub ensure {
 # A target created by hand in SAN Manager will be at max_sessions 1, and the
 # symptom is that exactly one node can use the storage. Fix it rather than
 # fail, but only when it is actually wrong.
+# CHAP on a target that already exists.
+#
+# `ensure` used to configure CHAP only on the path that CREATES the target, and
+# every other path returned the existing one untouched. So an operator adding CHAP
+# to a storage that already had a target got no error and no CHAP: `auth_type`
+# stayed 0 on the NAS while the configuration said otherwise. Measured on hardware
+# — `pvesm set --syno-chap-username` succeeded, the next activation refused
+# nothing, and the target still reported `auth_type=0`.
+#
+# That is worse than the empty-secret bug it was found next to, because there is
+# nothing at all to notice: no warning, no failure, and a configuration that reads
+# as though access control is on.
+#
+# Two things this must NOT do:
+#
+#   * Send a `set` on every call. This runs on the allocate and activate paths, so
+#     it compares first and only writes when the array disagrees. `auth_type` and
+#     `user` come back in the listing that was already fetched, so the no-change
+#     path costs nothing.
+#   * Decide anything from the secret. The NAS does not return it, so a CHANGED
+#     password is invisible here. `_revalidate` in the plugin pushes it
+#     unconditionally after `on_update_hook`, which is the one moment a new secret
+#     is known — this reconciles the parts the array will actually report.
+sub reconcile_chap {
+    my ($self, $target, %opt) = @_;
+    return if ref $target ne 'HASH';
+
+    my $want_user = $opt{chap_user};
+    my $want_on   = defined $want_user && length $want_user ? 1 : 0;
+
+    if ($want_on && (!defined $opt{chap_password} || !length $opt{chap_password})) {
+        die "storage '" . $self->api->storeid . "': syno-chap-username is set but"
+          . " there is no CHAP secret. Set syno-chap-password, or unset the"
+          . " username — a target with an empty secret accepts anyone while"
+          . " reporting that CHAP is on.\n";
+    }
+
+    my $have_on   = ($target->{auth_type} // 0) ? 1 : 0;
+    my $have_user = $target->{user} // '';
+
+    return if $have_on == $want_on
+           && (!$want_on || $have_user eq $want_user);
+
+    # Turning CHAP OFF reduces access control, so it is never silent even though
+    # it is what the operator asked for. Leaving it on would be worse: the target
+    # would demand a secret the node no longer sends, and every login would fail.
+    warn "storage '" . $self->api->storeid . "': removing CHAP from target"
+       . " '$target->{name}' because syno-chap-username is no longer set.\n"
+        if $have_on && !$want_on;
+
+    $self->set_chap($target->{target_id}, $want_on ? $want_user : undef,
+                    $want_on ? $opt{chap_password} : undef);
+    return;
+}
+
+# Write the CHAP settings to a target. Separate from reconcile_chap because the
+# plugin's update hook calls it unconditionally: a changed secret cannot be
+# detected by comparison, since the NAS never returns one.
+sub set_chap {
+    my ($self, $target_id, $user, $password) = @_;
+    die "a target id is required to set CHAP\n" if !defined $target_id;
+
+    my $on = defined $user && length $user ? 1 : 0;
+    die "storage '" . $self->api->storeid . "': refusing to set CHAP on target"
+      . " $target_id with an empty secret\n"
+        if $on && (!defined $password || !length $password);
+
+    $self->api->call_ok(API_TARGET, 'set',
+        target_id => PVE::Storage::Custom::Synology::API::json_string($target_id),
+        auth_type => $on,
+        user      => $on ? $user : '',
+        password  => $on ? $password : '',
+        _what     => ($on ? "enabling CHAP on target $target_id"
+                          : "removing CHAP from target $target_id"),
+    );
+    return 1;
+}
+
 sub ensure_multi_session {
     my ($self, $target) = @_;
     return 1 if ($target->{max_sessions} // 1) == MAX_SESSIONS_UNLIMITED;

@@ -4,6 +4,26 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.5.5~beta1] - 2026-08-06
+
+**0.5.3~beta1 和 0.5.4~beta1 無法使用。`pvesm add` 會直接失敗。**請升級跳過它們。
+
+### 修正
+
+- **明明提供了密碼，`pvesm add` 卻回報「missing value for required option 'syno-password'」。**`extract_sensitive_params` 會在 `check_config` 驗證**之前**把每個機密屬性從參數裡移除——PVE 的順序就是這樣——所以那個必填檢查在找一個已經被拿走的東西。機密屬性必須宣告成 `optional => 1`，並由 plugin 自己檢查它有沒有被提供；PVE 自己的 CIFS plugin 就是這樣做的。任何單元測試都抓不到這個：問題出在 PVE 兩個階段之間的互動，而它是在實際執行的第一分鐘被發現的。
+- **CHAP 只在 target 被建立時才會套用。**把 CHAP 加到一個 target 已經存在的 storage 上，既沒有錯誤也沒有存取控制——NAS 上那個 target 維持 `auth_type=0`，而設定卻說有。這是實機量到的。現在 `Target::ensure` 會拿陣列回報的狀態來對照 CHAP，而更新 hook 會把密鑰推送到這個 storage 擁有的**每一個** target，因為在 `per-volume` 模式下每顆磁碟各有一個。陣列永遠不會回傳密碼，所以改變過的密鑰只能推送、無法比對。
+- **設定了 CHAP 帳號但沒有密鑰，原本會被接受並只給一個警告。**現在會在寫入任何東西之前拒絕，而 `pvesm set` 完全不會動到設定。
+- **`pvesm set --delete syno-chap-username,syno-chap-password` 拒絕了自己。**PVE 會在 hook 回傳**之後**才套用刪除，所以 `$scfg` 仍然帶著那個帳號，而憑證儲存區已經把密鑰移除了。現在 hook 會算出「有效設定」——目前的設定，減去刪除，加上新值。
+- **一個無關的 `pvesm set --disable 1` 會回報「CHAP REMOVED from 1 target(s)」**，而那個 storage 根本沒有 CHAP、也沒有失去任何東西。現在對照動作會跳過陣列已經回報「沒有 CHAP」的 target。
+
+### 實機驗證
+
+0.5.2 到 0.5.5 的每一項變更都對這台 DS918+ 跑過：密碼不在 `storage.cfg` 而在 `/etc/pve/priv/storage/pvesyno.syno`（0600，`www-data` 被拒絕），API 不回傳任何憑證欄位，配置、啟用、區塊層級倒回（8 MiB 隨機資料寫入後歸零再倒回，`sha256` 前後相同）、從快照複製、`copy` 對快照正確拒絕而 `clone` 允許、縮小拒絕、名稱已存在拒絕、連續十二次失敗操作而工作階段沒有耗盡，然後釋放、停用、移除——**最後 NAS 回到原本的四個 LUN 和三個 target，沒有留下任何 `pve-` 開頭的東西，節點上也沒有 map、工作階段、node 記錄或 drop-in。**
+
+### 記錄下來，但沒有「修正」
+
+在 multipathd 執行中的情況下，`multipath -w <wwid>` 會印出 `wwid '<...>' removed` 而**什麼都沒改**；`multipathd del wwid` 回答 `fail`。所以這個 plugin 附加到 `/etc/multipath/wwids` 的 WWID 在卸離時不會被移除，而且沒有任何地方聲稱它們被移除了。`-W` 會有作用，但永遠不會被使用：測試節點上那個檔案有 334 筆，其中 319 筆屬於另一套儲存。殘留是每個曾經掛上的 LUN 一行，而且不會造成誤導，因為 WWID 是從 LUN 的 uuid 推導出來的，只可能對應到它原本那顆 LUN。
+
 ## [0.5.4~beta1] - 2026-08-06
 
 **第三輪稽核，而它三個發現裡有兩個是關於第二輪的。**這就是「改完東西之後再跑一次」而不是「改之前跑一次」的理由。
