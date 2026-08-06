@@ -6,6 +6,30 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.2.1~beta1] - 2026-08-06
+
+### Added
+
+- `Synology::Naming` — name building and **the ownership gate**, which decides
+  what this plugin may delete. It takes the storage id, not merely a name that
+  looks like some PVE plugin's: a prefix identifies the *storage*, never the
+  kind of object, so both halves are checked.
+- A measured answer that simplifies things: **snapshot names need no folding
+  at all.** DSM stores underscores, spaces, `+`, `@` and leading digits in a
+  snapshot name exactly, so PVE's names pass straight through — and a duplicate
+  within one LUN is refused with **18990513**, so a name identifies a snapshot.
+- 48 more tests, most of them hostile: a foreign LUN, a Virtual Machine Manager
+  disk, a prefix that is not at the start, and a name with a trailing newline
+  are all correctly *not* owned.
+
+### Fixed
+
+- The naming functions now refuse a **method** call instead of answering
+  wrongly. Called as `Naming->is_pve_managed_volume(...)` the arguments shift
+  along and the gate answers "not owned" for an object that is owned — safe,
+  but silent, and a listing would come back empty with nothing to explain it.
+  Writing the tests is what found it.
+
 ## [0.2.0~beta1] - 2026-08-06
 
 **The first code that talks to a NAS.** Three modules, 91 unit tests, and a full

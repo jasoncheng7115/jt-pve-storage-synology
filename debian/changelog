@@ -1,3 +1,14 @@
+jt-pve-storage-synology (0.2.1~beta1-1) unstable; urgency=low
+
+  * Synology::Naming: name building and the ownership gate, which takes the
+    storage id rather than trusting the shape of a name.
+  * Snapshot names need no folding: DSM stores PVE's names exactly, and refuses
+    a duplicate within one LUN with 18990513.
+  * The naming functions refuse a method call instead of silently answering
+    "not owned" when their arguments have shifted.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 21:45:00 +0800
+
 jt-pve-storage-synology (0.2.0~beta1-1) unstable; urgency=low
 
   * The first code that talks to a NAS: Synology::API, ::LUN and ::Target, with
