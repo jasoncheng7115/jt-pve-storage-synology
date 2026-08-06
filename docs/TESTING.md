@@ -197,6 +197,92 @@ another one.
 This is why the name limit is also enforced **before** the request is sent
 rather than left to the NAS to reject.
 
+### Rollback is safe here, and that was not a given
+
+`restore_snapshot` takes **`src_lun_uuid` and `snapshot_uuid`**. Sending the
+snapshot alone is refused with **18990508**, so the LUN must be named too.
+
+Three things were measured, and all three had to come out this way for a
+rollback to be shippable at all:
+
+| Question | Answer |
+|---|---|
+| Does the LUN's uuid change? | **No.** So the SCSI serial and the WWID are unchanged, and a node does not suddenly see a different disk |
+| Do snapshots newer than the one restored survive? | **Yes.** Restoring to the oldest of three left all three in place |
+| Is it recorded? | `restored_time` goes from 0 to the epoch second of the restore |
+
+The second answer is worth dwelling on, because the related projects had to
+**refuse** a rollback past newer snapshots — on those arrays the newer ones are
+destroyed, and a plugin that let PVE do it silently would delete snapshots the
+user could still see. Here nothing is destroyed, so
+`volume_rollback_is_possible` does not need that restriction and a storage can
+be rolled back repeatedly.
+
+### Snapshots and clones have no dependency chain
+
+Every other array in this family refuses to delete an object something else
+depends on, and both of those refusals have been the source of real defects.
+Synology refuses neither:
+
+| Attempted | Result |
+|---|---|
+| Delete a LUN that has snapshots | **Allowed.** The snapshots go with it — `list_snapshot` on the deleted uuid answers 18990531, so nothing is orphaned |
+| Delete the snapshot a clone was made from | **Allowed**, and the clone stays `normal` and usable |
+| Delete a LUN that is **mapped to a target** | **Allowed** |
+
+So the dependency-purging the related projects need is unnecessary — but the
+third row moves work onto the plugin instead: **nothing stops a mapped LUN being
+deleted**, so unmapping before deleting is entirely this plugin's
+responsibility. A LUN deleted while still mapped leaves every node that had it
+with a device that answers nothing.
+
+### A clone from a snapshot is thin
+
+`clone_snapshot` produces a `BLUN` with `allocated_size: 0` — space-efficient,
+so linked clones and templates are genuinely cheap rather than full copies.
+
+### `mapping_index` is reused, so a device path is not an identity
+
+```
+map three LUNs to one target      -> indexes 1, 2, 3
+unmap the middle one              -> indexes 1, 3
+map a fourth LUN                  -> indexes 1, 2, 3   <- the new LUN took index 2
+```
+
+**The freed index is handed to the next LUN.** A node holding a stale device for
+`...-iscsi-<iqn>-lun-2` would find that path now resolves to a completely
+different LUN. This is the "wrote to the wrong disk" class of fault, and it is
+reachable by ordinary use: detach a disk, attach another.
+
+Both public reference clients identify devices by `/dev/disk/by-path` and
+nothing else. **On this array that is not safe.** It is why the WWID derivation
+above is load-bearing rather than a convenience: a device is accepted only once
+the kernel's own identification of it matches the LUN that was asked for.
+
+### Mapping adds, and unmapping is surgical
+
+| Call | Behaviour |
+|---|---|
+| `map_target` with one target, on a LUN already mapped elsewhere | **Adds.** The existing mapping survives |
+| `unmap_target` with one target | Removes **only** that one |
+
+This is the opposite of Unity's `hostAccess`, where the list is replaced and
+sending one host unmaps every other node in the cluster. Here per-node mapping
+is safe as written. The plugin still reads the current list and sends the union,
+because a behaviour that has been measured once on one firmware is not a promise.
+
+### Concurrency and sessions
+
+- **Sixteen simultaneous creates all succeeded**, in 15 s, and the array's
+  contents matched what the API reported — no lost or duplicated LUN. The ~1 s
+  per create suggests DSM serialises internally, which would explain why
+  Cinder's driver wraps every request in a process-wide lock, but nothing here
+  required that lock for correctness.
+- **A second login on the same account does not evict the first.** Both sids
+  work simultaneously, so a cluster of nodes sharing one account will not knock
+  each other out — which error 107, "session interrupted by a duplicate login",
+  had made a real worry.
+
 ### Name rules
 
 | | |
@@ -288,19 +374,19 @@ one, the plugin refuses rather than assumes.
 
 | # | Question | Why it matters |
 |---|---|---|
-| R-1 | ~~The method name for restoring a LUN from its snapshot~~ **ANSWERED: `restore_snapshot`.** What remains: its **parameter names**, and whether a rollback keeps newer snapshots and preserves the LUN uuid | Knowing a method exists is not knowing what it does. A rollback that silently changes the LUN uuid changes the WWID, and every node then sees a different disk. **Rollback stays refused until the behaviour is verified, not merely the name** |
-| R-2 | Does `unmap_target` replace a LUN's target list or add to it? | If it replaces, unmapping one node could unmap all of them |
+| R-1 | ~~The method name, its parameters, and whether a rollback is safe~~ **FULLY ANSWERED: `restore_snapshot(src_lun_uuid, snapshot_uuid)`.** The LUN uuid is unchanged, snapshots newer than the restored one survive, and `restored_time` records it | Rollback is therefore shippable, and `volume_rollback_is_possible` does **not** need the refusal the related projects require. Sending the snapshot alone is refused with 18990508 |
+| R-2 | ~~Does `unmap_target` replace a LUN's target list or add to it~~ **ANSWERED: `map_target` ADDS, `unmap_target` removes only what is named.** The union is still sent, because one measurement on one firmware is not a promise | If it replaced, unmapping one node could unmap all of them — which is what Unity does |
 | R-3 | ~~LUN name length limit and legal characters~~ **ANSWERED.** 200 accepted; `_`, space, `+`, `@` refused; a 255-char name is **refused-but-created** | See the write-test sections above. The underscore refusal changes how a storage id is folded into a name |
 | R-4 | ~~Size granularity~~ **ANSWERED: exact at every size, no rounding.** But the documented 1 GB minimum is **not enforced by the API**, so the plugin enforces it | Getting less than was asked for means a filesystem that fills and then fails. Here the risk inverts: nothing stops a nonsensically small LUN |
 | R-5 | The Linux WWID a LUN's `vpd_unit_sn` becomes | Decides how a node identifies its device. Half-answered: the serial is the uuid; the kernel-side string still has to be read from a host that has one mapped |
-| R-6 | Whether a LUN with snapshots refuses deletion, and a snapshot with a clone | `qm destroy` and vzdump's snapshot mode both walk straight into this |
-| R-7 | Whether a clone is thin or a full copy | Decides whether linked clones are possible |
+| R-6 | ~~Whether a LUN with snapshots refuses deletion, and a snapshot with a clone~~ **ANSWERED: neither refuses, and nor does a MAPPED LUN.** Snapshots go with their LUN and are not orphaned | No dependency purging is needed — but unmap-before-delete becomes entirely the plugin's responsibility |
+| R-7 | ~~Whether a clone is thin or a full copy~~ **ANSWERED: thin.** `clone_snapshot` gives a `BLUN` with `allocated_size: 0` | Linked clones and templates are genuinely cheap |
 | R-8 | **PARTLY ANSWERED:** a 1 GiB create clears in ~1.2 s, and an immediate delete succeeds anyway. Still open for **clone**, which is the case that matters | A large clone can outlast a naive wait — the CSI driver's own bound is 20 seconds |
 | R-9 | ~~Whether `LUN list` has a server-side cap~~ **PARTLY ANSWERED: `offset`/`limit` are ignored and no total is reported.** So the listing returns everything it has — and nothing in the answer proves that | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. With no total to check against, only a second read can catch a short answer |
-| R-10 | Whether `list_snapshot` returns snapshots taken by DSM's own schedule | If it does, PVE would show a user's scheduled snapshots as its own and could delete them |
-| R-11 | `mapping_index` ceiling per target, and whether it is reused | A reused index with a stale device node in the kernel is the "wrote to the wrong disk" class of fault |
-| R-12 | Whether DSM tolerates concurrent requests | **Cinder wraps every single request in a process-wide lock.** It did not do that for fun |
-| R-13 | Whether a second login on one account evicts the first (error 107) | If it does, every node in a cluster would evict every other, every poll |
+| R-10 | **PARTLY ANSWERED:** every snapshot carries `taken_by`, and this plugin's own marker comes back verbatim, so filtering is possible. Whether DSM's *scheduled* snapshots appear in `list_snapshot` still needs a schedule configured | If they do, PVE would show a user's scheduled snapshots as its own and could delete them |
+| R-11 | ~~`mapping_index` ceiling per target, and whether it is reused~~ **ANSWERED: it IS reused.** A freed index goes to the next LUN mapped | This is the "wrote to the wrong disk" fault, reachable by detaching one disk and attaching another. It is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured |
+| R-12 | ~~Whether DSM tolerates concurrent requests~~ **ANSWERED: sixteen simultaneous creates all succeeded** and the array matched what the API reported. ~1 s each suggests internal serialisation | Cinder wraps every request in a process-wide lock; nothing here needed it for correctness |
+| R-13 | ~~Whether a second login on one account evicts the first~~ **ANSWERED: it does not.** Both sessions work simultaneously | Error 107 had made this a real worry for a cluster sharing one account |
 
 ### Needs a non-administrator account
 
@@ -308,12 +394,16 @@ one, the plugin refuses rather than assumes.
 |---|---|
 | R-14 | The minimum DSM privileges. The probe ran as an administrator, so it proved "an administrator can" and not "a non-administrator cannot". See `DSM-ACCOUNT.md` |
 
-### Needs hardware this project does not have
+### Supported by design, unverified — needs hardware this project does not have
+
+Both of Synology's high-availability arrangements are implemented. Neither has
+been run. The plugin **warns** on a shape it cannot verify rather than refusing
+it, and will not claim otherwise until someone reports a run.
 
 | # | Question |
 |---|---|
 | R-15 | **Synology HA (SHA)**: does the HA cluster IP behave as a single management address across a failover, and does `SYNO.Core.ISCSI.Node`'s uuid — which this plugin uses as the storage's identity — survive one? If the uuid changes on failover, pinning a storage to it would break the storage rather than protect it |
-| R-16 | **UC / SA dual-controller models** (`firmware_ver` containing `DSM UC`): both controllers have their own management address and there is no floating one. `SYNO.Core.Network.Interface` accepts `relay_node=node0`/`node1` to enumerate the other controller, and a target's `network_portals` gains a `controller_id` — neither of which can be exercised without such a chassis. **Refused for now**, rather than approximated |
+| R-16 | **UC / SA dual-controller models** (`firmware_ver` containing `DSM UC`): both controllers have their own management address and there is no floating one. `SYNO.Core.Network.Interface` accepts `relay_node=node0`/`node1` to enumerate the peer — on the single-controller test NAS both answer with the same interfaces, so the mechanism is harmless where it is not needed. **Implemented from Synology's own CSI logic; unverified.** The open questions are the ones a chassis answers: whether a LUN is owned by one controller, and whether a target's portals differ per controller — which together decide whether a node reaches its disk after a failover |
 
 ---
 

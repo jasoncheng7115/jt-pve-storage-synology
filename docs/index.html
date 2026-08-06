@@ -56,13 +56,14 @@
         </div>
         <a href="#verified" class="sidebar__link"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></a>
         <a href="#open" class="sidebar__link"><span class="lang-en">Still open</span><span class="lang-zh">尚未確認</span></a>
-        <a href="#rollback" class="sidebar__link"><span class="lang-en">Why rollback is refused</span><span class="lang-zh">為何拒絕倒回</span></a>
+        <a href="#rollback" class="sidebar__link"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
             <span class="lang-en">Use it</span><span class="lang-zh">使用</span>
         </div>
         <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
+        <a href="#ha" class="sidebar__link"><span class="lang-en">HA &amp; dual controllers</span><span class="lang-zh">HA 與雙控制器</span></a>
         <a href="#account" class="sidebar__link"><span class="lang-en">DSM account</span><span class="lang-zh">DSM 帳號</span></a>
         <a href="#requirements" class="sidebar__link"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></a>
     </div>
@@ -86,7 +87,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.1.2~beta1 <span class="hero__badge-sep">·</span>
+        <div class="hero__badge">v0.1.3~beta1 <span class="hero__badge-sep">·</span>
             <span class="lang-en">discovery stage</span><span class="lang-zh">探索階段</span>
         </div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
@@ -190,6 +191,14 @@
             <td><span class="lang-en">A node can identify its device by the kernel's own view instead of the path it was found on. Both reference clients use only by-path</span><span class="lang-zh">節點可以靠核心自己的認定辨識裝置，而不是靠它從哪個路徑被發現。兩份參考實作都只用 by-path</span></td>
         </tr>
         <tr>
+            <td><span class="lang-en">A create that reports <strong>failure</strong> can create the LUN anyway (a 255-character name, error 18990068)</span><span class="lang-zh">回報<strong>失敗</strong>的建立仍可能把 LUN 建出來（255 字元名稱，錯誤 18990068）</span></td>
+            <td><span class="lang-en">So a failed create is never believed: the name is looked up afterwards and what is found is adopted or deleted. Otherwise every such failure leaks a LUN PVE has no record of</span><span class="lang-zh">所以失敗的建立絕不被相信：事後按名稱查一次，找到的就接管或刪掉。否則每次這種失敗都漏掉一顆 PVE 沒有紀錄的 LUN</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en"><code>mapping_index</code> is <strong>reused</strong> — a freed index goes to the next LUN mapped</span><span class="lang-zh"><code>mapping_index</code> 會<strong>重用</strong>——被釋放的編號會給下一顆被對應的 LUN</span></td>
+            <td><span class="lang-en">A stale device path would resolve to a different disk. Both public clients identify devices by path alone; on this array that is not safe, which is what makes the WWID derivation load-bearing</span><span class="lang-zh">殘留的裝置路徑會指向另一顆磁碟。兩份公開用戶端都只用路徑認裝置；在這個陣列上那不安全，這也讓 WWID 推導成為承重結構</span></td>
+        </tr>
+        <tr>
             <td><span class="lang-en">The CSI driver's twelve-type LUN filter <strong>hid a LUN</strong> — a Virtual Machine Manager virtual disk</span><span class="lang-zh">CSI driver 的十二種型態 LUN 過濾條件<strong>藏了一顆 LUN</strong>——一個 Virtual Machine Manager 的虛擬磁碟</span></td>
             <td><span class="lang-en">Its capacity still comes out of the same volume. So this project lists unfiltered and matches locally: a filter verified to be incomplete is worse than no filter</span><span class="lang-zh">它的容量還是吃同一個儲存空間。所以本專案不帶過濾地列出、在本地比對：一個已被驗證為不完整的過濾條件，比不過濾更糟</span></td>
         </tr>
@@ -230,8 +239,8 @@
 
     <div class="module-list">
         <div class="module-item">
-            <div class="module-item__name">R-1 <span class="status-badge status-badge--partial"><span class="lang-en">name found, behaviour unknown</span><span class="lang-zh">已知名稱，行為未知</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">The restore method is <code>restore_snapshot</code>. Its parameters, and whether a rollback keeps newer snapshots and preserves the LUN uuid, are not established — so rollback stays refused</span><span class="lang-zh">還原方法是 <code>restore_snapshot</code>。它的參數，以及倒回是否保留較新的快照、是否保持 LUN uuid 不變，都還沒確認——所以倒回仍然拒絕</span></div>
+            <div class="module-item__name">R-5 <span class="status-badge status-badge--partial"><span class="lang-en">one sample</span><span class="lang-zh">只有一個樣本</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">The uuid-to-WWID rule reproduces one observed value exactly. A second sample from any other DSM would confirm or break it</span><span class="lang-zh">uuid 到 WWID 的規則精確重現了一個實測值。任何另一台 DSM 的第二個樣本就能確認或推翻它</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">R-2</div>
@@ -257,27 +266,107 @@
 </section>
 
 <section class="doc-section doc-section--accent" id="rollback">
-    <h2 class="section-title"><span class="lang-en">Why rollback is refused</span><span class="lang-zh">為什麼倒回被拒絕</span></h2>
+    <h2 class="section-title"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></h2>
 
     <p>
-        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one.</span>
-        <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<em>新的</em> volume」來還原，所以兩者都不需要。</span>
+        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one. The method was found by asking a DSM about nine candidate names, one of which answered — <strong><code>restore_snapshot</code></strong>, taking <code>src_lun_uuid</code> and <code>snapshot_uuid</code>.</span>
+        <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<em>新的</em> volume」來還原，所以兩者都不需要。這個方法是靠對一台 DSM 詢問九個候選名稱找到的，其中一個回答了——<strong><code>restore_snapshot</code></strong>，收 <code>src_lun_uuid</code> 與 <code>snapshot_uuid</code>。</span>
     </p>
 
     <p>
-        <span class="lang-en">The method has since been found on hardware: <strong><code>restore_snapshot</code></strong> on <code>SYNO.Core.ISCSI.LUN</code>, established by asking a DSM 7.1.1 about nine candidate names and getting exactly one answer. That is a real step forward and it is still not enough. <strong>Knowing a method exists is not knowing what it does.</strong> Its parameter names are unconfirmed, and so is the behaviour that matters: whether a rollback keeps snapshots newer than the one restored, and whether it preserves the LUN's uuid. A rollback that silently changes the uuid changes the WWID, and every node then sees a different disk.</span>
-        <span class="lang-zh">這個方法後來在實機上找到了：<code>SYNO.Core.ISCSI.LUN</code> 上的 <strong><code>restore_snapshot</code></strong>，做法是對一台 DSM 7.1.1 詢問九個候選名稱，而只有一個回答了。那是實質的進展，但仍然不夠。<strong>知道一個方法存在，不等於知道它做什麼。</strong>它的參數名稱尚未確認，真正要緊的行為也還沒確認：倒回之後比還原點更新的快照會不會保留、LUN 的 uuid 會不會改變。倒回若默默改掉 uuid 就是改掉 WWID，每個節點看到的就是另一顆磁碟。</span>
+        <span class="lang-en">Finding the name was not enough to enable it. Three things had to be true, and none was knowable in advance:</span>
+        <span class="lang-zh">找到名稱還不足以把它打開。有三件事必須成立，而事先沒有一件是可知的：</span>
     </p>
 
-    <p>
-        <span class="lang-en">The alternative some plugins take — clone the snapshot, delete the original, rename the clone into its place — is not acceptable here. It destroys the original before the replacement is proven, and it changes the LUN's identity, so every node then sees a different disk.</span>
-        <span class="lang-zh">有些 plugin 採用的替代方案——複製快照、刪掉原本的、把複本改成它的名字——在這裡不被接受。它在替代品被證明之前就毀掉了原件，而且它改變了 LUN 的身分，所以每個節點看到的都是另一顆磁碟。</span>
-    </p>
+    <div class="table-wrap">
+    <table>
+        <tbody>
+        <tr>
+            <td><span class="lang-en">The LUN's uuid must not change</span><span class="lang-zh">LUN 的 uuid 不可以變</span></td>
+            <td><span class="lang-en"><strong>It does not.</strong> The SCSI serial and the WWID survive, so a node does not suddenly find a different disk where its own was</span><span class="lang-zh"><strong>它不會變。</strong>SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en">Snapshots newer than the restored one must survive</span><span class="lang-zh">比還原點更新的快照必須存活</span></td>
+            <td><span class="lang-en"><strong>They do.</strong> Restoring to the oldest of three left all three in place</span><span class="lang-zh"><strong>會存活。</strong>還原到三個之中最舊的那一個，三個都還在</span></td>
+        </tr>
+        <tr>
+            <td><span class="lang-en">It must be observable afterwards</span><span class="lang-zh">事後必須看得出來</span></td>
+            <td><span class="lang-en"><code>restored_time</code> records the epoch second of the restore</span><span class="lang-zh"><code>restored_time</code> 會記錄還原當下的 epoch 秒</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
 
     <div class="alert alert--success">
-        <span class="lang-en">Snapshot create, list and delete all work, so <code>vzdump</code> snapshot mode is unaffected. Only the rollback operation is refused, and it is refused with a message that says why.</span>
-        <span class="lang-zh">快照的建立、列出、刪除都可用，所以 <code>vzdump</code> 的快照模式不受影響。只有倒回這個操作被拒絕，而且拒絕時會說明原因。</span>
+        <span class="lang-en">The second row is why the related projects <strong>refuse</strong> a rollback past newer snapshots: on those arrays the newer ones are destroyed, so letting PVE do it silently would delete snapshots the user could still see. Here nothing is destroyed, so that restriction is not needed and a disk can be rolled back repeatedly.</span>
+        <span class="lang-zh">第二列正是相關專案<strong>拒絕</strong>越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
     </div>
+</section>
+
+<section class="doc-section" id="ha">
+    <h2 class="section-title"><span class="lang-en">High availability and dual controllers</span><span class="lang-zh">高可用性與雙控制器</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Synology has two arrangements that both get called "HA". They are different problems. Both are supported.</span>
+        <span class="lang-zh">Synology 有兩種都被叫做「HA」的架構。它們是兩個不同的問題。兩種都支援。</span>
+    </p>
+
+    <div class="table-wrap">
+    <table>
+        <thead><tr>
+            <th></th>
+            <th><span class="lang-en">Synology HA (SHA)</span><span class="lang-zh">Synology HA（SHA）</span></th>
+            <th><span class="lang-en">UC / SA dual controller</span><span class="lang-zh">UC／SA 雙控制器</span></th>
+        </tr></thead>
+        <tbody>
+        <tr>
+            <td><strong><span class="lang-en">Shape</span><span class="lang-zh">架構</span></strong></td>
+            <td><span class="lang-en">two chassis, active/passive</span><span class="lang-zh">兩台機箱，主／備</span></td>
+            <td><span class="lang-en">two controllers in one chassis</span><span class="lang-zh">一個機箱兩個控制器</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Detected by</span><span class="lang-zh">偵測方式</span></strong></td>
+            <td>—</td>
+            <td><code>firmware_ver</code> <span class="lang-en">contains</span><span class="lang-zh">含</span> <code>DSM UC</code></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Management address</span><span class="lang-zh">管理位址</span></strong></td>
+            <td><span class="lang-en"><strong>one floating cluster IP</strong></span><span class="lang-zh"><strong>一個浮動的叢集 IP</strong></span></td>
+            <td><span class="lang-en"><strong>one per controller, none floating</strong></span><span class="lang-zh"><strong>每個控制器各一個，沒有浮動位址</strong></span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Configure as</span><span class="lang-zh">設定方式</span></strong></td>
+            <td><code>--syno-portal &lt;cluster-ip&gt;</code></td>
+            <td><code>--syno-portal &lt;a&gt;,&lt;b&gt;</code></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Closest analogue</span><span class="lang-zh">最接近的類比</span></strong></td>
+            <td><span class="lang-en">Pure Storage's <code>vir0</code></span><span class="lang-zh">Pure Storage 的 <code>vir0</code></span></td>
+            <td><span class="lang-en">PowerVault ME's two controller addresses</span><span class="lang-zh">PowerVault ME 的兩個控制器位址</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <p>
+        <span class="lang-en"><code>syno-portal</code> takes a list, tried in order and rotated on failure. The rotation happens <strong>inside</strong> the login and the request URL is built after it — a related project shipped a bug where the URL was built first, so every retry went on travelling to the address that had just been found dead.</span>
+        <span class="lang-zh"><code>syno-portal</code> 收一份清單，依序嘗試、失敗就輪替。輪替發生在登入<strong>裡面</strong>，而請求的 URL 是在輪替之後才組——相關專案出過一個缺陷：URL 先組好了，所以每次重試都繼續送往剛剛才被判定死掉的那個位址。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">On a UC chassis the second address need not be configured: <code>SYNO.Core.Network.Interface</code> accepts <code>relay_node=node0</code> and <code>node1</code> to enumerate the peer controller. On a single-controller NAS both answer with the same interfaces, so the mechanism is harmless where it is not needed — and on UC models a target's <code>network_portals</code> also carries a <code>controller_id</code>, which a single-controller NAS omits entirely.</span>
+        <span class="lang-zh">UC 機箱的第二個位址不必手動設定：<code>SYNO.Core.Network.Interface</code> 接受 <code>relay_node=node0</code> 與 <code>node1</code> 來列舉對側控制器。在單控制器的 NAS 上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的——而 UC 機型上 target 的 <code>network_portals</code> 還會帶 <code>controller_id</code>，單控制器的 NAS 完全不回傳這個欄位。</span>
+    </p>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Neither has been run on hardware, and the plugin says so.</span><span class="lang-zh">兩種都沒有在實機上跑過，而 plugin 會說出這件事。</span></strong>
+        <span class="lang-en">SHA is low risk — one address that happens to move, which is already handled. UC is a genuine unknown: whether a LUN is owned by one controller, and whether a target's portals differ per controller, together decide whether a node still reaches its disk after a failover. So the plugin <strong>warns</strong> on <code>DSM UC</code> rather than refusing, and this page keeps saying unverified until someone reports a run.</span>
+        <span class="lang-zh">SHA 風險低——就是一個會移動的位址，而那已經處理了。UC 是真正的未知：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同，這兩件合起來決定故障切換之後節點還找不找得到自己的磁碟。所以 plugin 偵測到 <code>DSM UC</code> 時<strong>發出警告</strong>而不是拒絕，而這一頁會一直寫著未驗證，直到有人回報實際運行結果。</span>
+    </div>
+
+    <p>
+        <span class="lang-en"><strong>If you run either, the most useful thing you can report is one number</strong>: does <code>SYNO.Core.ISCSI.Node</code>'s uuid stay the same across a failover? A storage's identity is pinned to it, so if it changes, that pin stops protecting the storage and starts breaking it.</span>
+        <span class="lang-zh"><strong>如果你手上有其中任何一種，最有價值的回報是一個數字</strong>：<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換之後還是同一個嗎？storage 的身分釘在它上面，所以如果它會變，那道釘子就不再保護 storage，而是開始破壞它。</span>
+    </p>
 </section>
 
 <section class="doc-section" id="probe">

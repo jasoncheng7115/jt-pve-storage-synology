@@ -59,32 +59,30 @@ its structure is its own.
 | Grow a disk | LUN expansion, then a bounded per-device refresh on each node |
 | Snapshot | DSM LUN snapshot, tagged so it is never confused with a user's own |
 | Clone | Clone from a LUN or from one of its snapshots |
-| **Rollback** | **Refused in the first release** — see below |
+| **Rollback** | `restore_snapshot`. The LUN's uuid is unchanged and newer snapshots survive |
 | Attach / detach | iSCSI login, device discovered by the kernel's own identification, dm-multipath |
 
-### Why rollback is refused
+### Rollback, and why it took a while to get here
 
-Neither reference implementation has one: Kubernetes and Cinder both restore by
-cloning a snapshot into a *new* volume, so neither needed it.
+Neither reference implementation has a snapshot rollback: Kubernetes and Cinder
+both restore by cloning a snapshot into a *new* volume, so neither needed one.
+The method was found by asking a DSM about nine candidate names, one of which
+answered — **`restore_snapshot`**, taking `src_lun_uuid` and `snapshot_uuid`.
 
-The method has since been found on hardware — it is **`restore_snapshot`**, on
-`SYNO.Core.ISCSI.LUN`, established by asking a DSM 7.1.1 about nine candidate
-names and getting exactly one answer. That is a real step forward, and it is
-still not enough to enable a rollback. **Knowing a method exists is not knowing
-what it does.** Its parameter names are unconfirmed, and so is the behaviour
-that actually matters: whether a rollback keeps snapshots newer than the one
-restored, and whether it preserves the LUN's uuid. A rollback that silently
-changes the uuid changes the WWID, and every node in the cluster then sees a
-different disk.
+Finding the name was not enough to enable it, because three things had to be
+true and none was knowable in advance:
 
-The alternative some plugins take — clone the snapshot, delete the original,
-rename the clone into its place — is not acceptable here. It destroys the
-original before the replacement is proven, and it changes the LUN's identity,
-so every node sees a different disk.
+| | |
+|---|---|
+| The LUN's uuid must not change | **It does not.** So the SCSI serial and the WWID survive, and a node does not suddenly find a different disk where its own was |
+| Snapshots newer than the restored one must survive | **They do.** Restoring to the oldest of three left all three in place |
+| It must be observable afterwards | `restored_time` records the epoch second of the restore |
 
-Snapshot create, list and delete all work, so `vzdump` snapshot mode is fine.
-Rollback is scheduled for 0.7.0, once that behaviour has been observed on a LUN
-nobody minds losing.
+The second one is the reason the related projects **refuse** a rollback past
+newer snapshots: on those arrays the newer snapshots are destroyed, so a plugin
+that let PVE do it silently would delete snapshots the user could still see.
+Here nothing is destroyed, so that restriction is not needed and a disk can be
+rolled back repeatedly.
 
 ## Requirements
 
@@ -123,6 +121,48 @@ matters more than the number:
 So an entry-level NAS running 7.2 may still be unusable, and a check that only
 read the version would not say why. The plugin gates on all four and names the
 one that failed.
+
+## High availability and dual controllers
+
+Synology has two arrangements that both get called "HA", and they are different
+problems with different answers. **Both are supported.**
+
+| | **Synology HA (SHA)** | **UC / SA dual controller** |
+|---|---|---|
+| Shape | two chassis, active/passive | two controllers in one chassis |
+| Detected by | — | `firmware_ver` contains `DSM UC` |
+| Management address | **one floating cluster IP** | **one per controller, none floating** |
+| Configure as | `--syno-portal <cluster-ip>` | `--syno-portal <ctrl-a>,<ctrl-b>` |
+| Closest analogue | Pure Storage's `vir0` | PowerVault ME's two controller addresses |
+
+`syno-portal` takes a list, tried in order and rotated on failure. The rotation
+happens **inside** the login and the request URL is built after it — a related
+project shipped a bug where the URL was built first, so every retry went on
+travelling to the address that had just been found dead.
+
+For a UC chassis the second address does not have to be configured:
+`SYNO.Core.Network.Interface` accepts `relay_node=node0` and `node1`, which
+enumerates the peer controller's interfaces. On a single-controller NAS both
+answer with the same interfaces, so the mechanism is harmless where it is not
+needed. On those models a target's `network_portals` also carries a
+`controller_id`, which a single-controller NAS omits entirely.
+
+### Neither has been run on hardware, and the plugin says so
+
+SHA is low risk: it is one address that happens to move, which is the case the
+plugin already handles. UC is a genuine unknown, and the open questions are the
+ones only a chassis can answer — whether a LUN is owned by one controller, and
+whether a target's portals differ per controller. Together those decide whether
+a node still reaches its disk after a failover.
+
+So the plugin **warns** when it detects `DSM UC` rather than refusing, and this
+page will keep saying "unverified" until someone reports a run. Both are in the
+register as R-15 and R-16.
+
+**If you run either, the most useful thing you can report is one number**: does
+`SYNO.Core.ISCSI.Node`'s uuid stay the same across a failover? A storage's
+identity is pinned to it, so if it changes, that pin stops protecting the
+storage and starts breaking it.
 
 ## The discovery tool
 

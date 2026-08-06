@@ -6,6 +6,48 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.1.3~beta1] - 2026-08-06
+
+Stage-4 write tests against a DS918+ on DSM 7.1.1, on a dedicated `pvetest-`
+prefix, with every object deleted afterwards and the array confirmed back to its
+original contents.
+
+### Added
+
+- **Rollback is supported.** `restore_snapshot(src_lun_uuid, snapshot_uuid)`
+  leaves the LUN's uuid unchanged — so the WWID survives — and snapshots newer
+  than the restored one are kept. `volume_rollback_is_possible` therefore does
+  **not** need the refusal the related projects require, and a disk can be
+  rolled back repeatedly.
+- **Both high-availability arrangements are supported**: Synology HA (one
+  floating cluster IP, like Pure's `vir0`) and UC/SA dual controller (one
+  address per controller, discovered via `relay_node`). Neither has been run on
+  hardware; the plugin warns on `DSM UC` rather than refusing, and the
+  documentation says unverified until someone reports a run.
+- A clone from a snapshot is **thin** (`allocated_size: 0`), so linked clones
+  and templates are genuinely cheap.
+
+### Fixed / learned
+
+- **A create that reports failure can create the LUN anyway** — a 255-character
+  name is refused with 18990068 and the LUN is made regardless. A failed create
+  is never believed: the name is looked up afterwards and what is found is
+  adopted or deleted.
+- **`mapping_index` is reused.** A freed index goes to the next LUN mapped, so a
+  stale device path resolves to a different disk. Device identity comes from the
+  kernel's WWID, never from a path — which both public reference clients rely on
+  exclusively.
+- **Nothing refuses a delete for dependency reasons** — not a LUN with
+  snapshots, not a snapshot with a live clone, and not a **mapped** LUN. So
+  unmapping before deleting is entirely this plugin's responsibility.
+- `map_target` adds and `unmap_target` removes only what is named, the opposite
+  of Unity's replace-the-list behaviour.
+- Sixteen simultaneous creates all succeeded and the array matched what the API
+  reported; a second login does not evict the first.
+- `_` is not legal in a LUN name, nor space, `+` or `@`. Sizes are created
+  exactly, with no rounding — and the documented 1 GB minimum is not enforced by
+  the API, so the plugin enforces it.
+
 ## [0.1.2~beta1] - 2026-08-06
 
 ### Fixed
