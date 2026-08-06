@@ -1,3 +1,14 @@
+jt-pve-storage-synology (0.3.1~beta1-1) unstable; urgency=low
+
+  * The PVE storage type is synologysan, not synologyiscsi. No type in this
+    family carries a protocol in its name, and a type name cannot be renamed
+    once anyone has used it — some Synology models support NVMe/TCP, at which
+    point synologyiscsi would be a wrong name that could not be corrected.
+    Changed now because the plugin is not written and it therefore costs nothing.
+  * Synology::WwidState and Synology::Health.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 00:15:00 +0800
+
 jt-pve-storage-synology (0.3.0~beta1-1) unstable; urgency=low
 
   * Synology::ISCSI, which never uses iscsiadm discovery: that creates node

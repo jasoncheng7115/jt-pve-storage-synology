@@ -8,7 +8,7 @@
 
 > ### 狀態：模組層已經可以用。**PVE plugin 本身還沒有寫。**
 >
-> `synologyiscsi` 還不能加到節點上。程式庫現在有的是 plugin 底下那一層：`Synology::API`、`::LUN`、`::Target`、`::Naming`、`::Multipath`、`::Command`，附單元測試，以及一次對著實機跑完的建立／快照／倒回／複製／對應／刪除完整生命週期——外加 `bin/pve-syno-api-probe`，一個唯讀工具，用來問一台 DSM 它實際上支援什麼。
+> `synologysan` 還不能加到節點上。程式庫現在有的是 plugin 底下那一層：`Synology::API`、`::LUN`、`::Target`、`::Naming`、`::Multipath`、`::Command`，附單元測試，以及一次對著實機跑完的建立／快照／倒回／複製／對應／刪除完整生命週期——外加 `bin/pve-syno-api-probe`，一個唯讀工具，用來問一台 DSM 它實際上支援什麼。
 >
 > 在這個階段就公開，是因為探索工具本身就有用；也因為在任何人信任一個建立在 Synology SAN API 上的 plugin 之前，那份「哪些知道、哪些不知道」的誠實登記簿值得先讀一遍。
 >

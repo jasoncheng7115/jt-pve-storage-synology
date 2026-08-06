@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.3.0~beta1
+VERSION = 0.3.1~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -40,7 +40,7 @@ install:
 	done
 
 uninstall:
-	rm -f  $(PERL5DIR)/PVE/Storage/Custom/SynologyISCSIPlugin.pm
+	rm -f  $(PERL5DIR)/PVE/Storage/Custom/SynologySANPlugin.pm
 	rm -rf $(PERL5DIR)/PVE/Storage/Custom/Synology/
 	@for f in $(BIN_SCRIPTS); do rm -f $(BINDIR)/$$(basename $$f); done
 

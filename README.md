@@ -11,7 +11,7 @@ locally.
 
 > ### Status: the module layer works. **The PVE plugin is not written yet.**
 >
-> `synologyiscsi` cannot be added to a node yet. What the repository holds is
+> `synologysan` cannot be added to a node yet. What the repository holds is
 > the layer beneath a plugin: `Synology::API`, `::LUN`, `::Target`, `::Naming`,
 > `::Multipath` and `::Command`, with unit tests and a full
 > create/snapshot/rollback/clone/map/delete lifecycle driven against real

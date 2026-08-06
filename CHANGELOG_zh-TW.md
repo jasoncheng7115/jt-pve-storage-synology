@@ -4,6 +4,18 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.3.1~beta1] - 2026-08-06
+
+### 變更
+
+- **PVE 儲存類型名稱是 `synologysan`，不是 `synologyiscsi`。**這個家族裡沒有任何一個 type 把協定寫進名字——`dellpowerstore`、`dellpowervault`、`dellunity`、`netappontap`、`purestorage`——而 Dell EMC 那個用一個 `dell-protocol` 選項同時涵蓋 iSCSI、FC、SAS 與 NVMe。風險不在於不一致：**type 名稱一旦有人用過就改不了**，而有些 Synology 機型確實支援 NVMe/TCP，屆時 `synologyiscsi` 會是一個錯的、又改不動的名字。`synologysan` 是廠商加產品——SAN Manager，正是本 plugin 驅動的子系統——並保留 `syno-protocol` 選項給未來。
+- 現在改，正是因為現在改零成本：plugin 還沒寫，所以世界上沒有任何 `storage.cfg` 寫過這兩個名字之一。
+
+### 新增
+
+- `Synology::WwidState`——逐節點記錄這個節點認領過的 WWID，好讓 `free_image` 能在 LUN 被刪除**之前**清理裝置，那時還有東西知道哪個裝置屬於它。讀取時逐筆驗證：這個檔案會被無人看管的回收路徑讀取，而一行損壞的內容不可以變成一道指令。
+- `Synology::Health`——`status()` 回答的內容。容量來自**一次**儲存空間讀取，絕不由加總 `allocated_size` 得出（reflink 的區塊會對兩顆 LUN 各算一次），加上 `pvesm status` 無法表達的 LUN 數量壓力警告，以及在 storage 被加入時就檢查的前置條件——而不是等到第一次拍快照才發現。
+
 ## [0.3.0~beta1] - 2026-08-06
 
 ### 新增

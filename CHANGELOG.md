@@ -6,6 +6,35 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.3.1~beta1] - 2026-08-06
+
+### Changed
+
+- **The PVE storage type is `synologysan`, not `synologyiscsi`.** No type in this
+  family carries a protocol in its name — `dellpowerstore`, `dellpowervault`,
+  `dellunity`, `netappontap`, `purestorage` — and Dell EMC's covers iSCSI, FC,
+  SAS and NVMe through one `dell-protocol` option. The risk is not
+  inconsistency: **a storage type cannot be renamed once anyone has used it**,
+  and some Synology models do support NVMe/TCP, at which point `synologyiscsi`
+  would be a wrong name that could not be corrected. `synologysan` is
+  vendor plus product — SAN Manager, which is exactly the subsystem this plugin
+  drives — and a `syno-protocol` option is reserved for later.
+- Changed now precisely because it costs nothing: the plugin is not written, so
+  no `storage.cfg` anywhere names either spelling.
+
+### Added
+
+- `Synology::WwidState` — per-node tracking of the WWIDs this node has claimed,
+  so `free_image` can clean up a device *before* the LUN is deleted and there is
+  still something that knows which device belonged to it. Validates every entry
+  on read: an unattended reaper consumes this file, and a corrupt line must not
+  become an instruction.
+- `Synology::Health` — what `status()` answers. Capacity from **one** volume
+  read, never by summing `allocated_size` (a reflink counts its blocks for both
+  LUNs), plus the LUN-count pressure warning that `pvesm status` has no way to
+  express, and the preconditions checked when a storage is added rather than
+  discovered at the first snapshot.
+
 ## [0.3.0~beta1] - 2026-08-06
 
 ### Added
