@@ -48,7 +48,13 @@ sub clear_warnings {
     return;
 }
 
-# Returns ($total, $used, $available, $active) in bytes, PVE's own shape.
+# Returns **($total, $available, $used, $active)** in bytes — PVE's own order,
+# which is what `PVE::Storage::Plugin::status` returns and NOT the intuitive
+# one. Getting it backwards showed the NAS's free space in the Used column, and
+# worse: `syno-min-free` then compared against used space, so the guard meant to
+# stop a Btrfs volume filling up was reading the wrong number entirely. Only
+# running `pvesm status` against the real NAS made it visible — the shape was
+# plausible and every unit test passed.
 #
 # Dies for nothing: an unreachable NAS is reported as inactive, because that is
 # what PVE does with the answer, and a die here would make `pvesm status` fail
@@ -88,7 +94,7 @@ sub status {
         _warn_once("$storeid:readonly",
             "storage '$storeid': the DSM volume '$location' is READ ONLY."
           . " Nothing can be allocated on it.\n");
-        return ($total, $used, 0, 0);
+        return ($total, 0, $used, 0);
     }
 
     my $st = $v->{status} // '';
@@ -110,7 +116,7 @@ sub status {
     # should stay the truth about space. The count is what a warning is for.
     lun_pressure($api, $lun, $storeid);
 
-    return ($total, $used, $free, 1);
+    return ($total, $free, $used, 1);
 }
 
 # Warn as the LUN ceiling approaches. One VM disk is one LUN, and no amount of

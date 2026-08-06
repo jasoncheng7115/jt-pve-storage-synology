@@ -4,6 +4,30 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.4.0~beta1] - 2026-08-07
+
+**plugin 可以用了。**`pvesm add synologysan` 註冊成功，而且每一個生命週期操作都已對一台 DS918+（DSM 7.1.1）完整跑過——跑了兩輪，節點與 NAS 上都沒有留下任何東西：
+
+```
+add → alloc → activate → snapshot → rollback → clone → resize → free → remove
+```
+
+仍然是預發行版：一個節點、一個機型、一個 DSM 版本，而且還沒有任何 VM 真的從它開機過。
+
+### 新增
+
+- `SynologySANPlugin`——PVE 儲存 plugin。`path()` 回傳 dm-uuid 連結而不是 `/dev/mapper/<wwid>`，因為在 `user_friendly_names yes` 的節點上後者並不存在。每一次啟用都會用**核心的** WWID 確認裝置才使用它，因為 `mapping_index` 會重用，而殘留的路徑會指向另一顆磁碟。`volume_rollback_is_possible` 刻意回傳 1：和相關專案那些陣列不同，這裡的倒回會保留較新的快照，而且 LUN 的 uuid 不變。
+- `on_add_hook` 會拒絕「id 折疊後與既有 storage 在同一台 NAS、同一個儲存空間上撞到同一個 LUN 前置字串」的 storage——那之後兩者無法區分，而且各自都能刪掉對方的磁碟。
+- `on_delete_hook` 會移除這個 storage 自己的 target 並讓本節點登出；`deactivate_storage` 則在任何其他節點上、當那裡已經沒有屬於我們的東西時做同一件事。
+
+### 修正——五個全都是「跑起來」才找到的，不是「讀出來」的
+
+- **`status()` 回傳的是 `(total, available, used, active)`**，不是直覺的順序。順序錯了，NAS 的可用空間會出現在 Used 欄；更糟的是 `syno-min-free` 會拿**已用**空間去比較，所以那道防止 Btrfs 儲存空間被寫滿的守衛，讀的是完全錯的數字。
+- `pvesm alloc` 傳的磁碟名稱是**空字串**而不是 undef，所以預設值從來沒有生效，LUN 名稱只剩下前置字串。
+- **擴充從來沒有傳到節點。**重新掃描必須送到 map 底下的 slave `sd` 裝置；`/sys/block/dm-N` 沒有 `device/rescan`，而對不存在的檔案回傳 0 把這件事藏起來了。
+- **對應到既有工作階段的 LUN 需要 `--rescan`。**登入只會發現當下已對應的 LUN，所以第一次啟用可以，之後每一次都找不到裝置。
+- **兩種殘留。**`free_image` 留下一個過時的 multipath map，因為工作階段還在時，刪除 LUN 不會移除 `sd` 節點。而 `pvesm remove` 留下本節點仍然登入著一個它剛剛刪掉的 target。
+
 ## [0.3.1~beta1] - 2026-08-06
 
 ### 變更

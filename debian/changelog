@@ -1,3 +1,17 @@
+jt-pve-storage-synology (0.4.0~beta1-1) unstable; urgency=low
+
+  * The plugin works: pvesm add synologysan registers, and add/alloc/activate/
+    snapshot/rollback/clone/resize/free/remove have all been driven end to end
+    against a DS918+ on DSM 7.1.1, twice, with no leftovers.
+  * Five bugs found by running it rather than reading it: status() returns
+    (total, available, used); pvesm alloc passes an empty name not undef; a
+    resize must rescan the map's slaves; a LUN mapped to an existing session
+    needs --rescan; and free_image and pvesm remove each left something behind.
+  * A storage whose id folds onto another's LUN prefix on the same NAS is
+    refused at add time.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 01:00:00 +0800
+
 jt-pve-storage-synology (0.3.1~beta1-1) unstable; urgency=low
 
   * The PVE storage type is synologysan, not synologyiscsi. No type in this

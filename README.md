@@ -9,14 +9,17 @@ locally.
 
 ---
 
-> ### Status: the module layer works. **The PVE plugin is not written yet.**
+> ### Status: **the plugin works.** Still a prerelease.
 >
-> `synologysan` cannot be added to a node yet. What the repository holds is
-> the layer beneath a plugin: `Synology::API`, `::LUN`, `::Target`, `::Naming`,
-> `::Multipath` and `::Command`, with unit tests and a full
-> create/snapshot/rollback/clone/map/delete lifecycle driven against real
-> hardware — plus `bin/pve-syno-api-probe`, a read-only tool that asks a DSM
-> what it actually supports.
+> `pvesm add synologysan` works, and every lifecycle operation — allocate,
+> activate, snapshot, roll back, clone, resize, free, remove — has been driven
+> end to end against a DS918+ on DSM 7.1.1, twice over, leaving nothing behind on
+> the node or the NAS.
+>
+> It is still a prerelease, and the honest reasons are: **one** node, **one**
+> model, **one** DSM version, and no VM has actually booted from it yet. Five
+> bugs were found in the first hour of running it that no amount of reading had
+> shown, so assume there are more.
 >
 > It is public at this stage because the discovery tool is useful on its own,
 > and because the honest register of what is and is not known about Synology's

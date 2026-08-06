@@ -105,8 +105,8 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.3.1~beta1 <span class="hero__badge-sep">·</span>
-            <span class="lang-en">discovery stage</span><span class="lang-zh">探索階段</span>
+        <div class="hero__badge">v0.4.0~beta1 <span class="hero__badge-sep">·</span>
+            <span class="lang-en">prerelease</span><span class="lang-zh">預發行版</span>
         </div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
@@ -132,9 +132,9 @@
     <h2 class="section-title"><span class="lang-en">Status and risk</span><span class="lang-zh">狀態與風險</span></h2>
 
     <div class="alert alert--warning">
-        <strong><span class="lang-en">There is no plugin yet.</span><span class="lang-zh">還沒有 plugin。</span></strong>
-        <span class="lang-en"><code>synologysan</code> cannot be added to a node yet. What is here is the layer beneath a plugin — the API transport, LUN, target, naming and multipath handling, with unit tests and a full create/snapshot/rollback/clone/map/delete lifecycle driven against real hardware — plus a read-only tool that asks a DSM what it supports. Do not plan production storage around this yet.</span>
-        <span class="lang-zh"><code>synologysan</code> 還不能加到節點上。這裡有的是 plugin 底下那一層——API 傳輸、LUN、target、命名與 multipath 處理，附單元測試，以及一次對著實機跑完的建立／快照／倒回／複製／對應／刪除完整生命週期——外加一個唯讀工具，用來問一台 DSM 它支援什麼。現在不要把正式儲存規劃在這上面。</span>
+        <strong><span class="lang-en">The plugin works, and it is still a prerelease.</span><span class="lang-zh">plugin 可以用了，而且它仍然是預發行版。</span></strong>
+        <span class="lang-en"><code>pvesm add synologysan</code> works, and every lifecycle operation has been driven end to end against a DS918+ on DSM 7.1.1, twice, leaving nothing behind. The honest reasons it is still a prerelease: <strong>one</strong> node, <strong>one</strong> model, <strong>one</strong> DSM version, and no VM has booted from it yet. Five bugs surfaced in the first hour of running it that no amount of reading had shown — assume there are more.</span>
+        <span class="lang-zh"><code>pvesm add synologysan</code> 可以用了，而且每一個生命週期操作都已對一台 DS918+（DSM 7.1.1）完整跑過兩輪，沒有留下任何東西。它仍然是預發行版的誠實理由是：<strong>一個</strong>節點、<strong>一個</strong>機型、<strong>一個</strong> DSM 版本，而且還沒有任何 VM 從它開機過。開始實際運行的第一個小時就冒出五個讀程式碼讀不出來的缺陷——請假設還有更多。</span>
     </div>
 
     <p>

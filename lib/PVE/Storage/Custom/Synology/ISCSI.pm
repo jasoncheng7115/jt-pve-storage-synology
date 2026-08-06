@@ -192,6 +192,26 @@ sub logout {
     return 0;
 }
 
+# Rescan ONE session, for LUNs mapped after it was established.
+#
+# A login discovers the LUNs mapped at that moment. Map another LUN to the same
+# target afterwards — which is what every allocation after the first does — and
+# no device appears until the session is rescanned. The first end-to-end run
+# through `pvesm` missed this because every earlier test logged in fresh.
+#
+# `-m node -T <iqn> -p <portal> -R`, never `-m session --rescan`: the latter
+# rescans EVERY session on the node, including other vendors' storage.
+sub rescan_session {
+    my ($iqn, $portal, %opt) = @_;
+    my $p = portal_string($portal, $opt{port}) or return 0;
+    return 0 if !has_session($iqn, $p);
+
+    my @iface = $opt{iface} ? ('-I', $opt{iface}) : ();
+    my (undef, undef, $rc) = _iscsiadm('-m', 'node', '-T', $iqn, '-p', $p,
+                                       @iface, '--rescan');
+    return $rc == 0 ? 1 : 0;
+}
+
 # ---------------------------------------------------------------------------
 # ifaces, for two portals on one subnet
 # ---------------------------------------------------------------------------
@@ -262,6 +282,26 @@ sub wait_for_by_path {
     return undef;
 }
 
+# Tell the kernel to forget one dead sd device.
+#
+# Needed because deleting the LUN on the NAS does NOT make its device disappear
+# here: the iSCSI session is still up, so the sd node survives as a dead device
+# and multipathd re-adds a map for it. Flushing the map before the delete is
+# therefore not enough on its own — the residual path has to go too, or a stale
+# map is left behind for a LUN that no longer exists.
+sub remove_sd_device {
+    my ($dev) = @_;
+    return 0 if !defined $dev;
+    my ($base) = $dev =~ m{([^/]+)\z} or return 0;
+    return 0 if $base !~ /\A[a-z]+[0-9]*\z/;
+
+    my $path = "/sys/block/$base/device/delete";
+    return 0 if !-w $path;
+
+    require PVE::Storage::Custom::Synology::Command;
+    return PVE::Storage::Custom::Synology::Command::sysfs_write_with_timeout($path, '1', 10);
+}
+
 # Ask the kernel to re-read one device's capacity after a resize.
 #
 # NOT a host scan: a scan discovers new devices, it does not refresh the ones
@@ -274,7 +314,14 @@ sub rescan_device {
     return 0 if $base !~ /\A[a-z0-9]+\z/;
 
     my $path = "/sys/block/$base/device/rescan";
-    return 0 if !-w $path;
+    # A missing rescan file means this is not an sd device — most likely a
+    # multipath MAP was passed instead of one of its slaves. Returning 0 quietly
+    # made a resize look as though it had propagated when it had not.
+    if (!-w $path) {
+        warn "cannot rescan $dev: $path is not writable. A multipath map has no"
+           . " rescan file — pass its slave devices instead.\n";
+        return 0;
+    }
 
     require PVE::Storage::Custom::Synology::Command;
     return PVE::Storage::Custom::Synology::Command::sysfs_write_with_timeout($path, '1', 10);

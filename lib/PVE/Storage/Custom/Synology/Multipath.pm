@@ -251,6 +251,53 @@ sub device_is_lun {
     return lc($found) eq lc($wwid) ? 1 : 0;
 }
 
+# The sd devices underneath a map.
+#
+# These are what carry a new size up to the map: rescanning the MAP itself does
+# nothing, because /sys/block/dm-N has no device/rescan — and a rescan helper
+# that silently returns 0 for a missing file makes that look like it worked. A
+# resize appeared to succeed on the NAS while the node went on seeing the old
+# size.
+#
+# Also what a delete path needs: the slave list has to be captured BEFORE the
+# map is flushed, because afterwards there is nothing left to ask.
+sub slaves_of_map {
+    my ($wwid) = @_;
+    _not_a_method($_[0]) if @_ && defined $_[0] && $_[0] eq __PACKAGE__;
+
+    my $link = dm_uuid_path($wwid) or return [];
+    my $target = eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm(5);
+        my $t = readlink($link);
+        alarm(0);
+        $t;
+    };
+    alarm(0);
+    return [] if !defined $target;
+
+    my ($dm) = $target =~ m{([^/]+)\z} or return [];
+
+    # Bounded together with the file tests that follow it, not just the glob.
+    my @slaves = eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm(5);
+        my @s = glob("/sys/block/$dm/slaves/*");
+        alarm(0);
+        @s;
+    };
+    alarm(0);
+
+    my @devs;
+    for my $entry (@slaves) {
+        # The name used is the one the match RETURNED, not the one read from the
+        # directory: it is the taint discipline and the correctness check in one.
+        my ($name) = $entry =~ m{/([a-z0-9]+)\z} or next;
+        push @devs, "/dev/$name";
+    }
+    return \@devs;
+}
+
 # ---------------------------------------------------------------------------
 # Acting on ONE map
 # ---------------------------------------------------------------------------

@@ -6,6 +6,53 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.4.0~beta1] - 2026-08-07
+
+**The plugin works.** `pvesm add synologysan` registers, and every lifecycle
+operation has been driven end to end against a DS918+ on DSM 7.1.1 — twice over,
+leaving nothing behind on the node or the NAS:
+
+```
+add → alloc → activate → snapshot → rollback → clone → resize → free → remove
+```
+
+Still a prerelease: one node, one model, one DSM version, and no VM has actually
+booted from it yet.
+
+### Added
+
+- `SynologySANPlugin` — the PVE storage plugin. `path()` returns the dm-uuid
+  link rather than `/dev/mapper/<wwid>`, which does not exist on a node with
+  `user_friendly_names yes`. Every activation confirms the device against the
+  **kernel's** WWID before using it, because `mapping_index` is reused and a
+  stale path resolves to a different disk. `volume_rollback_is_possible` returns
+  1 deliberately: unlike the related projects' arrays, a rollback here keeps
+  newer snapshots and leaves the LUN's uuid unchanged.
+- `on_add_hook` refuses a storage whose id folds onto an existing one's LUN
+  prefix on the same NAS and volume — they would be indistinguishable
+  afterwards, and each could delete the other's disks.
+- `on_delete_hook` removes the storage's own target and logs this node out of
+  it; `deactivate_storage` does the same on any other node once nothing of ours
+  is attached there.
+
+### Fixed — all five found by running it, not by reading it
+
+- **`status()` returns `(total, available, used, active)`**, not the intuitive
+  order. Backwards, the NAS's free space appeared in the Used column — and worse,
+  `syno-min-free` compared against *used* space, so the guard against filling a
+  Btrfs volume was reading the wrong number.
+- `pvesm alloc` passes an **empty string** for the disk name rather than undef,
+  so the default never applied and the LUN name came out as the bare prefix.
+- **A resize never reached the node.** The rescan must go to the map's slave `sd`
+  devices; `/sys/block/dm-N` has no `device/rescan`, and returning 0 for a
+  missing file hid it.
+- **A LUN mapped to an existing session needs `--rescan`.** A login discovers
+  only the LUNs mapped at that moment, so the first activation worked and every
+  one after it found no device.
+- **Two leftovers.** `free_image` left a stale multipath map, because deleting
+  the LUN does not remove the `sd` node while the session is up. And
+  `pvesm remove` left this node logged in to a target it had just deleted.
+
 ## [0.3.1~beta1] - 2026-08-06
 
 ### Changed
