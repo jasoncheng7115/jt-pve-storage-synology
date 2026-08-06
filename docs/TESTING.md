@@ -283,6 +283,106 @@ because a behaviour that has been measured once on one firmware is not a promise
   each other out — which error 107, "session interrupted by a duplicate login",
   had made a real worry.
 
+### The kernel side, confirmed on a second sample
+
+A 2 GiB thin LUN was mapped to a purpose-made target and attached to a Proxmox
+VE node. The WWID rule derived from the first sample predicted the answer
+exactly:
+
+```
+LUN uuid            13a3cd1e-f296-4d4b-b712-a85c139f9dac
+predicted WWID      3600140513a3cd1edf296d4d4bdb712da
+scsi_id -g -u       3600140513a3cd1edf296d4d4bdb712da     <- identical
+/sys/.../device/wwid  naa.600140513a3cd1edf296d4d4bdb712da
+```
+
+Two independent samples with unrelated uuids now agree, so the derivation is
+usable as a cross-check. The kernel's answer is still what decides.
+
+What the device reports of itself:
+
+| | |
+|---|---|
+| Vendor | `SYNOLOGY` (8 bytes) |
+| Product | `Storage` (16 bytes, space-padded — `Storage         `) |
+| Revision | `4.0` |
+| `TPGS` | **1** — the device advertises implicit ALUA |
+
+### The multipath findings, which change how a device is addressed
+
+**There is no built-in multipath configuration for Synology.** `multipathd show
+config` contains no `SYNOLOGY` entry at all, so the `conf.d` drop-in this plugin
+ships is not a tuning nicety — without it the device falls back to the generic
+defaults, and on the test node those include `no_path_retry "queue"`, which is
+precisely the setting that turns the loss of every path into an unkillable hang.
+
+**`/dev/mapper/<wwid>` cannot be assumed to exist.** The test node has
+`user_friendly_names yes`, so multipath named the map `mpathc`. The related
+projects return `/dev/mapper/<wwid>` from `path()`, and here that path would
+simply not be there. What *is* always there is the dm-uuid link:
+
+```
+/dev/disk/by-id/dm-uuid-mpath-3600140513a3cd1edf296d4d4bdb712da -> ../../dm-9
+```
+
+So a device is addressed by that, or by resolving the map name from the WWID —
+never by assuming a naming policy the node's administrator chose. Setting
+`user_friendly_names no` globally would rename **other vendors'** maps on the
+same node, which this project does not do.
+
+Also worth knowing: **`/dev/disk/by-id/scsi-*` did not appear at all** for the
+attached device on this node, though it did on another host with the same LUN
+type. It is not a reliable handle either.
+
+And when tearing a map down, `multipath -f` may answer **"device not found"**
+because `fail_if_no_path` has already caused multipathd to remove it. That is
+success, not an error.
+
+### Clone timings, and why `allocated_size` must not be used for capacity
+
+A clone of a LUN holding 512 MiB of real data:
+
+| | |
+|---|---|
+| `is_action_locked` cleared after | **3.5 s** (0.0 s for an empty LUN) |
+| The clone's reported `allocated_size` | **512 MiB** |
+| Space actually consumed on `/volume1` | **0 bytes** |
+
+So the clone is a **reflink**: the blocks are shared, and `allocated_size`
+counts them for both LUNs. **Summing `allocated_size` over-reports usage, and by
+an unbounded amount** — a template with twenty linked clones would appear to
+consume twenty times what it does. Capacity therefore comes from the volume's
+own `size_free_byte`, never from adding up LUNs, which is what `status()` does.
+
+A snapshot of the same LUN completed in **0.20 s** regardless of its contents.
+
+**Space is reclaimed lazily.** After deleting a LUN that had 512 MiB written to
+it, the volume's free space had not moved several minutes later. Nothing is
+lost — Btrfs returns it in its own time — but a plugin that expected free space
+to rise immediately after a delete would draw the wrong conclusion, and a
+`syno-min-free` guard must not be surprised by it.
+
+### R-14: a non-administrator could not even log in
+
+A freshly created non-administrator account was refused at the login itself with
+**402**, before any SAN API could be tried — so this run could not distinguish
+"cannot reach the SAN APIs" from "cannot log in to DSM at all". Narrowing it
+further needs the DSM application privilege granted by hand in the interface,
+and that is one login attempt per try against an **Auto Block policy of three
+failures in five minutes for a one-day block**, so it was left alone
+deliberately. The practical guidance in `DSM-ACCOUNT.md` is unchanged: the
+account has to be an administrator, and everything else should be taken away
+from it.
+
+Two incidental findings from that attempt, both worth keeping:
+
+- Passing `expired=now` to `SYNO.Core.User` `create` produces an account that
+  exists and cannot log in. The symptom is a 402 that reads like a permission
+  problem — a parameter whose meaning was guessed, quietly creating a broken
+  account.
+- `SYNO.Core.User` `set` with `expired=never` **reported success and changed
+  nothing.** Another API answer that cannot be taken at face value.
+
 ### Name rules
 
 | | |

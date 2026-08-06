@@ -6,6 +6,53 @@
 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，
 那份文件比這一份有用。
 
+## [0.1.4~beta1] - 2026-08-06
+
+階段 4 剩下的寫入測試，包含第一次掛到 Proxmox VE 節點。事後已確認節點與 NAS 都回到
+完全相同的起始狀態。
+
+### 新增
+
+- **WWID 推導在第二個獨立樣本上得到確認。** 一顆掛到節點的 LUN，`scsi_id` 給出的
+  正是預測值。
+- 裝置對自己的描述，而這些 NAS 的 API 都不提供：vendor `SYNOLOGY`、product
+  `Storage`（以空白填滿至 16 位元組）、revision `4.0`，以及 **`TPGS=1`**——它宣告
+  支援隱式 ALUA，這就是 multipath 自己啟用 `hwhandler='1 alua'` 的原因。
+
+### 變更
+
+- **裝置不再以 `/dev/mapper/<wwid>` 定址。** 測試節點設了 `user_friendly_names yes`，
+  所以 multipath 把 map 命名為 `mpathc`，那個路徑並不存在。而
+  `/dev/disk/by-id/dm-uuid-mpath-<wwid>` 一直都存在。把 `user_friendly_names no`
+  設成全域會把其他廠商的 map 一起改名，所以那不是選項。
+- **容量絕不由加總 `allocated_size` 得出。** 複製一顆內含 512 MiB 的 LUN，複本回報
+  512 MiB 已配置，卻消耗儲存空間**零**位元組——它是 reflink，共用區塊對兩顆 LUN 都
+  算了一次。一個範本帶二十個連結複本，看起來會像消耗了二十倍。
+
+### 學到的事
+
+- **multipath 沒有任何內建的 Synology 設定**——`multipathd show config` 裡沒有
+  `SYNOLOGY` 條目——所以 `conf.d` drop-in 是必要的，不是調校。少了它就套用通用預設值，
+  而測試節點上那些預設值包含 `no_path_retry "queue"`。
+- `multipath -f` 可能回答「device not found」，因為 `fail_if_no_path` 已經把 map
+  移除了。那是成功。
+- 空間是**延遲**回收的：刪除一顆寫入過 512 MiB 的 LUN 之後，過了幾分鐘儲存空間的
+  可用容量仍然沒變。
+- 複製一顆有資料的 LUN 會鎖 3.5 秒；快照不論內容多少都是 0.20 秒。
+- 快照的所有權可以過濾：`taken_by` 原封不動回傳，而空值會變成 `webapi`，所以不是本
+  plugin 拍的快照永遠可以區分。
+- **R-14 無法安全地再往下釘。** 一個新建的非管理員帳號在登入就被 402 拒絕，還沒機會
+  嘗試任何 SAN API，而每多試一次就用掉自動封鎖那三次失敗額度之一（封鎖一天）。
+  順帶留下兩個發現：`create` 帶 `expired=now` 會默默產生一個無法登入的帳號，而
+  `set` 帶 `expired=never` 回報成功卻什麼都沒改。
+
+### 修正
+
+- **文件網站進入時預設英文，並把語言帶在 URL 上**（`?lang=zh`）。它原本會參考瀏覽器
+  的地區設定，所以 zh-TW 的瀏覽器會落在一個正式版本是英文的頁面的中文版上。語言在
+  `<head>` 就套用，所以不會閃到錯誤的語言；用 `pushState`，所以上一頁會回到讀者原本
+  的語言。
+
 ## [0.1.3~beta1] - 2026-08-06
 
 在一台 DS918+（DSM 7.1.1）上執行階段 4 的寫入測試，使用專用的 `pvetest-` 前置

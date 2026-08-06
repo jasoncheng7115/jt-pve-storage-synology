@@ -6,6 +6,65 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.1.4~beta1] - 2026-08-06
+
+The rest of the stage-4 write tests, including the first attach to a Proxmox VE
+node. The node and the NAS were both confirmed back to their exact starting
+state afterwards.
+
+### Added
+
+- **The WWID derivation is confirmed on a second, independent sample.** A LUN
+  attached to a node produced exactly the predicted WWID from `scsi_id`.
+- The device's own identification, which no NAS API exposes: vendor `SYNOLOGY`,
+  product `Storage` (space-padded to 16), revision `4.0`, and **`TPGS=1`** — it
+  advertises implicit ALUA, which is why multipath enables `hwhandler='1 alua'`
+  by itself.
+
+### Changed
+
+- **A device is no longer addressed as `/dev/mapper/<wwid>`.** The test node has
+  `user_friendly_names yes`, so multipath named the map `mpathc` and that path
+  does not exist. `/dev/disk/by-id/dm-uuid-mpath-<wwid>` always does. Setting
+  `user_friendly_names no` globally would rename other vendors' maps, so it is
+  not an option.
+- **Capacity never comes from summing `allocated_size`.** A clone of a LUN
+  holding 512 MiB reports 512 MiB allocated and consumes **zero** bytes of the
+  volume — it is a reflink, and the shared blocks are counted for both LUNs. A
+  template with twenty linked clones would appear to consume twenty times what
+  it does.
+
+### Learned
+
+- **There is no built-in multipath configuration for Synology** — no `SYNOLOGY`
+  entry exists in `multipathd show config` — so the `conf.d` drop-in is
+  mandatory, not tuning. Without it the generic defaults apply, and on the test
+  node those include `no_path_retry "queue"`.
+- `multipath -f` may answer "device not found" because `fail_if_no_path` already
+  removed the map. That is success.
+- Space is reclaimed **lazily**: the volume's free space had not moved minutes
+  after deleting a LUN that had 512 MiB written to it.
+- A clone of a LUN with data is locked for 3.5 s; a snapshot takes 0.20 s
+  regardless of contents.
+- Snapshot ownership is filterable: `taken_by` is returned verbatim, and an
+  empty value becomes `webapi`, so snapshots this plugin did not take are always
+  distinguishable.
+- **R-14 could not be narrowed safely.** A new non-administrator account was
+  refused at login with 402, before any SAN API could be tried, and each further
+  attempt spends one of the three failures that Auto Block turns into a one-day
+  block. Two incidental findings kept: `create` with `expired=now` silently
+  produces an account that cannot log in, and `set` with `expired=never`
+  reported success while changing nothing.
+
+### Fixed
+
+- **The documentation site defaults to English and carries the language in the
+  URL** (`?lang=zh`). It was consulting the browser's locale, so a zh-TW browser
+  landed on the Chinese version of a page whose canonical form is English. The
+  language is applied in `<head>` so there is no flash of the wrong one, and
+  `pushState` means the back button returns to the language the reader came
+  from.
+
 ## [0.1.3~beta1] - 2026-08-06
 
 Stage-4 write tests against a DS918+ on DSM 7.1.1, on a dedicated `pvetest-`

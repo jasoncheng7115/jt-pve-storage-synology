@@ -17,6 +17,23 @@
 <meta name="twitter:description" content="Synology NAS storage plugin for Proxmox VE. Discovery stage. Open source, MIT License.">
 
 <link rel="stylesheet" href="style.css">
+
+<script>
+// The URL is the source of truth for language, so a link can carry it and a
+// reader can bookmark or share the page in the language they read. English is
+// the default on entry: the browser's locale is deliberately NOT consulted,
+// because a zh-TW browser was landing on the Chinese version of a page whose
+// canonical form is English.
+//
+// This runs in <head>, before the body renders. Doing it at the end of <body>
+// left a visible flash of English on ?lang=zh.
+(function () {
+    var lang = new URLSearchParams(location.search).get('lang') === 'zh' ? 'zh' : 'en';
+    var html = document.documentElement;
+    html.setAttribute('data-lang', lang);
+    html.setAttribute('lang', lang === 'zh' ? 'zh-Hant' : 'en');
+})();
+</script>
 </head>
 <body>
 
@@ -87,7 +104,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.1.3~beta1 <span class="hero__badge-sep">·</span>
+        <div class="hero__badge">v0.1.4~beta1 <span class="hero__badge-sep">·</span>
             <span class="lang-en">discovery stage</span><span class="lang-zh">探索階段</span>
         </div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
@@ -560,28 +577,33 @@
 </main>
 
 <script>
-// Language is a class on <html>, so both languages ship in the page and the
-// switch needs no reload and no second file to keep in step.
-function toggleLang() {
+// Language lives in the URL (?lang=zh), not in localStorage and not in the
+// browser's locale. Both languages ship in the page, so the switch is a class
+// on <html> and needs no reload — but the URL changes with it, which is what
+// makes a language shareable. pushState rather than replaceState, so the back
+// button returns to the language the reader came from.
+function applyLang(lang) {
     var html = document.documentElement;
-    var next = html.getAttribute('data-lang') === 'en' ? 'zh' : 'en';
-    html.setAttribute('data-lang', next);
-    html.setAttribute('lang', next === 'en' ? 'en' : 'zh-Hant');
-    try { localStorage.setItem('lang', next); } catch (e) {}
+    html.setAttribute('data-lang', lang);
+    html.setAttribute('lang', lang === 'zh' ? 'zh-Hant' : 'en');
 }
 
-(function () {
-    try {
-        var saved = localStorage.getItem('lang');
-        if (saved) {
-            document.documentElement.setAttribute('data-lang', saved);
-            document.documentElement.setAttribute('lang', saved === 'en' ? 'en' : 'zh-Hant');
-        } else if ((navigator.language || '').toLowerCase().indexOf('zh') === 0) {
-            document.documentElement.setAttribute('data-lang', 'zh');
-            document.documentElement.setAttribute('lang', 'zh-Hant');
-        }
-    } catch (e) {}
-})();
+function currentLang() {
+    return new URLSearchParams(location.search).get('lang') === 'zh' ? 'zh' : 'en';
+}
+
+function toggleLang() {
+    var next = currentLang() === 'en' ? 'zh' : 'en';
+    var url = new URL(location.href);
+    // English is the default, so it needs no parameter — a clean URL is the
+    // English page.
+    if (next === 'zh') { url.searchParams.set('lang', 'zh'); }
+    else { url.searchParams.delete('lang'); }
+    history.pushState({ lang: next }, '', url);
+    applyLang(next);
+}
+
+window.addEventListener('popstate', function () { applyLang(currentLang()); });
 
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');

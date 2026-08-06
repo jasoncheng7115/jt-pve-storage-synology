@@ -1,3 +1,20 @@
+jt-pve-storage-synology (0.1.4~beta1-1) unstable; urgency=low
+
+  * WWID derivation confirmed on a second independent sample, against a LUN
+    attached to a Proxmox VE node.
+  * A device is addressed by /dev/disk/by-id/dm-uuid-mpath-<wwid>, not
+    /dev/mapper/<wwid>: a node with user_friendly_names yes names the map mpathX
+    and that path does not exist.
+  * Capacity never comes from summing allocated_size — a clone is a reflink that
+    reports 512 MiB allocated while consuming zero bytes of the volume.
+  * There is no built-in multipath configuration for Synology, so the conf.d
+    drop-in is mandatory: without it the generic defaults apply, including
+    no_path_retry "queue".
+  * The documentation site defaults to English and carries the language in the
+    URL as ?lang=zh, applied in <head> so there is no flash.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 19:30:00 +0800
+
 jt-pve-storage-synology (0.1.3~beta1-1) unstable; urgency=low
 
   * Rollback is supported: restore_snapshot(src_lun_uuid, snapshot_uuid) leaves
