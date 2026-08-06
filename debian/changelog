@@ -1,3 +1,14 @@
+jt-pve-storage-synology (0.5.4~beta1-1) unstable; urgency=medium
+
+  * Fix CHAP, broken by 0.5.3~beta1's credential move: $scfg no longer carries
+    the secret, and both consumers turned the missing value into an EMPTY CHAP
+    secret rather than an error. Both now refuse.
+  * Stop claiming the `copy` feature for a snapshot: path() dies on a snapname,
+    so `qm clone --full --snapshot` failed partway instead of being refused.
+  * Validate a snapshot's create_time instead of asserting its unit (R-25).
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 23:00:00 +0800
+
 jt-pve-storage-synology (0.5.3~beta1-1) unstable; urgency=high
 
   * SECURITY: the DSM credentials are no longer written to /etc/pve/storage.cfg,

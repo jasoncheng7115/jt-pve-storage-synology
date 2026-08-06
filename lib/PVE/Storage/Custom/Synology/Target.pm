@@ -174,9 +174,19 @@ sub ensure {
     # DSM has no per-host LUN masking this project has been able to verify, so
     # CHAP is the only access control it can rely on. auth_type 1 is one-way.
     if (defined $opt{chap_user} && length $opt{chap_user}) {
+        # `// ''` used to stand here, and it turned a missing secret into an EMPTY
+        # one — access control that appears configured and protects nothing. That
+        # is strictly worse than no CHAP, because nobody goes looking for it.
+        # There is no safe default for a shared secret, so this refuses.
+        die "storage '" . $self->api->storeid . "': syno-chap-username is set but"
+          . " there is no CHAP secret. Set syno-chap-password, or unset the"
+          . " username — a target with an empty secret accepts anyone while"
+          . " reporting that CHAP is on.\n"
+            if !defined $opt{chap_password} || !length $opt{chap_password};
+
         $p{auth_type} = 1;
         $p{user}      = $opt{chap_user};
-        $p{password}  = $opt{chap_password} // '';
+        $p{password}  = $opt{chap_password};
     }
 
     my $r = $self->api->call(API_TARGET, 'create', %p);

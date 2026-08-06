@@ -6,6 +6,54 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.5.4~beta1] - 2026-08-06
+
+**A third audit pass, and two of its three findings are about the second one.**
+That is the argument for running it again after changing things rather than
+before.
+
+### Fixed
+
+- **Moving the credentials in 0.5.3~beta1 broke CHAP, silently.** Making
+  `syno-chap-password` sensitive means PVE strips it from the config, so
+  `$scfg->{'syno-chap-password'}` is undef — and both CHAP call sites still read
+  it from there, while both consumers ended in `$opt{chap_password} // ''`. The
+  result was not a failure but an **empty CHAP secret** on the target and in the
+  node's iSCSI record: access control that reports itself as configured and admits
+  anyone. There is one accessor now, and neither `Target::ensure` nor
+  `ISCSI::node_add` accepts a missing secret — there is no safe default for a
+  shared secret, so both refuse with the reason.
+
+  **Nobody shipped a storage with this**, because it was found by auditing the
+  change rather than by running it. If you configured CHAP on 0.5.3~beta1,
+  re-set `--syno-chap-password` and check the target's secret in SAN Manager.
+
+- **`copy` is no longer claimed for a snapshot.** `qm clone --full --snapshot
+  <name>` asks PVE for the `copy` feature with a snapshot name; a yes sent it to
+  `qemu-img convert` on `path(..., $snapname)`, which dies — a Synology LUN has no
+  device at a snapshot until it is cloned or rolled back. So PVE began an
+  operation and failed partway, reporting a problem with addressing rather than
+  with what was asked. It now refuses up front, and the action it suggests — a
+  linked clone from the snapshot — is supported. `clone => { snap => 1 }` is
+  unchanged and correct.
+
+### Changed
+
+- **A snapshot timestamp is validated instead of asserted.** The comment said
+  `create_time` had been "confirmed against the NAS's own clock"; no such
+  measurement exists in the register, and it **cannot** be made read-only because a
+  LUN carries no `create_time` field at all. It is now R-25, openly. A value
+  outside 2001–2065 yields no timestamp rather than one dated 1970, and a
+  millisecond value is converted. Nothing in Proxmox VE 9 reads the value —
+  `Replication` and `QemuServer` use the snapshot names and a `parent` field — so
+  this changes no behaviour today.
+
+### Added
+
+- `t/11-features.t` — 283 tests in total. It parses the feature table and asserts
+  that only `clone` and `snapshot` are claimed for a snapshot, so adding a `snap`
+  key forces someone back to the two refusals that make such a claim safe.
+
 ## [0.5.3~beta1] - 2026-08-06
 
 **A security fix that needs one action from anyone already running this.** The

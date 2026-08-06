@@ -128,9 +128,16 @@ sub node_add {
     }
 
     if (defined $opt{chap_user} && length $opt{chap_user}) {
+        # No `// ''` here either: an empty secret written into the node record
+        # makes every login attempt fail with an authentication error that looks
+        # like a wrong password on the NAS, and the node record persists.
+        die "iSCSI: a CHAP username was given for $iqn with no secret. Refusing"
+          . " to write an empty one into the node record.\n"
+            if !defined $opt{chap_password} || !length $opt{chap_password};
+
         for my $pair ([ 'node.session.auth.authmethod', 'CHAP' ],
                       [ 'node.session.auth.username', $opt{chap_user} ],
-                      [ 'node.session.auth.password', $opt{chap_password} // '' ]) {
+                      [ 'node.session.auth.password', $opt{chap_password} ]) {
             _iscsiadm('-m', 'node', '-T', $iqn, '-p', $p, @iface,
                      '-o', 'update', '-n', $pair->[0], '-v', $pair->[1]);
         }

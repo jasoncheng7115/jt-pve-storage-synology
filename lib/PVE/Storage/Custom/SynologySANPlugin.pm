@@ -409,6 +409,23 @@ sub _target_name {
     return "$prefix-tgt-$leaf";
 }
 
+# The CHAP secret, from the credential store.
+#
+# It must NOT be read from $scfg: `syno-chap-password` is a sensitive property, so
+# PVE strips it from the configuration — `$scfg->{'syno-chap-password'}` is undef
+# on any storage added by 0.5.3~beta1 or later. Both CHAP call sites did read it
+# from there, and because Target::ensure and ISCSI::login both fall back to
+# `$opt{chap_password} // ''`, the result was not a failure but an **empty CHAP
+# secret** on the target and on the node. Authentication that appears configured
+# and protects nothing is worse than none.
+#
+# Introduced by moving the credentials, and found by auditing the change rather
+# than by running it — which is the only reason it is not in a release.
+sub _chap_password {
+    my ($class, $storeid, $scfg) = @_;
+    return $class->_creds($storeid, $scfg)->{'chap-password'};
+}
+
 sub _ensure_target {
     my ($class, $api, $storeid, $scfg, $volname) = @_;
     my $tgt = $class->_tgt($api);
@@ -416,7 +433,7 @@ sub _ensure_target {
         name          => $class->_target_name($storeid, $scfg, $volname),
         iqn_prefix    => $scfg->{'syno-iqn-prefix'},
         chap_user     => $scfg->{'syno-chap-username'},
-        chap_password => $scfg->{'syno-chap-password'},
+        chap_password => $class->_chap_password($storeid, $scfg),
     );
 }
 
@@ -1128,7 +1145,7 @@ sub activate_volume {
 
         PVE::Storage::Custom::Synology::ISCSI::login($t->{iqn}, $portal,
             chap_user     => $scfg->{'syno-chap-username'},
-            chap_password => $scfg->{'syno-chap-password'});
+            chap_password => $class->_chap_password($storeid, $scfg));
 
         # A login discovers the LUNs mapped at that moment. This LUN was mapped
         # afterwards if the session already existed — which is every allocation
@@ -1405,14 +1422,46 @@ sub volume_snapshot_info {
         for my $s (@{ $lun->snapshot_list($obj->{uuid}) }) {
             next if !defined $s->{name};
             $info->{ $s->{name} } = {
-                id    => $s->{uuid},
-                # epoch seconds, confirmed against the NAS's own clock.
-                timestamp => $s->{create_time},
+                id => $s->{uuid},
+                # `create_time` is BELIEVED to be epoch seconds and that is R-25,
+                # still open. This comment used to say "confirmed against the NAS's
+                # own clock", and no measurement of it exists anywhere in the
+                # register — which is the one thing this project does not allow a
+                # comment to do. A LUN carries no create_time field at all, so it
+                # cannot be settled read-only; it needs a snapshot taken and read
+                # back against the NAS's clock.
+                #
+                # Nothing in Proxmox VE 9 reads this value — Replication and
+                # QemuServer use the snapshot NAMES and a `parent` field — so a
+                # wrong unit would break nothing today. It is guarded anyway,
+                # because "nothing reads it yet" is not a property of the data.
+                timestamp => _plausible_epoch($s->{create_time}),
             };
         }
     }
     eval { $api->logout };
     return $info;
+}
+
+# A timestamp PVE could act on, or none at all.
+#
+# Reporting a wrong one is worse than reporting nothing: a snapshot dated 1970 or
+# the year 58000 sorts to an end of the list and looks like a real answer.
+# Milliseconds are converted rather than rejected, because that is the one wrong
+# unit an API of this shape actually produces.
+sub _plausible_epoch {
+    my ($v) = @_;
+    return undef if !defined $v || $v !~ /\A[0-9]+\z/;
+
+    # 2001-09-09 .. 2065-01-24. Wide enough that a clock set badly still passes,
+    # narrow enough that a millisecond value cannot.
+    return $v + 0 if $v >= 1_000_000_000 && $v <= 3_000_000_000;
+
+    # Milliseconds.
+    my $s = int($v / 1000);
+    return $s if $s >= 1_000_000_000 && $s <= 3_000_000_000;
+
+    return undef;
 }
 
 sub clone_image {
@@ -1500,9 +1549,29 @@ sub volume_has_feature {
 
     my $features = {
         snapshot   => { current => 1, snap => 1 },
+
+        # `clone` with a snapshot IS supported: clone_image takes $snap and uses
+        # clone_from_snapshot, and the result is a reflink that costs nothing.
+        # `current` is supported too, which RBD cannot do — DSM clones a LUN
+        # directly, without needing a snapshot to hang the clone off.
         clone      => { base => 1, current => 1, snap => 1 },
         template   => { current => 1 },
-        copy       => { base => 1, current => 1, snap => 1 },
+
+        # NO `snap` HERE, and that is a correction rather than an omission.
+        #
+        # `copy` means PVE reads the source data itself — `qm clone --full
+        # --snapshot <name>` asks for exactly this (API2/Qemu.pm), and a yes sends
+        # it to `qemu-img convert` on `path($scfg, $volname, $storeid, $snapname)`.
+        # That call DIES: a Synology LUN has no device at a snapshot, so there is
+        # nothing to read from until the snapshot is cloned or rolled back. RBD can
+        # say yes because it addresses a snapshot directly as `pool/image@snap`.
+        #
+        # Declaring it made PVE start an operation and fail partway, with a message
+        # about addressing rather than about the operation. Saying no here makes it
+        # refuse up front with "Full clone feature is not supported for a snapshot
+        # of ...", which an operator can act on — and the action is a linked clone,
+        # which this storage does support.
+        copy       => { base => 1, current => 1 },
         sparseinit => { base => 1, current => 1 },
         rename     => { current => 1 },
     };

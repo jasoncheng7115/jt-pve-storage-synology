@@ -586,6 +586,47 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### The audit's third pass: a fix that broke CHAP, and a claim nobody had measured
+
+Two of the three findings here are about the *previous* pass. That is the point of
+running the audit again after changing things.
+
+**Moving the credentials broke CHAP, silently and in the worst direction.** Making
+`syno-chap-password` a sensitive property means PVE strips it from the config — so
+`$scfg->{'syno-chap-password'}` became undef. Both CHAP call sites were still
+reading it from there, and both consumers ended in `$opt{chap_password} // ''`. So
+the result was not a failure: it was an **empty CHAP secret**, written to the
+target on the NAS and into the node's iSCSI record. Access control that reports
+itself as configured and admits anyone. There is one accessor now, and neither
+consumer accepts a missing secret — there is no safe default for a shared secret,
+so both refuse.
+
+**`copy => { snap => 1 }` was a promise the plugin could not keep.** `qm clone
+--full --snapshot <name>` asks PVE for the `copy` feature with a snapshot name;
+a yes sends it to `qemu-img convert` on `path($scfg, $volname, $storeid,
+$snapname)`, which dies — a Synology LUN has no device at a snapshot until it is
+cloned or rolled back. RBD can say yes because it addresses `pool/image@snap`
+directly. So PVE began an operation and failed partway, reporting a problem with
+addressing rather than with what was asked. Saying no makes it refuse up front
+with something actionable, and the action — a linked clone from the snapshot — is
+supported.
+
+`t/11-features.t` now parses the feature table and asserts that only `clone` and
+`snapshot` are claimed for a snapshot, so adding a `snap` key forces someone back
+to the two refusals that make the claim safe.
+
+**R-25 was recorded as measured and never was.** The comment on the snapshot
+timestamp said `create_time` had been "confirmed against the NAS's own clock". No
+such measurement exists in this register. It cannot be settled read-only either:
+**a LUN carries no `create_time` field at all**, so it needs a snapshot taken and
+read back.
+
+Nothing in Proxmox VE 9 reads the value — `Replication` and `QemuServer` use the
+snapshot *names* and a `parent` field — so a wrong unit would break nothing today.
+It is guarded regardless: a value outside 2001–2065 yields no timestamp rather
+than one dated 1970, and a millisecond value is converted. Reporting a wrong
+timestamp is worse than reporting none, because it looks like an answer.
+
 ### The audit's second pass: four more, and where the credentials were
 
 The first pass looked at bounds and guards. The second followed the data, and the
@@ -707,6 +748,7 @@ one, the plugin refuses rather than assumes.
 
 | # | Question |
 |---|---|
+| R-25 | **The unit of a snapshot's `create_time`.** Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until 2026-08-06, when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
 | R-14 | The minimum DSM privileges. The probe ran as an administrator, so it proved "an administrator can" and not "a non-administrator cannot". See `DSM-ACCOUNT.md` |
 
 ### Supported by design, unverified — needs hardware this project does not have

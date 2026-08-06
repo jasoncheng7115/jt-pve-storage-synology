@@ -1,0 +1,128 @@
+#!/usr/bin/perl
+
+# What the plugin claims it can do must match what it will actually do.
+#
+# `volume_has_feature` is a promise PVE acts on before it starts work. A yes it
+# cannot honour does not produce a clean refusal — it produces a failure partway
+# through an operation, with a message about whatever broke rather than about what
+# was attempted.
+#
+# The concrete case: `copy => { snap => 1 }` was declared, `qm clone --full
+# --snapshot <name>` asks for exactly that (PVE::API2::Qemu), and a yes sends PVE
+# to `qemu-img convert` on `path($scfg, $volname, $storeid, $snapname)` — which
+# dies, because a Synology LUN has no device at a snapshot. RBD can say yes; it
+# addresses a snapshot directly as `pool/image@snap`. This storage cannot.
+#
+# So this file exists to keep the declaration and the implementation in the same
+# place in someone's head. It reads the source, so it runs with no Proxmox VE.
+
+use strict;
+use warnings;
+use Test::More;
+use lib 'lib';
+
+my $src = do {
+    open(my $fh, '<', 'lib/PVE/Storage/Custom/SynologySANPlugin.pm')
+        or BAIL_OUT('cannot read the plugin');
+    local $/; <$fh>;
+};
+
+my ($block) = $src =~ /my \$features = \{(.*?)\n    \};/s;
+ok($block, 'the feature table is where it is expected');
+
+# Parse it into { feature => { key => 1 } } so the assertions are about meaning
+# rather than about formatting.
+my %declared;
+while ($block =~ /^\s*(\w+)\s*=>\s*\{([^}]*)\}/mg) {
+    my ($feature, $keys) = ($1, $2);
+    $declared{$feature} = { map { $_ => 1 } ($keys =~ /(\w+)\s*=>\s*1/g) };
+}
+
+# --- the correction, and why it must not come back -------------------------
+
+ok(!$declared{copy}{snap},
+   'copy is NOT claimed for a snapshot: path() dies on a snapname, so a full'
+ . ' clone from a snapshot would fail partway rather than be refused');
+
+ok($declared{copy}{current}, 'copy of the current state is claimed');
+ok($declared{copy}{base},    'and of a base');
+
+# --- what IS supported for a snapshot --------------------------------------
+
+ok($declared{clone}{snap},
+   'clone from a snapshot IS claimed — clone_image takes $snap and uses'
+ . ' clone_from_snapshot, which needs no device on the node');
+
+ok($declared{clone}{current},
+   'and clone of the current state, which RBD cannot do: DSM clones a LUN'
+ . ' directly without needing a snapshot to hang it off');
+
+# --- the invariant behind all of it ----------------------------------------
+#
+# Anything claimed with `snap` must not depend on path() or activate_volume,
+# because both refuse a snapname outright. This is checked as an explicit list so
+# that adding a `snap` key forces someone to come back here.
+my @snap_claimed = sort grep { $declared{$_}{snap} } keys %declared;
+is_deeply(\@snap_claimed, ['clone', 'snapshot'],
+          'only clone and snapshot are claimed for a snapshot')
+    or diag('claimed with snap: ' . join(', ', @snap_claimed)
+          . ' — anything new here must work without path() or activate_volume,'
+          . ' both of which die on a snapname');
+
+# And the two refusals that make the invariant true.
+like($src, qr/cannot be addressed at a snapshot/,
+     'path() refuses a snapname');
+like($src, qr/a snapshot cannot be activated/,
+     'activate_volume refuses a snapname');
+
+# --- rename and template, which are current-only ---------------------------
+ok($declared{rename}{current} && !$declared{rename}{snap},
+   'rename is current-only');
+ok($declared{template}{current} && !$declared{template}{snap},
+   'template is current-only');
+
+# --- and the undef contract ------------------------------------------------
+#
+# volume_has_feature returns undef rather than 0 for an unsupported combination,
+# which is what the base class does and what PVE tests for truth.
+like($src, qr/return 1 if \$features->\{\$feature\}->\{\$key\};\s*\n\s*return undef;/,
+     'an unsupported combination answers undef, not 0');
+
+
+# --- the snapshot timestamp, which was asserted rather than measured --------
+#
+# `create_time` is believed to be epoch seconds. That is R-25 and it is still
+# open: a LUN carries no create_time field at all, so it cannot be settled
+# read-only, and the code comment claiming it had been "confirmed against the
+# NAS's own clock" cited a measurement that exists nowhere in the register.
+#
+# Nothing in Proxmox VE 9 reads the value — Replication and QemuServer use the
+# snapshot NAMES and a `parent` field — so a wrong unit breaks nothing today.
+# Guarded anyway, because "nothing reads it yet" is not a property of the data.
+
+# Loading the plugin needs Proxmox VE, and CI runs with none — so the guard's
+# behaviour is checked where PVE exists and its presence is checked everywhere.
+SKIP: {
+    skip 'no Proxmox VE on this machine', 8
+        if !eval { require PVE::Storage::Custom::SynologySANPlugin; 1 };
+
+    my $ep = \&PVE::Storage::Custom::SynologySANPlugin::_plausible_epoch;
+
+    is($ep->(1786011363), 1786011363, 'a plausible epoch-seconds value passes through');
+    is($ep->(1786011363000), 1786011363, 'milliseconds are converted, not rejected');
+
+    is($ep->(0),      undef, 'zero is not a timestamp');
+    is($ep->(12345),  undef, 'a small integer yields nothing rather than 1970');
+    is($ep->(undef),  undef, 'undef in, undef out');
+    is($ep->('abc'),  undef, 'a non-numeric value yields nothing');
+    is($ep->('17e9'), undef, 'and so does something merely numeric-looking');
+    is($ep->(1786011363000000), undef, 'microseconds are out of range and refused');
+}
+
+unlike($src, qr/confirmed against the NAS's own clock/,
+       'the unmeasured claim is gone from the source');
+like($src, qr/R-25, still open|R-25/,
+     'and the open register item is named where the value is used');
+
+
+done_testing();

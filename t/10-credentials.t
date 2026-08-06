@@ -70,6 +70,8 @@ SKIP: {
     mkdir $dir;
     # $CRED_DIR is a package variable and not a constant precisely so this works:
     # a constant would be folded into its call sites at compile time.
+    our $CRED_DIR;
+    local *CRED_DIR = \$PVE::Storage::Custom::SynologySANPlugin::CRED_DIR;
     local $PVE::Storage::Custom::SynologySANPlugin::CRED_DIR = $dir;
 
     my $file = $P->_cred_file('mystore');
@@ -162,5 +164,74 @@ like($src, qr/fifteen releases wrote the password into storage\.cfg/i,
      'the plaintext fallback is deliberate and documented, not an oversight');
 like($src, qr/Datastore\.Audit/,
      'and the migration notice tells the operator what the exposure was');
+
+
+# --- CHAP: the regression that moving the credentials introduced ------------
+#
+# `syno-chap-password` is a sensitive property, so $scfg->{'syno-chap-password'}
+# is undef on any storage added by 0.5.3~beta1 or later. Both CHAP call sites
+# were still reading it from there, and both consumers fell back to
+# `$opt{chap_password} // ''` — so the result was not a failure but an EMPTY CHAP
+# secret on the target and in the node record. Access control that appears
+# configured and protects nothing.
+
+unlike($src, qr/chap_password\s*=>\s*\$scfg->\{/,
+       'no CHAP call site reads the secret from $scfg, where PVE strips it');
+like($src, qr/sub _chap_password/,
+     'there is one accessor for it, so a third call site cannot get it wrong');
+
+for my $mod (qw(Target ISCSI)) {
+    my $m = do {
+        open(my $fh, '<', "lib/PVE/Storage/Custom/Synology/$mod.pm") or BAIL_OUT("no $mod");
+        local $/; <$fh>;
+    };
+    unlike($m, qr/\$opt\{chap_password\}\s*\/\/\s*''/,
+           "$mod.pm does not turn a missing CHAP secret into an empty one");
+    my %phrase = (
+        Target => qr/there is no CHAP secret/,
+        ISCSI  => qr/CHAP username was given for .* with no secret/,
+    );
+    like($m, $phrase{$mod}, "$mod.pm refuses instead");
+}
+
+# And it really refuses, rather than merely mentioning it in a comment.
+{
+    package ChapAPI;
+    sub new { bless { sent => [] }, shift }
+    sub storeid { 'chaptest' }
+    # `ensure` lists first, so the listing has to be a real (empty) one or the
+    # code dies before it ever reaches the CHAP block.
+    sub call {
+        my ($self, $api, $method, %p) = @_;
+        push @{ $self->{sent} }, [ $method, \%p ];
+        return { success => 1, data => { targets => [] } } if $method eq 'list';
+        return { success => 1, data => { target_id => 1 } };
+    }
+    sub call_ok { my $s = shift; return $s->call(@_)->{data} }
+    sub sent { $_[0]->{sent} }
+}
+# The refusal really fires — the block lives in Target::ensure, not create.
+{
+    require PVE::Storage::Custom::Synology::Target;
+    my $mock = ChapAPI->new;
+    my $tgt = PVE::Storage::Custom::Synology::Target->new($mock);
+
+    my $err = '';
+    eval { $tgt->ensure(name => 'x-tgt', chap_user => 'someone') } or $err = $@;
+    like($err, qr/there is no CHAP secret/,
+         'a CHAP username with no secret is refused rather than defaulted');
+    like($err, qr/accepts anyone while reporting that CHAP is on/,
+         'and the message says what an empty secret would actually mean');
+    ok(!grep({ $_->[0] eq 'create' } @{ $mock->sent }),
+       'no target was created with an empty secret — the refusal precedes it');
+
+    # With a secret it gets past the refusal.
+    $err = '';
+    eval { $tgt->ensure(name => 'x-tgt', chap_user => 'someone',
+                        chap_password => 'a-real-secret') } or $err = $@;
+    unlike($err, qr/there is no CHAP secret/,
+           'and a supplied secret is accepted');
+}
+
 
 done_testing();
