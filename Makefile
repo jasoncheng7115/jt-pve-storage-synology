@@ -21,7 +21,8 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets check-zh critic release-check deb deb-clean clean
+        check-multipath-flush check-secrets check-zh critic check-release-archive \
+        release-check deb deb-clean clean
 
 all:
 	@echo "Nothing to build. Run 'make install', 'make test' or 'make deb'."
@@ -86,6 +87,31 @@ syntax:
 # deliberately violates — `return undef` is required by the three-valued safety
 # contract, and the `_not_a_method` guard must read @_ before unpacking it. Read
 # that file before switching anything else off.
+# Every released version's .deb must still be fetchable from this tree.
+#
+# This did not exist for the first fifteen releases and nothing noticed: the
+# `.gitignore` carried a `!releases/*.deb` negation waiting for a directory that
+# had never been created, so the rule read as satisfied while the archive was
+# empty. A tester on 0.3.1 could not have obtained 0.3.1. The archive was
+# reconstructed from GitHub and verified against each release's own published
+# checksum; this target is what stops it lapsing again.
+check-release-archive:
+	@echo "Checking the release archive..."
+	@missing=0; \
+	for tag in $$(git tag -l 'v*' 2>/dev/null); do \
+		v=$$(echo "$$tag" | sed 's/^v//; s/-beta/.beta/'); \
+		if ! ls releases/*_$$v-*_all.deb >/dev/null 2>&1; then \
+			echo "  MISSING: $$tag has no .deb in releases/"; missing=1; \
+		fi; \
+	done; \
+	if [ "$$missing" = "1" ]; then \
+		echo ""; \
+		echo "A tester on that version cannot fetch what they are running."; \
+		echo "Download it from its GitHub release into releases/ and commit it."; \
+		exit 1; \
+	fi; \
+	echo "  OK: every tag has its .deb ($$(ls releases/*.deb 2>/dev/null | wc -l) archived)."
+
 critic:
 	@if command -v perlcritic >/dev/null 2>&1; then \
 		perlcritic --profile .perlcriticrc lib/ bin/ \
@@ -186,7 +212,8 @@ check-zh:
 	@echo "Checking the Traditional Chinese documents..."
 	@perl tools/check-zh-markdown.pl
 
-release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve critic
+release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve critic \
+               check-release-archive
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
 		| sed 's/-[0-9]*$$//'); \
