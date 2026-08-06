@@ -557,7 +557,9 @@ sub on_delete_hook {
         # THIS NODE's session first. Removing the target on the NAS while a node
         # is still logged in leaves that node with a session and a node record
         # pointing at something that no longer exists — which is what the first
-        # `pvesm remove` produced. Other nodes clean up in deactivate_storage.
+        # `pvesm remove` produced. Other nodes are NOT cleaned up here and
+        # nothing in PVE cleans them up either — see deactivate_storage's
+        # comment. `pve-syno-reap` is the path for them.
         $class->_detach_target($storeid, $scfg, $t->{iqn});
 
         eval { $tgt->delete($t->{target_id}) };
@@ -979,12 +981,136 @@ sub activate_storage {
 # Called per node. Logs this node out of the storage's targets once nothing of
 # ours is left on it — which is how a node OTHER than the one that ran
 # on_delete_hook stops holding a session to a target that has been removed.
+# ---------------------------------------------------------------------------
+# Reaping orphaned devices
+# ---------------------------------------------------------------------------
+
+# A map this node holds for a LUN the NAS no longer has.
+#
+# MEASURED on a three-node cluster, 2026-08-06. A running VM was live-migrated
+# pve1 -> pve2 -> pve3 and then destroyed on pve3. PVE calls `deactivate_volume`
+# on the source node only when it copied a LOCAL volume — `QemuMigrate`'s single
+# `deactivate_volumes` call is inside `sync_offline_local_volumes` — so for a
+# SHARED storage the source node is never told. pve3 cleaned up correctly and
+# **pve1 and pve2 were each left with a multipath map and a tracking entry for a
+# LUN that had ceased to exist.** One per LUN, per node that ever saw it.
+#
+# `WwidState::orphans` was written for exactly this and had never been called from
+# anywhere. It is the mechanism; this is the caller.
+#
+# It is not corruption: `mapping_index` reuse means a stale device path can point
+# at a different LUN, and the kernel-WWID check is what stops that (rule 48). It
+# is a leak, and a dead map is something an operator will eventually trip over.
+#
+# THE SAFETY CONTRACT, and none of it is optional:
+#
+#   * `$live` must be a COMPLETE listing. A partial one would name every live
+#     volume an orphan, and this list feeds a flush. `orphans` returns nothing
+#     when handed anything that is not a hash, and the NAS read is not wrapped in
+#     an eval that could swallow a failure into an empty set.
+#   * `is_device_in_use` must answer a definite **0**. undef means "could not
+#     tell", and a safety check that cannot answer must not answer "safe".
+#   * One map at a time, named. Never a node-wide flush.
+sub reap_orphans {
+    my ($class, $storeid, $scfg, %opt) = @_;
+    my $dry = $opt{dry_run} ? 1 : 0;
+    my @report;
+
+    my $state = $class->_state($storeid);
+    my $tracked = $state->tracked;
+    return [] if !%$tracked;
+
+    # The complete live set, or nothing at all. A failure here must not become an
+    # empty listing, because an empty listing makes everything an orphan.
+    my $api = $class->_api($storeid, $scfg);
+    my $lun = $class->_lun($api);
+    my $luns = $lun->list(location => $class->_location($scfg));
+    eval { $api->logout };
+    die "storage '$storeid': could not read the LUN list; not reaping anything\n"
+        if ref $luns ne 'ARRAY';
+
+    my %live;
+    for my $l (@$luns) {
+        my $w = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($l->{uuid});
+        $live{ lc $w } = 1 if defined $w;
+    }
+
+    for my $wwid (@{ $state->orphans(\%live) }) {
+        my $volname = $state->volname_for($wwid) // '?';
+        my $path = PVE::Storage::Custom::Synology::Multipath::device_path_for_wwid($wwid);
+
+        if (!defined $path) {
+            # No device left; only the bookkeeping is stale.
+            push @report, { wwid => $wwid, volname => $volname,
+                            action => $dry ? 'would untrack' : 'untracked',
+                            reason => 'no device on this node' };
+            $state->untrack($wwid) if !$dry;
+            next;
+        }
+
+        my $in_use = PVE::Storage::Custom::Synology::Multipath::is_device_in_use($path);
+        if (!defined $in_use) {
+            push @report, { wwid => $wwid, volname => $volname, action => 'skipped',
+                            reason => "could not determine whether $path is in use"
+                                    . " — refusing rather than guessing" };
+            next;
+        }
+        if ($in_use) {
+            push @report, { wwid => $wwid, volname => $volname, action => 'skipped',
+                            reason => "$path is IN USE on this node even though the"
+                                    . " LUN is gone from the NAS" };
+            next;
+        }
+
+        if ($dry) {
+            push @report, { wwid => $wwid, volname => $volname,
+                            action => 'would flush', reason => "$path" };
+            next;
+        }
+
+        $class->_detach_local($storeid, $scfg, $wwid);
+        my $gone = PVE::Storage::Custom::Synology::Multipath::map_is_gone($wwid);
+        push @report, { wwid => $wwid, volname => $volname,
+                        action => (defined $gone && $gone) ? 'flushed' : 'flush incomplete',
+                        reason => "$path" };
+    }
+
+    return \@report;
+}
+
 sub deactivate_storage {
     my ($class, $storeid, $scfg, $cache) = @_;
 
     my $state = eval { $class->_state($storeid) } or return 1;
+
+    # NOTHING IN PROXMOX VE CALLS THIS FUNCTION.
+    #
+    # Verified across the whole /usr/share/perl5/PVE tree on PVE 9: only the
+    # dispatcher in Storage.pm and the per-plugin implementations exist, and
+    # neither pvestatd nor the API invokes it. The comment that stood here an hour
+    # ago said "PVE calls deactivate_storage when it is finished with the storage
+    # on this node", which is simply untrue — and the sibling NetApp plugin had
+    # already found and corrected the identical claim, so it was a family lesson
+    # this project failed to import rather than a new discovery.
+    #
+    # It is kept, implemented and safe, because it is reachable manually and a
+    # future PVE release may start calling it. But it is NOT the cleanup path:
+    # `pve-syno-reap` is, and the documentation says so.
+    #
+    # Reap first regardless. A node that migrated a VM away keeps a map for a LUN
+    # that may since have been deleted, and the tracking check below would read
+    # that as "something is still attached" and never log out — one stale entry
+    # would pin a session open for good.
+    my $reaped = eval { $class->reap_orphans($storeid, $scfg) };
+    warn "storage '$storeid': could not reap orphaned devices: $@" if $@;
+    for my $r (@{ $reaped // [] }) {
+        print "storage '$storeid': $r->{action} orphan $r->{volname}"
+            . " ($r->{wwid}) — $r->{reason}\n";
+    }
+
     my $tracked = eval { $state->tracked } // {};
-    # Something is still attached here; leaving is not this call's business.
+    # Something is still legitimately attached here; leaving is not this call's
+    # business.
     return 1 if %$tracked;
 
     my $prefix = eval { PVE::Storage::Custom::Synology::Naming::prefix_for($storeid) };
@@ -1035,7 +1161,17 @@ sub list_images {
 
         my (undef, undef, $owner) = eval { $class->parse_volname($volname) };
         next if !defined $owner;
-        next if defined $vmid && $owner ne $vmid;
+
+        # `!$vollist &&` matters, and it is the base class's own condition.
+        #
+        # When the caller named exact volids it knows what it asked for, so the
+        # vmid is not also applied — otherwise a volid on the list whose owner
+        # differs would be silently absent from the answer. Applying both is what
+        # this did, and while no caller in Proxmox VE 9 passes both (every
+        # `vdisk_list` call site passes `$vollist` as undef), the base guards it
+        # deliberately and a listing that is quietly short is the fault this
+        # project treats most seriously — see R-9.
+        next if !$vollist && defined $vmid && $owner ne $vmid;
 
         my $volid = "$storeid:$volname";
         if ($vollist) {
@@ -1355,7 +1491,30 @@ sub _detach_local {
 
     my $map = PVE::Storage::Custom::Synology::Multipath::map_name_for_wwid($wwid);
     if (defined $map) {
+        # Captured BEFORE the flush: once the map is gone there is nothing left
+        # to ask which sd devices belonged to it.
+        my $slaves = PVE::Storage::Custom::Synology::Multipath::slaves_of_map($wwid);
+
         PVE::Storage::Custom::Synology::Multipath::flush_map($map);
+
+        # IF THE MAP SURVIVED, its paths are holding it, and that is not a
+        # hypothetical: it is what a node sees when the LUN was deleted from
+        # ANOTHER node. The iSCSI session here is still up, so each sd node
+        # survives as a dead device and multipathd rebuilds a map over it —
+        # `failed faulty running`, one path, pointing at nothing.
+        #
+        # Measured on a three-node cluster: a VM migrated pve1 -> pve2 -> pve3 and
+        # destroyed on pve3 left pve1 and pve2 each holding such a map, and
+        # `pve-syno-reap --remove` reported "flush incomplete" because this
+        # function stopped at the first flush. `free_image` had the extra step and
+        # this did not — the same work written twice, and only one copy correct.
+        #
+        # Only on the failure path, deliberately: removing the sd devices on an
+        # ordinary VM stop would force a rediscovery that is not needed.
+        if (!PVE::Storage::Custom::Synology::Multipath::map_is_gone($wwid)) {
+            PVE::Storage::Custom::Synology::ISCSI::remove_sd_device($_) for @$slaves;
+            PVE::Storage::Custom::Synology::Multipath::flush_map($map);
+        }
     }
 
     # Untracked only when the device is verifiably gone: map_is_gone answers

@@ -125,4 +125,26 @@ like($src, qr/R-25, still open|R-25/,
      'and the open register item is named where the value is used');
 
 
+# --- list_images must filter the way the base class filters ------------------
+#
+# PVE's own list_images applies the vmid filter only when NO $vollist was given:
+# `next if !$vollist && defined($vmid) && ($owner ne $vmid)`. When the caller
+# named exact volids it knows what it asked for. Applying both would leave a
+# requested volid silently absent — the same fault class as R-9's quietly
+# truncated listing, and the code that reads such a list decides what may be
+# deleted.
+#
+# No caller in Proxmox VE 9 passes both, so this is a latent divergence rather
+# than a live bug. It is asserted because the base guards it on purpose.
+{
+    my ($li) = $src =~ /\nsub list_images \{(.*?)\n\}/s;
+    ok($li, 'list_images is there');
+    like($li, qr/next if !\$vollist && defined \$vmid/,
+         'the vmid filter is conditional on no vollist, as in the base class');
+    unlike($li, qr/next if defined \$vmid && \$owner ne \$vmid;/,
+           'and not applied unconditionally');
+    like($li, qr/ctime\s*=>\s*undef/,
+         'ctime is undef, honestly: a LUN carries no create_time field (R-25)');
+}
+
 done_testing();

@@ -4,6 +4,39 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.0~beta1] - 2026-08-06
+
+**備份、還原、一台 guest 從 NAS 開機、跨三個節點即時遷移。**最後三個重要的空白都關掉了，而關掉它們的過程又找出兩個缺陷。
+
+### 新增
+
+- **`pve-syno-reap`**——回報（加上 `--remove` 則清除）本節點為 NAS 上已不存在的 LUN 所持有的 multipath map。預設是試跑。它絕不動到正在使用中的裝置，對任何無法確定狀態的東西是跳過，不是假設。
+
+### 修正
+
+- **`WwidState::orphans` 沒有任何呼叫者。**它就是為下面那個情況寫的，註解寫得很長，而完全沒有地方呼叫它——一段代替修正存在的死程式碼。`reap_orphans` 就是那個呼叫者。
+- **`_detach_local` 無法 flush 一個「LUN 是從其他節點被刪除」的 map。**這個節點的 iSCSI 工作階段還開著，所以每個 `sd` 節點會以死掉的裝置留下來，而 multipathd 會在它上面重建一個 map。`free_image` 會先取得 slave 清單、flush、移除殘留路徑、再 flush 一次；`_detach_local` 停在第一次 flush——同一段程序被寫了兩次，而只有一份是對的。現在它會在、而且只在 flush 失敗時移除殘留路徑，所以一般的 VM 停止流程沒有改變。
+
+### 更正
+
+- **Proxmox VE 裡沒有任何東西呼叫 `deactivate_storage`。**這是對整個 `/usr/share/perl5/PVE` 目錄樹驗證過的：只有分派函式和各 plugin 自己的實作存在。所以這個專案原本那句「`pvesm set --disable 1` 會讓每個節點在下一次輪詢時停用」是錯的，而同一個下午寫下的一段註解聲稱 PVE 會「在這個節點用完這個 storage 時」呼叫它，也是錯的。相關專案 NetApp 那支早就發現並修正過完全相同的說法。文件裡的移除程序現在會先在每個節點上執行 `pve-syno-reap`。
+
+### 實機驗證
+
+一台 cirros guest 從 Synology LUN 開機，在三節點叢集上，全程 TCG（三台都沒有 KVM）：
+
+| | |
+|---|---|
+| Guest 從 LUN 開機 | 掛上 `sda1` 並把檔案系統擴充到填滿它 |
+| `vzdump` snapshot／stop／suspend | 13 秒／19 秒／15 秒，全部成功 |
+| `qmrestore` 到新 VMID、開機、驗證 | payload `md5`**完全相同** |
+| 即時遷移 pve1 → pve2 → pve3 | 中斷 **5 毫秒**、然後 **87 毫秒**，`/proc/uptime` 全程連續 |
+| Guest 重新開機 | payload 完好 |
+| 三個節點、一個共用 storage | 全部 active，全部用複寫過來的憑證登入成功 |
+| `/etc/pve/priv/storage/` 複寫 | 三個節點都確認，權限 `0600` |
+
+收尾時 NAS 回到原本的四個 LUN 和三個 target，沒有任何 `pve-` 開頭的東西，而每個節點都沒有 map、工作階段、node 記錄、憑證或 drop-in。
+
 ## [0.5.5~beta1] - 2026-08-06
 
 **0.5.3~beta1 和 0.5.4~beta1 無法使用。`pvesm add` 會直接失敗。**請升級跳過它們。

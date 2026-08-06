@@ -426,19 +426,38 @@ which rewrite the file and would drop other vendors' entries.
 
 `on_delete_hook` runs on **one** node — the one where `pvesm remove` was typed.
 It removes the target and releases that node's session. The other nodes are never
-told, because once the storage is gone from the configuration PVE has no reason
-to call `deactivate_storage` for it there.
+told.
 
-The leftover is a dead session and a failed map pointing at a target that no
-longer exists. Harmless, but it accumulates. **To remove a storage cleanly:**
+**And `deactivate_storage` will not save you, because nothing calls it.** Verified
+across the whole `/usr/share/perl5/PVE` tree on Proxmox VE 9: only the dispatcher
+in `Storage.pm` and the per-plugin implementations exist, and neither `pvestatd`
+nor the API ever invokes it. This project's own earlier text claimed that disabling
+a storage made "each node deactivate on its next poll" — that was wrong, and the
+sibling NetApp plugin had already found and corrected the identical claim.
+
+So the leftover — a dead session and a failed map pointing at a target that no
+longer exists — is **operator territory**, and the procedure below is the real one
+rather than a formality:
 
 ```bash
-pvesm set <storage> --disable 1     # each node deactivates on its next poll
-# wait for the storages to go inactive everywhere, then:
+# 1. On EVERY node, while the storage still exists in the configuration:
+pve-syno-reap --storage <storage>            # dry run, shows what is left
+pve-syno-reap --storage <storage> --remove   # then act
+
+# 2. Only then, on one node:
 pvesm remove <storage>
 ```
 
-If one is left behind, on that node:
+`pve-syno-reap` exists because of what a three-node run showed: a VM
+live-migrated pve1 → pve2 → pve3 and destroyed on pve3 left **pve1 and pve2 each
+holding a multipath map and a tracking entry for a LUN that no longer existed**.
+PVE's only `deactivate_volumes` call during migration is inside
+`sync_offline_local_volumes`, so for a shared storage the source node is never
+told. The tool defaults to a dry run, never touches a device that is in use, and
+skips — rather than assumes — anything whose state it cannot establish.
+
+If a session is still left on a node after the storage is gone from the
+configuration, the tool can no longer find it, and it is manual:
 
 ```bash
 multipathd disablequeueing map <map>
@@ -589,6 +608,68 @@ then compared against existing targets.
 There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
+
+### Backup, a real guest, and three nodes — the run that closed the last gaps
+
+Everything before this was `pvesm` and `dd`. This was a cirros guest booting from a
+Synology LUN, backed up three ways, restored, migrated across three nodes and
+rebooted. No KVM on any node, so all of it under TCG emulation.
+
+| | |
+|---|---|
+| Import (`qm importdisk`, 112 MiB) | 8 s |
+| Guest boot from the LUN | mounted `sda1`, **resized the filesystem to fill the LUN**, reached a login prompt |
+| `vzdump --mode snapshot` (live) | 13 s, 36 MB archive, `resuming VM again` after the QMP backup started |
+| `vzdump --mode stop` | 19 s, VM stopped and restarted correctly |
+| `vzdump --mode suspend` | 15 s, resumed after 1 s |
+| `qmrestore` to a new VMID on the same storage | 1 GiB read, 94.7 % sparse |
+| Restored guest booted, payload `md5` | **identical to the original** |
+| Live migration pve1 → pve2 | downtime **5 ms** |
+| Live migration pve2 → pve3 | downtime **87 ms**, `/proc/uptime` 405 s — continuous through both |
+| Guest reboot | payload intact |
+| Three nodes, one shared storage | all three `active`, all three authenticated from the replicated credential |
+
+`/etc/pve/priv/storage/` replicates: a file written on pve1 appeared on pve2 and
+pve3 within seconds at mode `0600`. That was the load-bearing assumption of the
+credential change and it had not been checked until now.
+
+#### Two defects, and the second was the same work written twice
+
+**`WwidState::orphans` had no caller.** It was written for the case below,
+documented at length, and invoked from nowhere — dead code standing in for a fix.
+
+The case: a VM live-migrated pve1 → pve2 → pve3 and destroyed on pve3 left
+**pve1 and pve2 each holding a multipath map and a tracking entry for a LUN that no
+longer existed.** PVE's only `deactivate_volumes` call during migration is inside
+`sync_offline_local_volumes`, so for a shared storage the source node is never
+told. That is PVE's shape, not a bug in it — but a block-device plugin has
+per-node state, and one dead map accumulates per LUN per node that ever saw it.
+
+**And `_detach_local` could not clean it up.** When the LUN is deleted from another
+node, this node's iSCSI session is still up, so each `sd` node survives as a dead
+device and multipathd rebuilds a map over it — `failed faulty running`, one path,
+pointing at nothing. `free_image` captured the slaves, flushed, removed the
+residual paths and flushed again. `_detach_local` stopped at the first flush. The
+same procedure written twice, and only one copy correct; the reaper's first real
+run reported **`flush incomplete`** and the map stayed. It now removes residual
+paths when — and only when — a flush has failed, so an ordinary VM stop is
+unchanged.
+
+With both fixed, `pve-syno-reap --remove` cleared the dead map on pve1 and pve2
+and left the live LUN, the running VM and the node's NetApp maps untouched.
+
+#### Nothing in Proxmox VE calls `deactivate_storage`
+
+Verified across the whole `/usr/share/perl5/PVE` tree: only the dispatcher in
+`Storage.pm` and the per-plugin implementations exist. Neither `pvestatd` nor the
+API invokes it.
+
+So this project's own instruction that `pvesm set --disable 1` makes "each node
+deactivate on its next poll" was **false**, and a code comment written the same
+afternoon claiming PVE calls it "when it is finished with the storage on this node"
+was false too. The sibling NetApp plugin had already found and corrected the
+identical claim — a family lesson this project failed to import rather than a new
+discovery. Per-node cleanup is operator territory, and `pve-syno-reap` is the path.
 
 ### The hardware run of this session's own changes, which found four more
 

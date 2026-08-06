@@ -6,6 +6,61 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.0~beta1] - 2026-08-06
+
+**Backup, restore, a guest booting from the NAS, live migration across three
+nodes.** The last three gaps that mattered are closed, and closing them found two
+more defects.
+
+### Added
+
+- **`pve-syno-reap`** — reports, and with `--remove` clears, multipath maps this
+  node holds for LUNs the NAS no longer has. Default is a dry run. It never
+  touches a device that is in use, and skips rather than assumes anything whose
+  state it cannot establish.
+
+### Fixed
+
+- **`WwidState::orphans` had no caller.** It was written for the case below,
+  documented at length, and invoked from nowhere — dead code standing in for a
+  fix. `reap_orphans` is the caller.
+- **`_detach_local` could not flush a map whose LUN was deleted from another
+  node.** This node's iSCSI session is still up, so each `sd` node survives as a
+  dead device and multipathd rebuilds a map over it. `free_image` captured the
+  slaves, flushed, removed the residual paths and flushed again; `_detach_local`
+  stopped at the first flush — the same procedure written twice with only one copy
+  correct. It now removes residual paths when, and only when, a flush has failed,
+  so an ordinary VM stop is unchanged.
+
+### Corrected
+
+- **Nothing in Proxmox VE calls `deactivate_storage`.** Verified across the whole
+  `/usr/share/perl5/PVE` tree: only the dispatcher and the per-plugin
+  implementations exist. So this project's instruction that
+  `pvesm set --disable 1` makes "each node deactivate on its next poll" was false,
+  and a code comment written the same afternoon claiming PVE calls it "when it is
+  finished with the storage on this node" was false too. The sibling NetApp plugin
+  had already found and corrected the identical claim. The documented removal
+  procedure now runs `pve-syno-reap` on each node first.
+
+### Verified on hardware
+
+A cirros guest booting from a Synology LUN, on a three-node cluster, all under TCG
+(no KVM anywhere):
+
+| | |
+|---|---|
+| Guest boot from the LUN | mounted `sda1` and resized the filesystem to fill it |
+| `vzdump` snapshot / stop / suspend | 13 s / 19 s / 15 s, all succeeded |
+| `qmrestore` to a new VMID, boot, verify | payload `md5` **identical** |
+| Live migration pve1 → pve2 → pve3 | **5 ms** then **87 ms** downtime, `/proc/uptime` continuous |
+| Guest reboot | payload intact |
+| Three nodes, one shared storage | all active, all authenticated from the replicated credential |
+| `/etc/pve/priv/storage/` replication | confirmed on all three nodes at mode `0600` |
+
+Ended with the NAS on its original four LUNs and three targets, nothing `pve-`
+left, and every node with no map, session, node record, credential or drop-in.
+
 ## [0.5.5~beta1] - 2026-08-06
 
 **0.5.3~beta1 and 0.5.4~beta1 could not be used. `pvesm add` failed outright.**

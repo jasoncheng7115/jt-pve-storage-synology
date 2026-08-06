@@ -1,0 +1,125 @@
+#!/usr/bin/perl
+
+# Report — and optionally remove — multipath maps this node holds for LUNs the
+# NAS no longer has.
+#
+# WHY THIS EXISTS, measured on a three-node cluster on 2026-08-06:
+#
+# A running VM was live-migrated pve1 -> pve2 -> pve3 and then destroyed on pve3.
+# Proxmox VE calls `deactivate_volume` on the source node only when it copied a
+# LOCAL volume — QemuMigrate's single `deactivate_volumes` call is inside
+# `sync_offline_local_volumes` — so for a SHARED storage the source node is never
+# told anything happened. pve3 cleaned up correctly. **pve1 and pve2 were each
+# left holding a multipath map and a tracking entry for a LUN that no longer
+# existed.**
+#
+# That is PVE's shape rather than a bug in it: for a shared storage the volume is
+# reachable from every node, so there is nothing for PVE to deactivate. But a
+# block-device plugin does have per-node state, and one dead map accumulates per
+# LUN per node that ever saw it.
+#
+# It is not a route to the wrong disk — `mapping_index` is reused, and the
+# kernel-WWID check is what makes that safe — but a dead map is something an
+# operator eventually trips over, and it pins a session open.
+#
+# DEFAULT IS DRY RUN. Nothing is removed unless --remove is given. A device that
+# is in use, or that cannot be shown to be unused, is never touched: "could not
+# determine" is not "safe".
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+
+my $VERSION = '0.6.0~beta1';
+
+my ($remove, $storage, $all, $help, $quiet);
+GetOptions(
+    'remove'    => \$remove,
+    'storage=s' => \$storage,
+    'all'       => \$all,
+    'quiet'     => \$quiet,
+    'help'      => \$help,
+) or usage(1);
+usage(0) if $help;
+
+sub usage {
+    my ($rc) = @_;
+    print <<"EOF";
+pve-syno-reap $VERSION — find multipath maps left behind for deleted LUNs
+
+Usage:
+  pve-syno-reap --storage <id> [--remove]
+  pve-syno-reap --all [--remove]
+
+  --storage <id>   one synologysan storage
+  --all            every synologysan storage configured on this node
+  --remove         actually flush what is reported (default is a dry run)
+  --quiet          only print findings, not the "nothing to do" lines
+
+Runs on ONE node and reports only that node's leftovers. A cluster needs it on
+each node — which is the same shape as the removal procedure in the README.
+
+Nothing in use is touched, and a device whose state cannot be determined is
+skipped rather than assumed idle.
+EOF
+    exit $rc;
+}
+
+usage(1) if !$storage && !$all;
+
+eval {
+    require PVE::Storage;
+    require PVE::Storage::Custom::SynologySANPlugin;
+    1;
+} or die "this must run on a Proxmox VE node: $@";
+
+my $cfg = PVE::Storage::config();
+my $ids = $cfg->{ids} // {};
+
+my @storages;
+if ($all) {
+    @storages = sort grep { ($ids->{$_}{type} // '') eq 'synologysan' } keys %$ids;
+    die "no synologysan storage is configured on this node\n" if !@storages;
+} else {
+    die "storage '$storage' is not configured on this node\n" if !$ids->{$storage};
+    die "storage '$storage' is type '$ids->{$storage}{type}', not synologysan\n"
+        if ($ids->{$storage}{type} // '') ne 'synologysan';
+    @storages = ($storage);
+}
+
+my $plugin = 'PVE::Storage::Custom::SynologySANPlugin';
+my $found  = 0;
+my $acted  = 0;
+
+for my $sid (@storages) {
+    my $scfg = $ids->{$sid};
+
+    my $report = eval { $plugin->reap_orphans($sid, $scfg, dry_run => !$remove) };
+    if ($@) {
+        warn "storage '$sid': $@";
+        next;
+    }
+
+    if (!@{ $report // [] }) {
+        print "storage '$sid': nothing left behind on this node.\n" if !$quiet;
+        next;
+    }
+
+    print "storage '$sid':\n";
+    for my $r (@$report) {
+        $found++;
+        $acted++ if $r->{action} =~ /^(?:flushed|untracked)$/;
+        printf "  %-18s %s  %s\n", $r->{action}, $r->{volname}, $r->{wwid};
+        printf "  %-18s %s\n", '', $r->{reason} if defined $r->{reason};
+    }
+}
+
+if ($found && !$remove) {
+    print "\nThis was a dry run. Add --remove to act on the above.\n";
+} elsif ($acted) {
+    print "\nRemoved $acted leftover(s) on this node."
+        . " Run it on the other nodes too.\n";
+}
+
+exit 0;

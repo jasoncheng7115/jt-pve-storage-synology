@@ -280,7 +280,22 @@ scsi_id -g -u       3600140513a3cd1edf296d4d4bdb712da     <- 完全相同
 
 #### 移除共用 storage 會在其他節點留下工作階段
 
-`on_delete_hook` 只在**一個**節點上執行——就是打 `pvesm remove` 的那個。它會移除 target 並釋放那個節點的工作階段。其他節點永遠不會被通知，因為 storage 一旦從設定裡消失，PVE 就沒有理由在那裡為它呼叫 `deactivate_storage`。
+`on_delete_hook` 只在**一個**節點上執行——就是打 `pvesm remove` 的那個。它會移除 target 並釋放那個節點的工作階段。其他節點永遠不會被通知。
+
+**而 `deactivate_storage` 救不了你，因為根本沒有東西呼叫它。**這是在 Proxmox VE 9 上對整個 `/usr/share/perl5/PVE` 目錄樹驗證過的：只有 `Storage.pm` 裡的分派函式和各 plugin 自己的實作存在，而 `pvestatd` 和 API 都不會去呼叫它。這個專案自己先前的文字曾聲稱停用 storage 會讓「每個節點在下一次輪詢時停用」——那是錯的，而相關專案 NetApp 那支早就發現並修正過完全相同的說法。
+
+所以那個殘留物——一個死掉的工作階段，加上一個指向已不存在 target 的失敗 map——是**管理者的工作範圍**，而下面那段程序是真正要做的事，不是形式：
+
+```bash
+# 1. 在「每一個」節點上，趁 storage 還在設定裡的時候：
+pve-syno-reap --storage <storage>            # 試跑，顯示留下了什麼
+pve-syno-reap --storage <storage> --remove   # 然後真的處理
+
+# 2. 之後才在其中一個節點上：
+pvesm remove <storage>
+```
+
+`pve-syno-reap` 之所以存在，是因為一次三節點測試顯示：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果**pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN**。PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以對共用 storage 而言，來源節點永遠不會被通知。這個工具預設是試跑，絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。
 
 留下來的是一個死掉的工作階段和一個失敗的 map，指向一個已經不存在的 target。無害，但會累積。**要乾淨地移除一個 storage：**
 
@@ -399,6 +414,42 @@ Target 的 IQN 裡嵌的是**建立當時**的 NAS 主機名稱——測試機�
 這個型號上沒有 `SYNO.San.Nvme.*`，所以它不支援 NVMe-oF。
 
 ---
+
+### 備份、一台真的 guest、以及三個節點——關掉最後幾個空白的那一輪
+
+在這之前的所有測試都是 `pvesm` 和 `dd`。這一次是一台 cirros guest 從 Synology LUN 開機，用三種方式備份、還原、跨三個節點遷移、再重新開機。三台節點都沒有 KVM，所以全程是 TCG 模擬。
+
+| | |
+|---|---|
+| 匯入（`qm importdisk`，112 MiB）| 8 秒 |
+| Guest 從 LUN 開機 | 掛上 `sda1`，**把檔案系統擴充到填滿整個 LUN**，進到登入提示 |
+| `vzdump --mode snapshot`（線上）| 13 秒，36 MB 封存檔，QMP 備份啟動後就 `resuming VM again` |
+| `vzdump --mode stop` | 19 秒，VM 正確地停止並重新啟動 |
+| `vzdump --mode suspend` | 15 秒，1 秒後恢復 |
+| `qmrestore` 到同一個 storage 上的新 VMID | 讀取 1 GiB，94.7% 是稀疏區 |
+| 還原後的 guest 開機、payload `md5` | **與原始完全相同** |
+| 即時遷移 pve1 → pve2 | 中斷 **5 毫秒** |
+| 即時遷移 pve2 → pve3 | 中斷 **87 毫秒**，`/proc/uptime` 405 秒——兩次遷移全程連續 |
+| Guest 重新開機 | payload 完好 |
+| 三個節點、一個共用 storage | 三個都 `active`，三個都用複寫過來的憑證登入成功 |
+
+`/etc/pve/priv/storage/` 會複寫：在 pve1 寫的檔案幾秒內出現在 pve2 和 pve3，權限是 `0600`。這是憑證那次修改最關鍵的假設，而在此之前一直沒有被檢查過。
+
+#### 兩個缺陷，而第二個是同一段工作被寫了兩次
+
+**`WwidState::orphans`沒有任何呼叫者。**它就是為下面這個情況寫的，註解寫得很長，而完全沒有地方呼叫它——一段代替修正存在的死程式碼。
+
+情況是：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果**pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN。**PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以對共用 storage 而言，來源節點永遠不會被通知。這是 PVE 的形態，不是它的錯——但區塊裝置 plugin 有屬於各節點自己的狀態，而每一顆曾經被某節點看到過的 LUN 都會在該節點累積一個死掉的 map。
+
+**而 `_detach_local` 清不掉它。**當 LUN 是從另一個節點被刪除的，這個節點的 iSCSI 工作階段還開著，所以每個 `sd` 節點會以死掉的裝置留下來，而 multipathd 會在它上面重建一個 map——`failed faulty running`，一條路徑，指向什麼都沒有。`free_image` 會先取得 slave 清單、flush、移除殘留路徑、再 flush 一次。`_detach_local` 停在第一次 flush。同一段程序被寫了兩次，而只有一份是對的；reaper 第一次真的執行時回報 **`flush incomplete`**，map 留在那裡。現在它會在——而且只在——flush 失敗時移除殘留路徑，所以一般的 VM 停止流程沒有改變。
+
+兩者都修好之後，`pve-syno-reap --remove` 清掉了 pve1 和 pve2 上的死 map，而存活的 LUN、正在執行的 VM、以及該節點上 NetApp 的 map 都沒有被動到。
+
+#### Proxmox VE 裡沒有任何東西呼叫 `deactivate_storage`
+
+這是對整個 `/usr/share/perl5/PVE` 目錄樹驗證過的：只有 `Storage.pm` 裡的分派函式和各 plugin 自己的實作存在。`pvestatd` 和 API 都不會呼叫它。
+
+所以這個專案自己那句「`pvesm set --disable 1` 會讓每個節點在下一次輪詢時停用」是**錯的**，而同一個下午寫下的一段程式碼註解聲稱 PVE 會「在這個節點用完這個 storage 時」呼叫它，也是錯的。相關專案 NetApp 那支早就發現並修正過完全相同的說法——這是一個沒有被匯入的家族教訓，不是新發現。各節點的清理屬於管理者的工作範圍，而 `pve-syno-reap` 就是那條路徑。
 
 ### 對這一段自己的修改做實機測試，又找出四個
 

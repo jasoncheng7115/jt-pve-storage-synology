@@ -1,3 +1,19 @@
+jt-pve-storage-synology (0.6.0~beta1-1) unstable; urgency=medium
+
+  * New tool pve-syno-reap: clears multipath maps this node holds for LUNs the
+    NAS no longer has. Dry run by default.
+  * Wire up WwidState::orphans, which had been written for exactly that case and
+    called from nowhere.
+  * Fix _detach_local so it can flush a map whose LUN was deleted from another
+    node: it now removes the residual sd paths when a flush has failed, which is
+    what free_image had been doing and this had not.
+  * Correct the removal procedure: nothing in Proxmox VE calls
+    deactivate_storage, so per-node cleanup is operator territory.
+  * Verified on hardware: guest boot from the NAS, vzdump in all three modes,
+    qmrestore, live migration across three nodes, guest reboot.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 02:00:00 +0800
+
 jt-pve-storage-synology (0.5.5~beta1-1) unstable; urgency=high
 
   * 0.5.3~beta1 and 0.5.4~beta1 could not be used: pvesm add failed with
