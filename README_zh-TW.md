@@ -164,11 +164,31 @@ bin/pve-syno-api-probe --host 192.0.2.10 --user pve-storage
 
 `--probe-methods` 需要明確開啟。它指名一個 NAS 從未發出過的 LUN 與快照 uuid，所以存在的方法只能拒絕——而拒絕本身就證明它在那裡。它能動到的東西並不存在，但送出的畢竟是破壞性方法的名稱，所以先問過再做。
 
+## 清理工具
+
+`pve-syno-reap` 會回報——加上 `--remove` 則清除——本節點為 NAS 上已不存在的 LUN 所持有的 multipath map，以及當機留下的追蹤記錄。**預設是試跑。**
+
+```bash
+pve-syno-reap --storage <storage>            # 顯示留下了什麼
+pve-syno-reap --storage <storage> --remove   # 然後真的處理
+pve-syno-reap --all --remove                 # 本節點上每一個 synologysan storage
+```
+
+**節點當機之後請執行它，移除 storage 之前也請在每個節點上執行**。有兩件事讓它成為必要，而兩件都是在三節點叢集上量測到的：
+
+- Proxmox VE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以對**共用** storage 而言，來源節點永遠不會被告知 VM 已經離開。一台 VM 從 `pve1 → pve2 → pve3` 遷移後在 pve3 上被銷毀，pve1 和 pve2 就會各自留著一個對應已不存在 LUN 的 map。
+- 被硬重置的節點根本不會執行 `deactivate_volume`，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。
+
+兩者都不危險——每個使用者在動作之前都會重新檢查裝置，而裝置身分一律來自核心的 WWID——但它們會累積。這個工具絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。
+
+Proxmox VE 裡沒有任何東西會呼叫 `deactivate_storage`（對整個 `/usr/share/perl5/PVE` 目錄樹驗證過），所以這個清理工作屬於管理者，不屬於 PVE。
+
 ## 文件
 
 | | |
 |---|---|
 | [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) | 哪些驗證過、哪些沒有，以及測試計畫。**在信任任何東西之前先讀這份** |
+| [docs/LIMITS_zh-TW.md](docs/LIMITS_zh-TW.md) | 各機型公布的 LUN 與 target 上限，每個數字都附官方出處 |
 | [docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md) | DSM 帳號、最小權限、自動封鎖、兩步驟驗證、TLS |
 
 ## 相關專案

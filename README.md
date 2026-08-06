@@ -264,12 +264,43 @@ issued, so a method that exists can only refuse — and the refusal proves it is
 there. Nothing it could act on is real, but the names being sent are
 destructive ones, so it asks first.
 
+## The cleanup tool
+
+`pve-syno-reap` reports — and with `--remove` clears — multipath maps this node
+holds for LUNs the NAS no longer has, and tracking entries left by a crash.
+**Default is a dry run.**
+
+```bash
+pve-syno-reap --storage <storage>            # show what is left behind
+pve-syno-reap --storage <storage> --remove   # then act
+pve-syno-reap --all --remove                 # every synologysan storage on this node
+```
+
+**Run it after a node crash, and on every node before removing a storage.** Two
+things make it necessary, both measured on a three-node cluster:
+
+- Proxmox VE's only `deactivate_volumes` call during migration is inside
+  `sync_offline_local_volumes`, so for a **shared** storage the source node is
+  never told a VM left. A VM migrated `pve1 → pve2 → pve3` and destroyed on pve3
+  leaves pve1 and pve2 each holding a map for a LUN that no longer exists.
+- A hard-reset node never runs `deactivate_volume` at all, so its tracking file
+  keeps an entry for a LUN it is no longer attached to.
+
+Neither is dangerous — every consumer re-checks for a device before acting, and
+device identity always comes from the kernel's WWID — but they accumulate. The
+tool never touches a device that is in use, and skips rather than assumes anything
+whose state it cannot establish.
+
+Nothing in Proxmox VE calls `deactivate_storage` (verified across the whole
+`/usr/share/perl5/PVE` tree), so this cleanup is the operator's, not PVE's.
+
 ## Documentation
 
 | | |
 |---|---|
 | [docs/TESTING.md](docs/TESTING.md) | What is verified, what is not, and the test plan. **Read this before trusting anything** |
 | [docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md) | The DSM account, its minimum privileges, Auto Block, 2FA, TLS |
+| [docs/LIMITS.md](docs/LIMITS.md) | Every model's published LUN and target maxima, with the official source for each figure |
 
 ## Related projects
 
