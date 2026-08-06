@@ -8,7 +8,7 @@
 
 ### 新增
 
-- `Synology::ISCSI`。**絕不使用 `iscsiadm -m discovery`**：一次 SendTargets 探索會為 NAS 上*每一個* target 建立節點紀錄，包含擁有者自己的、以及一個 Proxmox Backup Server 正在使用的；而在 `node.startup = automatic` 的節點上，那些紀錄會在開機時被登入。節點紀錄改為直接建立，一次一個 target、一個 portal。
+- `Synology::ISCSI`。**絕不使用 `iscsiadm -m discovery`**：一次 SendTargets 探索會為 NAS 上**每一個** target 建立節點紀錄，包含擁有者自己的、以及一個 Proxmox Backup Server 正在使用的；而在 `node.startup = automatic` 的節點上，那些紀錄會在開機時被登入。節點紀錄改為直接建立，一次一個 target、一個 portal。
 - **機型自己的上限，從 NAS 讀取而不是看規格表。**`SYNO.Core.System info type=define` 在 DS918+ 上回報 `max_iscsiluns` **256**、`max_iscsitrgs` **128**，而技術規格表寫的是 512 與 256。兩份公開的參考實作都沒有讀它。
 - plugin 現在會在 NAS 之前就拒絕建立 LUN，並用一句說得出真正原因的話——開到上限時 DSM 回 18990541，到操作者眼前是「配置失敗」，而 `pvesm status` 還顯示好幾 TB 可用。剩下十六個時會警告一次。這個數量包含不屬於這個 storage 的 LUN，而這是它從不送那個會藏起 Virtual Machine Manager 磁碟的型態過濾條件的第二個理由。
 - 節點端模組已對硬體驗證：一顆 LUN 掛到 Proxmox VE 節點、裝置由核心的 WWID 確認（推導規則的**第三個**獨立確認）、擴充、然後卸離——並確認節點回到完全相同的先前狀態。
