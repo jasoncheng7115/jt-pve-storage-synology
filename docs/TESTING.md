@@ -34,7 +34,7 @@ see "How a session is carried" below.
 | Model | DS918+ |
 | DSM | 7.1.1-42962 Update 9 |
 | Volume | `/volume1`, **Btrfs**, 14301.5 GiB total |
-| Note | A **production** NAS. Read-only probing only, so far |
+| Note | A **production** NAS, also running Virtual Machine Manager. Read-only probing only, so far |
 
 **No write test has been run yet. No plugin code exists yet.** Everything in
 the "verified" table below was established read-only.
@@ -146,6 +146,30 @@ contribution:
 ls -l /dev/disk/by-id/ | grep -i 6001405
 ```
 
+### A filter that is not merely unverified, but verified to be incomplete
+
+Synology's CSI driver lists LUNs with an explicit twelve-type filter
+(`BLOCK`, `FILE`, `THIN`, `ADV`, `SINK`, `CINDER`, …, `BLUN`, `BLUN_THICK`, …).
+On the test NAS, that filter returned **3 LUNs where the unfiltered listing
+returned 4**. The hidden one:
+
+```
+type 295, VDISK_BLUN, 120 GiB — a Virtual Machine Manager virtual disk
+```
+
+Its 120 GiB comes out of the same volume as everything else, so a client
+trusting that filter under-counts provisioned space by that much and cannot see
+the object at all.
+
+**So this project never sends the types filter.** It lists unfiltered and
+matches locally on the name, which is the only ownership test it trusts anyway.
+The probe now runs both listings and reports what the filter would have hidden,
+because the next DSM may hide a different type.
+
+This is the general rule made concrete: a listing this plugin asked to filter
+must be checked to have filtered, and "nothing there" and "filtered out" are
+indistinguishable in the answer.
+
 ### `dev_attribs` — the real key names
 
 Read from an existing LUN:
@@ -199,7 +223,7 @@ one, the plugin refuses rather than assumes.
 
 | # | Question | Why it matters |
 |---|---|---|
-| R-1 | **The method name for restoring a LUN from its snapshot** | Neither reference client has one. `restored_time` proves the operation exists. Until the name is known, **rollback is refused** |
+| R-1 | ~~The method name for restoring a LUN from its snapshot~~ **ANSWERED: `restore_snapshot`.** What remains: its **parameter names**, and whether a rollback keeps newer snapshots and preserves the LUN uuid | Knowing a method exists is not knowing what it does. A rollback that silently changes the LUN uuid changes the WWID, and every node then sees a different disk. **Rollback stays refused until the behaviour is verified, not merely the name** |
 | R-2 | Does `unmap_target` replace a LUN's target list or add to it? | If it replaces, unmapping one node could unmap all of them |
 | R-3 | LUN name length limit and legal characters | The name carries the ownership check. Silent truncation means two disks with one name |
 | R-4 | Size granularity | Getting less than was asked for means a filesystem that fills and then fails |
@@ -207,7 +231,7 @@ one, the plugin refuses rather than assumes.
 | R-6 | Whether a LUN with snapshots refuses deletion, and a snapshot with a clone | `qm destroy` and vzdump's snapshot mode both walk straight into this |
 | R-7 | Whether a clone is thin or a full copy | Decides whether linked clones are possible |
 | R-8 | How long `is_action_locked` stays set | A large clone can outlast a naive wait — the CSI driver's own bound is 20 seconds |
-| R-9 | Whether `LUN list` has a server-side cap | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted |
+| R-9 | ~~Whether `LUN list` has a server-side cap~~ **PARTLY ANSWERED: `offset`/`limit` are ignored and no total is reported.** So the listing returns everything it has — and nothing in the answer proves that | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. With no total to check against, only a second read can catch a short answer |
 | R-10 | Whether `list_snapshot` returns snapshots taken by DSM's own schedule | If it does, PVE would show a user's scheduled snapshots as its own and could delete them |
 | R-11 | `mapping_index` ceiling per target, and whether it is reused | A reused index with a stale device node in the kernel is the "wrote to the wrong disk" class of fault |
 | R-12 | Whether DSM tolerates concurrent requests | **Cinder wraps every single request in a process-wide lock.** It did not do that for fun |

@@ -1,3 +1,24 @@
+jt-pve-storage-synology (0.1.1~beta1-1) unstable; urgency=low
+
+  * The snapshot restore method is named restore_snapshot, established against
+    hardware. Nine candidate names were asked about; one answered. Rollback is
+    still refused in this release: knowing a method exists is not knowing its
+    parameters or whether it keeps newer snapshots and preserves the LUN uuid.
+  * The LUN listing no longer sends a types filter. Synology's own CSI driver
+    sends an explicit twelve-type list, and on the test NAS that list hid a
+    Virtual Machine Manager virtual disk whose 120 GiB comes out of the same
+    volume. The probe now lists unfiltered and reports what the filter would
+    have hidden.
+  * The register no longer reports a listing that was skipped as one the
+    account could not read. Skipped, refused and succeeded are three different
+    outcomes, and conflating the first two is the mistake this project's own
+    rules exist to prevent.
+  * A read method that succeeds is no longer flagged as alarming; only a
+    destructive candidate succeeding is.
+  * Error 18990004 recorded, observed from SYNO.Core.ISCSI.Host get.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 15:00:00 +0800
+
 jt-pve-storage-synology (0.1.0~beta1-1) unstable; urgency=low
 
   * First packaged build. Contains no storage plugin.

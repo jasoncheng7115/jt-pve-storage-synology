@@ -15,11 +15,14 @@
 # written for.
 #
 # The one thing that needs saying out loud: --probe-methods sends candidate
-# method names WITH NO PARAMETERS, to tell "no such method" (DSM error 103)
-# apart from "method exists, your parameters are wrong" (101). A rollback with
-# no snapshot to roll back to cannot roll anything back — but it is still a
-# call to a destructive method, so it is behind its own flag and off by
-# default.
+# method names naming a LUN and snapshot uuid the NAS has never issued, so a
+# method that exists can only refuse — and the refusal code proves it is there.
+# DSM answers 103 for a method it does not have, and an object-not-found code
+# for one it does. Nothing it could act on is real, but the names being sent are
+# destructive ones, so it is behind its own flag and off by default.
+#
+# It has already earned its keep: on a DSM 7.1.1 it found restore_snapshot,
+# which neither reference implementation has, out of nine candidate names.
 
 use strict;
 use warnings;
@@ -54,7 +57,7 @@ sub read_password {
     return $answer;
 }
 
-my $VERSION = '0.1.0~beta1';
+my $VERSION = '0.1.1~beta1';
 
 my $host;
 my $port;
@@ -259,6 +262,10 @@ my %COMMON_ERR = (
 
 my %ISCSI_ERR = (
     18990002 => 'out of free space',
+    # Observed from SYNO.Core.ISCSI.Host `get` given a uuid that does not
+    # exist. Not in either reference client's table; recorded because the code
+    # is the only thing worth keying a decision on.
+    18990004 => 'no such object (observed, undocumented)',
     18990500 => 'bad LUN type',
     18990505 => 'bad LUN UUID',
     18990531 => 'no such LUN',
@@ -519,12 +526,14 @@ say_line('');
 if ($show_luns) {
     say_head('LUNs (SYNO.Core.ISCSI.LUN list)');
 
+    # Listed WITHOUT a types filter, deliberately. Synology's CSI driver sends
+    # an explicit twelve-type list, and on the test NAS that list hid a LUN —
+    # so the filter is not merely unverified, it is known to be incomplete. A
+    # listing that quietly omits objects is read as "this is everything" by
+    # whatever decides what may be deleted or how much space is provisioned.
     my $r = call('SYNO.Core.ISCSI.LUN', 'list',
         $api_info{'SYNO.Core.ISCSI.LUN'}{maxVersion} // 1,
-        {
-            types => '["BLOCK","FILE","THIN","ADV","SINK","CINDER","CINDER_BLUN","CINDER_BLUN_THICK","BLUN","BLUN_THICK","BLUN_SINK","BLUN_THICK_SINK"]',
-            additional => '["allocated_size","status","flashcache_status","is_action_locked"]',
-        },
+        { additional => '["allocated_size","status","flashcache_status","is_action_locked"]' },
         json_params => 0,
     );
 
@@ -568,6 +577,9 @@ if ($show_luns) {
                 $l->{restored_time} // '-');
         }
         $report{lun_count} = scalar @$luns;
+        # Kept whole, not just counted: the filtered-versus-unfiltered
+        # comparison later needs the uuids to say which LUNs a filter hides.
+        $report{luns} = $luns;
         $report{lun_sample_keys} = [ sort keys %{ $luns->[0] // {} } ];
         say_line('');
         say_line('  fields a LUN row actually carries: %s',
@@ -742,14 +754,18 @@ if (!$probe_methods) {
     say_line('');
 
     my $probe = sub {
-        my ($api, $method, $params) = @_;
+        my ($api, $method, $params, %o) = @_;
         return if !$api_info{$api};
 
         my $r = call($api, $method, $api_info{$api}{maxVersion} // 1, $params);
         my $code = $r->{error};
 
+        # For a listing, succeeding IS the expected answer and means the method
+        # is there. Only a *destructive* candidate succeeding is alarming, and
+        # conflating the two cried wolf on the first real run.
         my $verdict =
-            $r->{success}      ? 'SUCCEEDED — stop and investigate before doing anything else'
+            $r->{success} && $o{read_only} ? 'PRESENT — returned data, as a read method should'
+          : $r->{success}      ? 'SUCCEEDED — stop and investigate before doing anything else'
           : !defined $code     ? 'no error code: ' . ($r->{transport} // '?')
           : $code == 103       ? 'absent'
           : $code == 102       ? 'API absent'
@@ -771,7 +787,7 @@ if (!$probe_methods) {
 
     say_line('');
     say_line('  read methods of the access-control object (SYNO.Core.ISCSI.Host):');
-    $probe->($_->[0], $_->[1], {}) for @HOST_CANDIDATES;
+    $probe->($_->[0], $_->[1], {}, read_only => 1) for @HOST_CANDIDATES;
 }
 
 # ---------------------------------------------------------------------------
@@ -798,16 +814,52 @@ if ($api_info{'SYNO.Core.ISCSI.LUN'} && defined $report{lun_count}) {
         say_line('  asked for 1 of %d, got %d', $report{lun_count}, $n);
         say_line('  other keys beside luns: %s', @keys ? join(', ', @keys) : 'NONE');
         if ($n == 1) {
-            say_line('  => limit IS honoured. Paging is therefore possible, and a');
-            say_line('     bare list may be capped by a server-side default. Find');
-            say_line('     the total before trusting any listing.');
-        } elsif ($n == $report{lun_count}) {
-            say_line('  => limit is IGNORED: list always returns everything. Simpler,');
-            say_line('     but then nothing reports a total either, so a short answer');
-            say_line('     cannot be told from a complete one.');
+            say_line('  => limit IS honoured, so a bare list may be capped by a');
+            say_line('     server-side default. Find the total before trusting one.');
+        } else {
+            say_line('  => limit is IGNORED: the listing returns everything it has.');
+            say_line('     Nothing reports a total either, so a short answer cannot');
+            say_line('     be told from a complete one — only a second read can.');
         }
         $report{list_limit_honoured} = ($n == 1 ? 1 : 0);
         $report{list_extra_keys}     = \@keys;
+    }
+
+    # The filter Synology's own CSI driver sends, compared against the
+    # unfiltered listing above. Any LUN that appears only in the unfiltered
+    # answer is one that a client trusting that filter cannot see — and its
+    # capacity still comes out of the same volume.
+    say_line('');
+    say_line('  Now the same listing WITH the CSI driver\'s twelve-type filter,');
+    say_line('  to see whether that filter hides anything:');
+
+    my $f = call('SYNO.Core.ISCSI.LUN', 'list', 1,
+        { types => '["BLOCK","FILE","THIN","ADV","SINK","CINDER","CINDER_BLUN","CINDER_BLUN_THICK","BLUN","BLUN_THICK","BLUN_SINK","BLUN_THICK_SINK"]',
+          additional => '["allocated_size","status","is_action_locked"]' },
+        json_params => 0);
+
+    if (!$f->{success}) {
+        say_line('  refused: %s', $f->{transport} // err_text($f->{error}));
+    } else {
+        my %seen = map { ($_->{uuid} // '') => 1 } @{ $f->{data}{luns} // [] };
+        my @hidden = grep { !$seen{ $_->{uuid} // '' } } @{ $report{luns} // [] };
+        say_line('  filtered: %d of %d', scalar @{ $f->{data}{luns} // [] },
+            $report{lun_count});
+        if (@hidden) {
+            say_line('  *** the filter HIDES %d LUN(s):', scalar @hidden);
+            for my $h (@hidden) {
+                say_line('        %s  type=%s (%s)  %.1f GiB',
+                    $h->{name} // '?', $h->{type} // '?',
+                    $h->{type_str} // '?', ($h->{size} // 0) / 1024 ** 3);
+            }
+            say_line('      So do not send that filter. List unfiltered and match');
+            say_line('      locally on the name, which is the only ownership test');
+            say_line('      this plugin trusts anyway.');
+        } else {
+            say_line('  => the filter hides nothing on this NAS. It still should not');
+            say_line('     be relied on: it hid a VDISK_BLUN on another one.');
+        }
+        $report{types_filter_hides} = [ map { $_->{name} } @hidden ];
     }
 } else {
     say_line('  skipped: the LUN listing above did not succeed');
@@ -823,23 +875,42 @@ my @btrfs = grep { ($_->{fs_type} // '') eq 'btrfs' } @{ $report{volumes} // [] 
 
 say_line('  settled by this run:');
 say_line('    - the API set and every version range this NAS accepts');
-say_line('    - the account can%s read LUNs and targets',
-    defined $report{lun_count} ? '' : 'NOT');
+
+# "Not asked" is not "cannot". The first run of --probe-methods used --no-luns,
+# and this line reported that the account could NOT read LUNs — which was
+# false, and is exactly the confusion between "could not ask" and "the answer
+# is no" that the plugin's own rules forbid. Skipped, refused and succeeded are
+# three different outcomes.
+say_line('    - %s',
+      !$show_luns                  ? 'LUN and target listings were SKIPPED (--no-luns), so this'
+                                     . ' run says nothing about them'
+    : defined $report{lun_count}   ? 'the account can read LUNs and targets'
+    :                                'the account could NOT read LUNs or targets — see the'
+                                     . ' refusals above');
 say_line('    - %d Btrfs volume(s), so thin LUNs with snapshots are%s possible',
     scalar @btrfs, @btrfs ? '' : ' NOT');
 say_line('    - %s',
     $report{node_uuid} ? 'the NAS reports a node uuid to pin a storage to'
                        : 'no node uuid could be read');
+if (my $m = $report{methods}) {
+    my @present = grep { ($m->{$_}{verdict} // '') =~ /^PRESENT/ } sort keys %$m;
+    if (@present) {
+        say_line('    - these methods exist on this DSM:');
+        say_line('        %s', $_) for @present;
+    }
+}
+
 say_line('');
 say_line('  NOT settled — these need a write, on a volume nobody minds:');
 say_line('    - LUN name length limit and legal characters');
 say_line('    - size granularity: create an odd size, read back what was made');
 say_line('    - whether unmap_target replaces a LUN\'s target list or adds to it');
-say_line('    - what the SCSI WWID of a Synology LUN is, and how it relates');
-say_line('      to the LUN uuid (this decides how a node finds its device)');
 say_line('    - whether a LUN with snapshots refuses to be deleted');
 say_line('    - whether clone_snapshot is thin or a full copy');
 say_line('    - how long is_action_locked stays set, and on which operations');
+say_line('    - for any restore method found above: its PARAMETER names, and');
+say_line('      whether a rollback keeps newer snapshots and preserves the');
+say_line('      LUN uuid. Knowing a method exists is not knowing what it does');
 
 if ($json_out) {
     print JSON->new->canonical->pretty->encode(\%report);

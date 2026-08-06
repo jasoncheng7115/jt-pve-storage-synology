@@ -86,7 +86,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.1.0~beta1 <span class="hero__badge-sep">·</span>
+        <div class="hero__badge">v0.1.1~beta1 <span class="hero__badge-sep">·</span>
             <span class="lang-en">discovery stage</span><span class="lang-zh">探索階段</span>
         </div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
@@ -190,6 +190,10 @@
             <td><span class="lang-en">A node can identify its device by the kernel's own view instead of the path it was found on. Both reference clients use only by-path</span><span class="lang-zh">節點可以靠核心自己的認定辨識裝置，而不是靠它從哪個路徑被發現。兩份參考實作都只用 by-path</span></td>
         </tr>
         <tr>
+            <td><span class="lang-en">The CSI driver's twelve-type LUN filter <strong>hid a LUN</strong> — a Virtual Machine Manager virtual disk</span><span class="lang-zh">CSI driver 的十二種型態 LUN 過濾條件<strong>藏了一顆 LUN</strong>——一個 Virtual Machine Manager 的虛擬磁碟</span></td>
+            <td><span class="lang-en">Its capacity still comes out of the same volume. So this project lists unfiltered and matches locally: a filter verified to be incomplete is worse than no filter</span><span class="lang-zh">它的容量還是吃同一個儲存空間。所以本專案不帶過濾地列出、在本地比對：一個已被驗證為不完整的過濾條件，比不過濾更糟</span></td>
+        </tr>
+        <tr>
             <td><span class="lang-en"><code>max_sessions</code> defaults to <strong>1</strong></span><span class="lang-zh"><code>max_sessions</code> 預設是 <strong>1</strong></span></td>
             <td><span class="lang-en">A target left at the default admits exactly one node, so no cluster can share it and no map can be multipathed</span><span class="lang-zh">停在預設值的 target 只容許一個節點，所以叢集無法共用，也做不出 multipath</span></td>
         </tr>
@@ -226,16 +230,16 @@
 
     <div class="module-list">
         <div class="module-item">
-            <div class="module-item__name">R-1 <span class="status-badge status-badge--planned"><span class="lang-en">blocks rollback</span><span class="lang-zh">擋住倒回</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">The method name for restoring a LUN from its snapshot. Neither reference client has one</span><span class="lang-zh">從快照還原 LUN 的方法名稱。兩份參考實作都沒有</span></div>
+            <div class="module-item__name">R-1 <span class="status-badge status-badge--partial"><span class="lang-en">name found, behaviour unknown</span><span class="lang-zh">已知名稱，行為未知</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">The restore method is <code>restore_snapshot</code>. Its parameters, and whether a rollback keeps newer snapshots and preserves the LUN uuid, are not established — so rollback stays refused</span><span class="lang-zh">還原方法是 <code>restore_snapshot</code>。它的參數，以及倒回是否保留較新的快照、是否保持 LUN uuid 不變，都還沒確認——所以倒回仍然拒絕</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">R-2</div>
             <div class="module-item__desc"><span class="lang-en">Whether unmapping replaces a LUN's target list or adds to it — if it replaces, unmapping one node could unmap all of them</span><span class="lang-zh">解除對應是取代整份 target 清單還是加入——若是取代，解除一個節點可能把全部一起解掉</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">R-9</div>
-            <div class="module-item__desc"><span class="lang-en">Whether a LUN listing has a server-side cap. A silently truncated listing reads as "this is everything", and the code that reads it decides what may be deleted</span><span class="lang-zh">LUN 列表有沒有伺服器端上限。被靜默截斷的清單讀起來就是「全部就這些」，而讀它的程式碼決定什麼可以刪</span></div>
+            <div class="module-item__name">R-9 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分解答</span></span></div>
+            <div class="module-item__desc"><span class="lang-en"><code>offset</code> and <code>limit</code> are ignored and no total is reported, so the listing returns everything it has — and nothing in the answer proves that. Only a second read can catch a short one</span><span class="lang-zh"><code>offset</code> 與 <code>limit</code> 被忽略，也不回報總數，所以清單會回傳它手上的全部——而回應裡沒有任何東西能證明這一點。只有第二次讀取才抓得到短少的答案</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">R-12</div>
@@ -256,8 +260,13 @@
     <h2 class="section-title"><span class="lang-en">Why rollback is refused</span><span class="lang-zh">為什麼倒回被拒絕</span></h2>
 
     <p>
-        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one. SAN Manager's interface plainly has a Restore button, and every LUN reports a <code>restored_time</code> field, so the API exists — but <strong>its method name is not known</strong>, and this project does not send guessed names to destructive operations.</span>
-        <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<em>新的</em> volume」來還原，所以兩者都不需要。SAN Manager 的介面上明明有「還原」按鈕，而每一顆 LUN 都會回報 <code>restored_time</code> 欄位，所以 API 確實存在——但<strong>它的方法名稱未知</strong>，而這個專案不會拿猜來的名稱去做破壞性操作。</span>
+        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one.</span>
+        <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<em>新的</em> volume」來還原，所以兩者都不需要。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">The method has since been found on hardware: <strong><code>restore_snapshot</code></strong> on <code>SYNO.Core.ISCSI.LUN</code>, established by asking a DSM 7.1.1 about nine candidate names and getting exactly one answer. That is a real step forward and it is still not enough. <strong>Knowing a method exists is not knowing what it does.</strong> Its parameter names are unconfirmed, and so is the behaviour that matters: whether a rollback keeps snapshots newer than the one restored, and whether it preserves the LUN's uuid. A rollback that silently changes the uuid changes the WWID, and every node then sees a different disk.</span>
+        <span class="lang-zh">這個方法後來在實機上找到了：<code>SYNO.Core.ISCSI.LUN</code> 上的 <strong><code>restore_snapshot</code></strong>，做法是對一台 DSM 7.1.1 詢問九個候選名稱，而只有一個回答了。那是實質的進展，但仍然不夠。<strong>知道一個方法存在，不等於知道它做什麼。</strong>它的參數名稱尚未確認，真正要緊的行為也還沒確認：倒回之後比還原點更新的快照會不會保留、LUN 的 uuid 會不會改變。倒回若默默改掉 uuid 就是改掉 WWID，每個節點看到的就是另一顆磁碟。</span>
     </p>
 
     <p>

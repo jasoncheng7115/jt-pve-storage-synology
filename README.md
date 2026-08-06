@@ -65,10 +65,17 @@ its structure is its own.
 ### Why rollback is refused
 
 Neither reference implementation has one: Kubernetes and Cinder both restore by
-cloning a snapshot into a *new* volume, so neither needed it. SAN Manager's
-interface plainly has a Restore button, and the NAS reports a `restored_time`
-field on every LUN, so the API exists — but **its method name is not known**,
-and this project does not send guessed names to destructive operations.
+cloning a snapshot into a *new* volume, so neither needed it.
+
+The method has since been found on hardware — it is **`restore_snapshot`**, on
+`SYNO.Core.ISCSI.LUN`, established by asking a DSM 7.1.1 about nine candidate
+names and getting exactly one answer. That is a real step forward, and it is
+still not enough to enable a rollback. **Knowing a method exists is not knowing
+what it does.** Its parameter names are unconfirmed, and so is the behaviour
+that actually matters: whether a rollback keeps snapshots newer than the one
+restored, and whether it preserves the LUN's uuid. A rollback that silently
+changes the uuid changes the WWID, and every node in the cluster then sees a
+different disk.
 
 The alternative some plugins take — clone the snapshot, delete the original,
 rename the clone into its place — is not acceptable here. It destroys the
@@ -76,9 +83,8 @@ original before the replacement is proven, and it changes the LUN's identity,
 so every node sees a different disk.
 
 Snapshot create, list and delete all work, so `vzdump` snapshot mode is fine.
-`bin/pve-syno-api-probe --probe-methods` exists to end this restriction, and it
-is the single most useful thing an owner of a Synology NAS can run for this
-project.
+Rollback is scheduled for 0.7.0, once that behaviour has been observed on a LUN
+nobody minds losing.
 
 ## Requirements
 
