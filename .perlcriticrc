@@ -1,0 +1,83 @@
+# perlcritic configuration for jt-pve-storage-synology.
+#
+# `make critic` was in this project's command list from the start and had never
+# once passed: 120 findings, of which the overwhelming majority are policies this
+# code violates ON PURPOSE, because a safety rule in CLAUDE.md requires it. A
+# guard that cannot pass is a guard people learn to ignore, and this project has
+# already been taught that lesson twice — by `check-zh` and by the imports test.
+#
+# So each policy switched off below carries the reason. Nothing is disabled for
+# being inconvenient. Where perlcritic and a safety rule disagree, the safety
+# rule wins and the disagreement is written down here rather than left as noise
+# in the output.
+
+severity = 4
+verbose  = %f: %m at line %l, column %c.  (%p)\n
+
+# --------------------------------------------------------------------------
+# Policies that fight a safety rule. These are the load-bearing ones.
+# --------------------------------------------------------------------------
+
+# `return undef` is REQUIRED here, not tolerated.
+#
+# Rule 12: a safety check that cannot answer must not answer "safe".
+# `is_device_in_use` and its kind return 1 / 0 / **undef**, and every destructive
+# caller refuses on undef. Bare `return;` yields an EMPTY LIST in list context —
+# so `my ($r) = f();` would give undef either way, but `my @r = f();` and any
+# caller doing `scalar(f())` cannot tell "no" from "could not ask". That
+# distinction is the entire point of the contract, and this policy would erase
+# it. perlcritic is simply wrong for this codebase.
+[-Subroutines::ProhibitExplicitReturnUndef]
+
+# `_not_a_method($_[0])` has to inspect @_ BEFORE unpacking it.
+#
+# Naming and Multipath are functions, not methods. Called as
+# `Module->function(...)` the arguments shift by one and nothing errors — the
+# ownership gate answered "not owned" for an object that WAS owned, and
+# `conf_content` silently ignored a caller's `no_path_retry`. Both mistakes were
+# made for real. The guard works by looking at the first argument before it is
+# bound to a name, which is exactly what this policy forbids.
+[-Subroutines::RequireArgUnpacking]
+
+# `select(undef, undef, undef, 0.1)` is a sub-second sleep, and deliberate.
+#
+# Two reasons, both load-bearing. `sleep` takes whole seconds, and a 1-second
+# granularity in a bounded retry loop turns a 2-second bound into a 2-second
+# wait every time. And `sleep` interacts with the ALRM these modules rely on for
+# every bound — Time::HiRes::sleep would be the clean answer, but adding a
+# dependency to satisfy a style rule is how a plugin fails to load on a node that
+# does not have it.
+[-BuiltinFunctions::ProhibitSleepViaSelect]
+
+# The lock's lifetime IS the filehandle's lifetime.
+#
+# WwidState holds `flock(LOCK_EX|LOCK_NB)` across a read-modify-write and closes
+# only after unlocking. Closing "as soon as possible" would drop the lock in the
+# middle of the critical section.
+[-InputOutput::RequireBriefOpen]
+
+# A password prompt must read the terminal, not @ARGV.
+#
+# `<>` reads files named on the command line. For a password prompt with echo
+# already suppressed that is not a style question — it would silently accept a
+# password from a file or a pipe. IO::Interactive is also not installed on a
+# Proxmox VE node, and this tool must run on one with nothing added.
+[-InputOutput::ProhibitExplicitStdin]
+[-InputOutput::ProhibitInteractiveTest]
+
+# --------------------------------------------------------------------------
+# Policies that are simply not this project's house style.
+# --------------------------------------------------------------------------
+
+# `use constant` is what PVE's own modules use, and these constants are read by
+# the tests. Readonly is not installed on a node.
+[-ValuesAndExpressions::ProhibitConstantPragma]
+
+# `$lun->delete($uuid)` and `$target->delete($id)` are methods on an object.
+# Renaming them to `delete_lun` would read worse at every call site, and there is
+# no ambiguity with the builtin at a `->` call.
+[-Subroutines::ProhibitBuiltinHomonyms]
+
+# A `return;` at the end of a sub whose value is never used adds a line and says
+# nothing. Where a return value IS part of the contract it is explicit.
+[-Subroutines::RequireFinalReturn]

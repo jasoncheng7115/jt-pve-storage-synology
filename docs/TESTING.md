@@ -586,6 +586,70 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### The third module of this shape, and the prediction that came true
+
+`CLAUDE.md` had said: if a third module of functions-not-methods appears, give it
+the same guard. `Command` was that module and the guard was missing. It surfaced
+the moment its first test was written, because `$C->is_block_device($path)` is
+the natural thing to write:
+
+```
+Odd number of elements in hash assignment at Command.pm line 50.
+```
+
+Perl bound the class name to `$path` and the remaining argument to `%opts`. The
+function then answered **"not a block device"** for a device that exists — and
+the audit line "`-b` on a `/dev` path goes through `is_block_device`" would still
+have read as satisfied.
+
+This is the worst form of the bug in this family so far. `Naming`'s shifted call
+refused something it should have allowed; `Multipath`'s ignored a setting this
+one **answers a safety question wrongly, quietly, in the direction of acting.**
+
+### R-10 narrows: the only schedules on this NAS cannot reach a LUN's snapshot list
+
+Read-only, from the node DSM was not blocking. The question was whether a user's
+**scheduled** snapshots appear in `list_snapshot` and could therefore be deleted
+or rolled back to by a VM operation.
+
+| What was asked | Answer |
+|---|---|
+| `SYNO.Core.ISCSI.LUN.Snapshot.Schedule` | **error 102 — no such API.** LUN snapshot scheduling is not a separate endpoint on DSM 7.1.1 |
+| `SYNO.Core.TaskScheduler list` | 4 tasks, 2 of them snapshot-related and enabled — both **share** snapshots (`Share [photo] Snapshot`, `Share [homes] Snapshot`) |
+| `list_snapshot` on each of the four LUNs already on the NAS | **0 snapshots on all four**, so no foreign `taken_by` sample was available |
+
+A shared-folder snapshot is a different object from a LUN snapshot and cannot
+appear in a LUN's snapshot list, so on this NAS the hazard is not reachable at
+all. What remains unmeasured is a LUN snapshot schedule created through Snapshot
+Replication, which needs that package configured against a LUN this plugin owns.
+
+**It does not gate anything, because the filter is a whitelist.**
+`snapshot_list` keeps only snapshots whose `taken_by` equals this plugin's own
+marker — so an unknown origin is excluded by default rather than needing to be
+recognised. A blacklist would have had to be told about every kind of snapshot
+DSM can produce; this one does not.
+
+### The audit run that found two things
+
+Run mechanically over the whole tree rather than by reading. Most of the
+checklist was already clean — `decoded_content` is always `charset => 'none'`,
+no decision is made on message text, no `-b` on a `/dev` path bypasses the
+bounded helper, no password reaches a URL, `LC_ALL=C` is pinned in the one place
+commands are run. Two were not:
+
+- **An unbounded `waitpid` on a success path.** `sysfs_read_with_timeout` cleared
+  its alarm and then reaped with `waitpid($pid, 0)`. Reaching it requires EOF,
+  which means the child had already flushed and was on its way to `_exit` — so it
+  is safe by argument. But "the child must have exited by now" is the reasoning
+  behind every other hang this module exists to prevent, and a child merely
+  stopped rather than dead would block it forever. It is a bounded reap now, with
+  no signal: the child did its job.
+- **The ownership gate was in `free_image` only.** `volume_snapshot_rollback`
+  **overwrites a disk** and was relying on the `taken_by` whitelist — sound, since
+  a snapshot this plugin took implies a LUN it owns, but that is inference where
+  the rule asks for a check. Both snapshot paths now call
+  `is_pve_managed_volume($name, $storeid)` directly.
+
 ## Not verified
 
 Nothing in this list is acted on by code. Where a plugin decision depends on
@@ -604,7 +668,7 @@ one, the plugin refuses rather than assumes.
 | R-7 | ~~Whether a clone is thin or a full copy~~ **ANSWERED: thin.** `clone_snapshot` gives a `BLUN` with `allocated_size: 0` | Linked clones and templates are genuinely cheap |
 | R-8 | ~~How long `is_action_locked` stays set~~ **ANSWERED:** 1.2 s after a 1 GiB create, 0.0 s cloning an empty LUN, **3.5 s cloning a LUN holding 512 MiB**, and 0.20 s for a snapshot of any size. An immediate delete after a create succeeds anyway | A large clone can outlast a naive wait — the CSI driver's own bound is 20 s, which a clone of a few hundred GiB could exceed |
 | R-9 | ~~Whether `LUN list` has a server-side cap~~ **PARTLY ANSWERED: `offset`/`limit` are ignored and no total is reported.** So the listing returns everything it has — and nothing in the answer proves that | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. With no total to check against, only a second read can catch a short answer |
-| R-10 | **PARTLY ANSWERED:** every snapshot carries `taken_by`, and this plugin's own marker comes back verbatim, so filtering is possible. Whether DSM's *scheduled* snapshots appear in `list_snapshot` still needs a schedule configured | If they do, PVE would show a user's scheduled snapshots as its own and could delete them |
+| R-10 | **NARROWED, see above:** the only enabled schedules on the test NAS are SHARE snapshots, which structurally cannot appear in a LUN's snapshot list, and `SYNO.Core.ISCSI.LUN.Snapshot.Schedule` does not exist. **PARTLY ANSWERED:** every snapshot carries `taken_by`, and this plugin's own marker comes back verbatim, so filtering is possible. Whether DSM's *scheduled* snapshots appear in `list_snapshot` still needs a schedule configured | If they do, PVE would show a user's scheduled snapshots as its own and could delete them |
 | R-11 | ~~`mapping_index` ceiling per target, and whether it is reused~~ **ANSWERED: it IS reused.** A freed index goes to the next LUN mapped | This is the "wrote to the wrong disk" fault, reachable by detaching one disk and attaching another. It is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured |
 | R-12 | ~~Whether DSM tolerates concurrent requests~~ **ANSWERED: sixteen simultaneous creates all succeeded** and the array matched what the API reported. ~1 s each suggests internal serialisation | Cinder wraps every request in a process-wide lock; nothing here needed it for correctness |
 | R-13 | ~~Whether a second login on one account evicts the first~~ **ANSWERED: it does not.** Both sessions work simultaneously | Error 107 had made this a real worry for a cluster sharing one account |

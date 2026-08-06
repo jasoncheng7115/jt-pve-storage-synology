@@ -46,6 +46,10 @@ sub read_password {
     if (-t STDIN) {
         $echo_off = 1 if system('stty', '-echo') == 0;
     }
+    ## no critic (InputOutput::ProhibitExplicitStdin)
+    # <> would read @ARGV as filenames — for a PASSWORD prompt that is not a
+    # style question: it would silently take the password from a file named on
+    # the command line, or from a pipe, with echo suppression already applied.
     my $answer = <STDIN>;
     if ($echo_off) {
         system('stty', 'echo');
@@ -57,7 +61,7 @@ sub read_password {
     return $answer;
 }
 
-my $VERSION = '0.5.1~beta1';
+my $VERSION = '0.5.2~beta1';
 
 my $host;
 my $port;
@@ -301,12 +305,14 @@ sub say_head {
     my ($t) = @_;
     return if $json_out;
     print "\n$t\n", '-' x length($t), "\n";
+    return;
 }
 
 sub say_line {
     my ($fmt, @args) = @_;
     return if $json_out;
     printf "$fmt\n", @args;
+    return;
 }
 
 # ---------------------------------------------------------------------------

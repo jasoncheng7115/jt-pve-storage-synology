@@ -6,6 +6,56 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.5.2~beta1] - 2026-08-06
+
+**An audit found three things that reading the code had not.** All three are the
+same species: code that was correct by argument rather than by check.
+
+### Fixed
+
+- **`Command`'s functions could be called as methods, and the answer would have
+  been a silent wrong one.** `Naming` and `Multipath` were guarded against this
+  after being called as `Module->function(...)`, where the arguments shift by one
+  and nothing errors. `Command` is the third module of that shape and had no
+  guard — `Command->is_block_device($dev)` binds the class name to the path and
+  reports **"not a block device"** for a device that exists. That is worse than
+  the earlier two: it answers a safety question wrongly, in the direction of
+  acting. `is_block_device`, both sysfs helpers and the command runner now refuse
+  a method call outright.
+- **An unbounded `waitpid` on a success path.** `sysfs_read_with_timeout` cleared
+  its alarm and then blocked in `waitpid($pid, 0)`. Safe by argument — reaching
+  it needs EOF, so the child had already flushed — but a child merely stopped
+  rather than dead would hold it forever, and this module exists precisely to not
+  reason that way. Bounded now, and it does not signal: the child did its job.
+- **The ownership gate was in `free_image` only.** `volume_snapshot_rollback`
+  overwrites a disk and was relying on the `taken_by` whitelist. Sound, but it is
+  inference where the rule asks for a check. Both snapshot paths now call
+  `is_pve_managed_volume($name, $storeid)` directly.
+
+### Changed
+
+- **`make critic` passes, and is now part of `release-check`.** It had never
+  passed: 120 findings, mostly policies this code violates on purpose —
+  `return undef` is what the three-valued safety contract requires, and the
+  `_not_a_method` guard must read `@_` before unpacking it. `.perlcriticrc`
+  disables exactly those, with the reason written beside each, and the result was
+  then shown to still fail on a deliberate regression. A guard in the command
+  list that cannot pass is a guard nobody runs.
+- **The base-class sweep re-run against current PVE**: 21 methods reach
+  `filesystem_path` or `$scfg->{path}`, 20 overridden. The twenty-first,
+  `list_volumes`, is safe by construction — only `images` and `rootdir` are
+  declared and both route to the overridden `list_images` — and that is now
+  recorded so the next sweep does not chase it.
+- **R-10 narrowed.** The only enabled snapshot schedules on the test NAS are
+  *share* snapshots, which cannot appear in a LUN's snapshot list, and
+  `SYNO.Core.ISCSI.LUN.Snapshot.Schedule` does not exist. The filter is a
+  whitelist on `taken_by`, so an unknown origin is excluded by default.
+
+### Added
+
+- `t/08-command.t` — 203 tests in total. It demonstrates the bounded reap
+  surviving a stopped child, and the method-call guard refusing.
+
 ## [0.5.1~beta1] - 2026-08-06
 
 **Real multipath, and a defect that a real block exposed.** Both of the NAS's

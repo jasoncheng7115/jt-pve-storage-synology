@@ -1,3 +1,14 @@
+jt-pve-storage-synology (0.5.2~beta1-1) unstable; urgency=low
+
+  * Command's functions now refuse a method call: the shifted arguments made
+    is_block_device answer "not a block device" for a device that exists.
+  * Bound the reap on sysfs_read_with_timeout's success path.
+  * Call the ownership gate directly in both snapshot destructive paths.
+  * make critic passes and is part of release-check; .perlcriticrc records why
+    each disabled policy is disabled.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 18:00:00 +0800
+
 jt-pve-storage-synology (0.5.1~beta1-1) unstable; urgency=low
 
   * Fix the credential latch: it was per-object and so did not survive a poll,

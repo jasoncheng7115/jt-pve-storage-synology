@@ -1076,6 +1076,18 @@ sub volume_snapshot_delete {
     my $obj = $lun->get($name);
     if (!$obj) { eval { $api->logout }; return 1 }
 
+    # THE OWNERSHIP GATE, explicitly, on the LUN as well as the snapshot.
+    #
+    # The snapshot whitelist below already refuses a snapshot this plugin did not
+    # take, and a snapshot this plugin took implies a LUN this plugin owns — but
+    # that is two hops of reasoning guarding an operation that OVERWRITES a disk.
+    # Rule: a prefix identifies the STORAGE, never the kind of object, so the
+    # object gets its own check.
+    die "storage '$storeid': refusing to delete a snapshot of '$name', which this storage does not"
+      . " own\n"
+        if !PVE::Storage::Custom::Synology::Naming::is_pve_managed_volume($name, $storeid);
+
+
     # Only this plugin's own snapshots are visible here, so a user's scheduled
     # snapshot cannot be deleted by a VM operation.
     my ($found) = grep { ($_->{name} // '') eq $snap } @{ $lun->snapshot_list($obj->{uuid}) };
@@ -1092,6 +1104,18 @@ sub volume_snapshot_rollback {
     my $lun = $class->_lun($api);
     my $name = PVE::Storage::Custom::Synology::Naming::lun_name($storeid, $volname);
     my $obj = $lun->get($name) or die "storage '$storeid': no LUN '$name'\n";
+
+    # THE OWNERSHIP GATE, explicitly, on the LUN as well as the snapshot.
+    #
+    # The snapshot whitelist below already refuses a snapshot this plugin did not
+    # take, and a snapshot this plugin took implies a LUN this plugin owns — but
+    # that is two hops of reasoning guarding an operation that OVERWRITES a disk.
+    # Rule: a prefix identifies the STORAGE, never the kind of object, so the
+    # object gets its own check.
+    die "storage '$storeid': refusing to roll back '$name', which this storage does not"
+      . " own\n"
+        if !PVE::Storage::Custom::Synology::Naming::is_pve_managed_volume($name, $storeid);
+
 
     my ($found) = grep { ($_->{name} // '') eq $snap } @{ $lun->snapshot_list($obj->{uuid}) };
     die "storage '$storeid': '$name' has no snapshot named '$snap' taken by this"

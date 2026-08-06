@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.5.1~beta1
+VERSION = 0.5.2~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -82,9 +82,13 @@ syntax:
 		echo "        Proxmox VE node to check them."; \
 	fi
 
+# `.perlcriticrc` records, with a reason for each, the policies this project
+# deliberately violates — `return undef` is required by the three-valued safety
+# contract, and the `_not_a_method` guard must read @_ before unpacking it. Read
+# that file before switching anything else off.
 critic:
 	@if command -v perlcritic >/dev/null 2>&1; then \
-		perlcritic --severity 4 lib/ bin/ \
+		perlcritic --profile .perlcriticrc lib/ bin/ \
 			&& echo "  OK: perlcritic severity 4 is clean."; \
 	else \
 		echo "  perlcritic is not installed (apt install libperl-critic-perl)"; \
@@ -182,7 +186,7 @@ check-zh:
 	@echo "Checking the Traditional Chinese documents..."
 	@perl tools/check-zh-markdown.pl
 
-release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve
+release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve critic
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
 		| sed 's/-[0-9]*$$//'); \

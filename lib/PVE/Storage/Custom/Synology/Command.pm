@@ -35,6 +35,25 @@ our @EXPORT_OK = qw(
 # Bounded file tests
 # ---------------------------------------------------------------------------
 
+# THE THIRD MODULE OF THIS SHAPE, so it gets the same guard.
+#
+# These are functions, not methods. Naming and Multipath were both called as
+# `Module->function(...)` at some point, the arguments shifted by one, and
+# nothing errored — the ownership gate answered "not owned" for an object that
+# WAS owned, and a caller's `no_path_retry` was silently ignored. Here the
+# failure would be quieter still: `Command->is_block_device($dev)` binds the
+# class name to $path, so a real device is reported as **not a block device**,
+# and %opts gets an odd number of elements. A safety check that answers the
+# wrong question is worse than one that dies.
+sub _not_a_method {
+    my ($first) = @_;
+    return if !defined $first;
+    return if $first ne __PACKAGE__;
+    die __PACKAGE__ . ": these are functions, not methods. Call"
+      . " Command::is_block_device(...) rather than"
+      . " Command->is_block_device(...).\n";
+}
+
 # -b, bounded.
 #
 # A Perl file test is a stat(2), and stat on a path under /dev is not free:
@@ -47,6 +66,7 @@ our @EXPORT_OK = qw(
 # is put back afterwards. Nesting alarms without doing this silently cancels
 # the caller's own timeout, which is worse than the problem being solved.
 sub is_block_device {
+    _not_a_method($_[0]);
     my ($path, %opts) = @_;
 
     return 0 unless defined $path && length $path;
@@ -85,6 +105,7 @@ sub is_block_device {
 # timeout. The child is what may end up stuck in D state; the parent stays
 # responsive either way.
 sub sysfs_write_with_timeout {
+    _not_a_method($_[0]);
     my ($path, $data, $timeout) = @_;
     $timeout //= 10;
 
@@ -123,6 +144,7 @@ sub sysfs_write_with_timeout {
 # Read a sysfs/proc file in a child process. Returns the content, or undef on
 # timeout or failure.
 sub sysfs_read_with_timeout {
+    _not_a_method($_[0]);
     my ($path, $timeout) = @_;
     $timeout //= 5;
 
@@ -177,8 +199,33 @@ sub sysfs_read_with_timeout {
         return undef;
     }
 
-    waitpid($pid, 0);
+    # A bounded reap, not `waitpid($pid, 0)`. The alarm was cleared four lines
+    # up, so a blocking wait here has nothing protecting it — and this module's
+    # rule is that NOTHING touches the kernel without a bound, with no exception
+    # for a path that looks safe. It does look safe: EOF means the child already
+    # flushed and reached `_exit`. But "the child must have exited by now" is the
+    # same reasoning that put every other hang in this file, and a child that is
+    # merely stopped rather than dead would block this forever.
+    _reap_bounded($pid);
     return length($content) ? $content : undef;
+}
+
+# Reap a child that is expected to have finished. Bounded, and it does NOT
+# signal: the caller has already read the child's output to EOF, so killing it
+# would be killing something that did its job.
+sub _reap_bounded {
+    my ($pid, $seconds) = @_;
+    return if !$pid;
+
+    my $deadline = time() + ($seconds // 2);
+    while (time() < $deadline) {
+        return if waitpid($pid, POSIX::WNOHANG()) != 0;
+        select(undef, undef, undef, 0.05);
+    }
+
+    warn "child pid $pid closed its output but had not exited after 2s;"
+       . " leaving it to init rather than blocking\n";
+    return;
 }
 
 sub _reap_timed_out_child {
@@ -200,6 +247,7 @@ sub _reap_timed_out_child {
 }
 
 sub _run_cmd {
+    _not_a_method($_[0]);
     my ($cmd, %opts) = @_;
 
     my $timeout = $opts{timeout} // 30;
