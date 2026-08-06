@@ -89,6 +89,56 @@ them**:
 - `lun_id` and a target's `mapping_index` are **different numbers**.
   `mapping_index` starts at **1**, not 0.
 
+### How a LUN's uuid becomes a Linux WWID
+
+Read from a host that had a LUN attached:
+
+```
+scsi-360014055f81ee18d0f41d41fcd8becd8 -> sdg
+VENDOR=SYNOLOGY  MODEL=Storage
+SERIAL=5f81ee18-0f41-41fc-8bec-816622bdd576     <- the LUN's uuid, unchanged
+```
+
+The relation is deterministic:
+
+```
+WWID = "3" + "6001405" + (the uuid with "-" replaced by "d", first 25 characters)
+```
+
+`6001405` is Linux-IO's IEEE company identifier, so Synology's target is
+LIO-based — **but this is not stock LIO behaviour.** Upstream's
+`spc_gen_naa_6h_vendor_specific()` converts the serial with `hex_to_bin()` and
+**skips** any character that is not hex, which would give
+`360014055f81ee180f4141fc8bec81662` — and that is not what the NAS produces.
+Synology maps the hyphen to `d` rather than dropping it. Reading the upstream
+source would have given a confidently wrong answer here; only hardware gave the
+right one.
+
+Three consequences:
+
+1. The WWID can be computed **before the device appears**, so a multipath map
+   can be pinned deterministically and a node can tell whether the device it
+   found is the LUN it asked for — instead of trusting the path it was
+   discovered on.
+2. **The last 11 characters of the uuid are discarded.** The WWID is therefore
+   not a lossless function of the uuid, it cannot be inverted, and two uuids
+   differing only in their tail would collide. With random uuids that is
+   negligible, but the rule stands: the computed value is a **cross-check**,
+   and the kernel's own identification is what decides.
+3. The two strings a multipath `conf.d` drop-in needs are
+   `vendor "SYNOLOGY"` and `product "Storage"`. **Neither is available from the
+   NAS API** — they are SCSI INQUIRY responses. Guessing them wrong makes the
+   drop-in silently ineffective, and an ineffective `no_path_retry` means
+   queueing forever when every path is gone.
+
+One sample does not prove a rule. Predictions for two LUNs that were not
+attached, to be checked when a test LUN is made:
+
+| uuid | predicted WWID |
+|---|---|
+| `2738c2d2-1620-494c-8363-6322ba801219` | `360014052738c2d2d1620d494cd8363d6` |
+| `01516325-653a-4f9f-b331-63db3f30a4f3` | `3600140501516325d653ad4f9fdb331d6` |
+
 ### `dev_attribs` — the real key names
 
 Read from an existing LUN:

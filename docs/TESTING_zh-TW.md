@@ -82,6 +82,49 @@ vpd_unit_sn
 - `lun_id` 和 target 的 `mapping_index` 是**兩個不同的數字**。`mapping_index`
   **從 1 開始，不是 0**。
 
+### LUN 的 uuid 怎麼變成 Linux 的 WWID
+
+在一台掛著該 LUN 的主機上讀到：
+
+```
+scsi-360014055f81ee18d0f41d41fcd8becd8 -> sdg
+VENDOR=SYNOLOGY  MODEL=Storage
+SERIAL=5f81ee18-0f41-41fc-8bec-816622bdd576     <- 就是 LUN 的 uuid，原封不動
+```
+
+關係是確定性的：
+
+```
+WWID = "3" + "6001405" + （uuid 把 "-" 換成 "d" 之後的前 25 個字元）
+```
+
+`6001405` 是 Linux-IO 的 IEEE 公司識別碼，所以 Synology 的 target 是 LIO 系的——
+**但這不是原廠 LIO 的行為。** 上游的 `spc_gen_naa_6h_vendor_specific()` 用
+`hex_to_bin()` 轉換序號，非十六進位字元會被**跳過**，那樣算出來是
+`360014055f81ee180f4141fc8bec81662`——而那不是 NAS 產出的值。Synology 是把連字號
+映射成 `d`，不是丟掉。**照著上游原始碼推論會得到一個很有自信的錯誤答案**，只有實機
+給了對的。
+
+三個後果：
+
+1. WWID **可以在裝置出現之前就算出來**，所以 multipath map 能確定性地釘住，而且節點
+   能判斷「我找到的裝置是不是我要的那顆 LUN」——不必只相信它是從哪個路徑被發現的。
+2. **uuid 的最後 11 個字元被丟掉了。** 所以 WWID 不是 uuid 的無損函式、不可反推，
+   而且兩個只在尾端不同的 uuid 會撞同一個 WWID。隨機 uuid 下機率可忽略，但規則不變：
+   算出來的值是**交叉核對**用的，最終認定要由核心自己的識別決定。
+3. multipath `conf.d` drop-in 需要的兩個字串是 `vendor "SYNOLOGY"` 與
+   `product "Storage"`。**兩個都不可能從 NAS 的 API 取得**——它們是 SCSI INQUIRY 的
+   回應。猜錯會讓 drop-in 靜靜地不生效，而 `no_path_retry` 不生效就代表所有路徑消失
+   時會無限排隊。
+
+一個樣本不足以證明一條規則。兩顆當時未掛載的 LUN 的預測值記在這裡，等建立測試 LUN
+時對照：
+
+| uuid | 預測的 WWID |
+|---|---|
+| `2738c2d2-1620-494c-8363-6322ba801219` | `360014052738c2d2d1620d494cd8363d6` |
+| `01516325-653a-4f9f-b331-63db3f30a4f3` | `3600140501516325d653ad4f9fdb331d6` |
+
 ### `dev_attribs`——真實的鍵名
 
 從一顆既有 LUN 讀到的：
