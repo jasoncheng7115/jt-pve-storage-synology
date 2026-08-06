@@ -41,7 +41,12 @@ the "verified" table below was established read-only.
 
 ---
 
-## Verified on hardware (2026-08-06, read-only)
+## Verified on hardware (2026-08-06)
+
+Everything down to the `dev_attribs` table was read-only. The sections marked
+as write tests below were run on a dedicated `pvetest-` name prefix, with the
+owner's agreement, and every object created was deleted afterwards and the
+array confirmed back to its original contents.
 
 ### How a session is carried — the two reference clients disagree, and one is wrong here
 
@@ -170,6 +175,66 @@ This is the general rule made concrete: a listing this plugin asked to filter
 must be checked to have filtered, and "nothing there" and "filtered out" are
 indistinguishable in the answer.
 
+### A create that reports failure can create the LUN anyway
+
+Reproduced deterministically. A LUN name of exactly **255 characters** is
+refused with error **18990068** — and the LUN is created regardless: full name,
+correct size, `status: normal`, entirely usable. At 256 characters the refusal
+is clean (**18990503**, an illegal name) and nothing is made.
+
+```
+create, 255-char name  ->  REFUSED 18990068
+                       ->  ... and 1 new LUN is on the array
+create, 256-char name  ->  REFUSED 18990503, nothing created
+```
+
+**So a failed create must never be believed on its own.** After any create
+failure the plugin looks the name up, and either adopts what it finds or
+deletes it. Without that, every such failure leaks a LUN that Proxmox VE has no
+record of: the space is gone, nothing points at it, and the next attempt makes
+another one.
+
+This is why the name limit is also enforced **before** the request is sent
+rather than left to the NAS to reject.
+
+### Name rules
+
+| | |
+|---|---|
+| Length | 200 characters accepted exactly. 255 refused-but-created, 256+ cleanly refused. The exact ceiling between 200 and 255 was not pinned because nothing here needs a name that long |
+| Legal | `-` hyphen, `.` dot, `:` colon, upper case, digits |
+| **Refused** (18990503) | **`_` underscore**, space, `+`, `@` |
+
+**The underscore matters.** A Proxmox VE storage id may contain one, and the
+related projects fold a storage id into the array object's name — so the folding
+here cannot use `_`, and a storage id containing one has to be sanitised to
+something legal. That reintroduces the collision the related projects hit, where
+two different storage ids fold to the same prefix and each can then see and
+delete the other's disks, so the check that refuses the second such storage is
+not optional on this array.
+
+### Size granularity: there is none, and the documented minimum is not enforced
+
+Every size asked for was created **exactly**, with no rounding at any boundary:
+
+```
+1 GiB + 1 byte, 1 GiB - 1 byte, 1 GiB + 512, 3 GiB + 12345   all exact
+100 MiB   exact          1 byte   exact
+```
+
+That is simpler than every other array in this family — no alignment arithmetic
+is needed. But note the second half: the knowledge centre documents a **1 GB
+minimum LUN size** and **the API does not enforce it**. A one-byte LUN was
+created without complaint. So the minimum is the plugin's to enforce, and a
+storage that accepted a tiny disk would be relying on undocumented behaviour.
+
+### `is_action_locked` after a create
+
+Cleared after **1.2 s** for a 1 GiB thin LUN, and a delete issued immediately
+after the create — with no wait at all — succeeded. So the lock is not a
+blanket gate on the next operation; it has to be polled where it matters
+(cloning) rather than assumed everywhere.
+
 ### `dev_attribs` — the real key names
 
 Read from an existing LUN:
@@ -225,12 +290,12 @@ one, the plugin refuses rather than assumes.
 |---|---|---|
 | R-1 | ~~The method name for restoring a LUN from its snapshot~~ **ANSWERED: `restore_snapshot`.** What remains: its **parameter names**, and whether a rollback keeps newer snapshots and preserves the LUN uuid | Knowing a method exists is not knowing what it does. A rollback that silently changes the LUN uuid changes the WWID, and every node then sees a different disk. **Rollback stays refused until the behaviour is verified, not merely the name** |
 | R-2 | Does `unmap_target` replace a LUN's target list or add to it? | If it replaces, unmapping one node could unmap all of them |
-| R-3 | LUN name length limit and legal characters | The name carries the ownership check. Silent truncation means two disks with one name |
-| R-4 | Size granularity | Getting less than was asked for means a filesystem that fills and then fails |
+| R-3 | ~~LUN name length limit and legal characters~~ **ANSWERED.** 200 accepted; `_`, space, `+`, `@` refused; a 255-char name is **refused-but-created** | See the write-test sections above. The underscore refusal changes how a storage id is folded into a name |
+| R-4 | ~~Size granularity~~ **ANSWERED: exact at every size, no rounding.** But the documented 1 GB minimum is **not enforced by the API**, so the plugin enforces it | Getting less than was asked for means a filesystem that fills and then fails. Here the risk inverts: nothing stops a nonsensically small LUN |
 | R-5 | The Linux WWID a LUN's `vpd_unit_sn` becomes | Decides how a node identifies its device. Half-answered: the serial is the uuid; the kernel-side string still has to be read from a host that has one mapped |
 | R-6 | Whether a LUN with snapshots refuses deletion, and a snapshot with a clone | `qm destroy` and vzdump's snapshot mode both walk straight into this |
 | R-7 | Whether a clone is thin or a full copy | Decides whether linked clones are possible |
-| R-8 | How long `is_action_locked` stays set | A large clone can outlast a naive wait — the CSI driver's own bound is 20 seconds |
+| R-8 | **PARTLY ANSWERED:** a 1 GiB create clears in ~1.2 s, and an immediate delete succeeds anyway. Still open for **clone**, which is the case that matters | A large clone can outlast a naive wait — the CSI driver's own bound is 20 seconds |
 | R-9 | ~~Whether `LUN list` has a server-side cap~~ **PARTLY ANSWERED: `offset`/`limit` are ignored and no total is reported.** So the listing returns everything it has — and nothing in the answer proves that | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. With no total to check against, only a second read can catch a short answer |
 | R-10 | Whether `list_snapshot` returns snapshots taken by DSM's own schedule | If it does, PVE would show a user's scheduled snapshots as its own and could delete them |
 | R-11 | `mapping_index` ceiling per target, and whether it is reused | A reused index with a stale device node in the kernel is the "wrote to the wrong disk" class of fault |
@@ -242,6 +307,13 @@ one, the plugin refuses rather than assumes.
 | # | Question |
 |---|---|
 | R-14 | The minimum DSM privileges. The probe ran as an administrator, so it proved "an administrator can" and not "a non-administrator cannot". See `DSM-ACCOUNT.md` |
+
+### Needs hardware this project does not have
+
+| # | Question |
+|---|---|
+| R-15 | **Synology HA (SHA)**: does the HA cluster IP behave as a single management address across a failover, and does `SYNO.Core.ISCSI.Node`'s uuid — which this plugin uses as the storage's identity — survive one? If the uuid changes on failover, pinning a storage to it would break the storage rather than protect it |
+| R-16 | **UC / SA dual-controller models** (`firmware_ver` containing `DSM UC`): both controllers have their own management address and there is no floating one. `SYNO.Core.Network.Interface` accepts `relay_node=node0`/`node1` to enumerate the other controller, and a target's `network_portals` gains a `controller_id` — neither of which can be exercised without such a chassis. **Refused for now**, rather than approximated |
 
 ---
 

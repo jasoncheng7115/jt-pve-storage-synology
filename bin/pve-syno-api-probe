@@ -262,6 +262,13 @@ my %COMMON_ERR = (
 
 my %ISCSI_ERR = (
     18990002 => 'out of free space',
+    # Observed on a write test: a 255-character LUN name is refused with this
+    # code AND the LUN is created anyway. A failed create must therefore be
+    # followed by a lookup, never believed.
+    18990068 => 'name too long — and the object may exist regardless (observed)',
+    # Observed: an illegal character in a name. `_`, space, `+` and `@` are
+    # refused; `-`, `.`, `:` and upper case are accepted.
+    18990503 => 'illegal name (observed)',
     # Observed from SYNO.Core.ISCSI.Host `get` given a uuid that does not
     # exist. Not in either reference client's table; recorded because the code
     # is the only thing worth keying a decision on.
