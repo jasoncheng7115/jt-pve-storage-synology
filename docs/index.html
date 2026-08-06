@@ -79,6 +79,7 @@
         <div class="sidebar__heading">
             <span class="lang-en">Use it</span><span class="lang-zh">使用</span>
         </div>
+        <a href="#reap" class="sidebar__link"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></a>
         <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
         <a href="#limits" class="sidebar__link"><span class="lang-en">How many LUNs</span><span class="lang-zh">最多幾個 LUN</span></a>
         <a href="#ha" class="sidebar__link"><span class="lang-en">HA &amp; dual controllers</span><span class="lang-zh">HA 與雙控制器</span></a>
@@ -456,6 +457,33 @@
         <span class="lang-en"><strong>If you run either, the most useful thing you can report is one number</strong>: does <code>SYNO.Core.ISCSI.Node</code>'s uuid stay the same across a failover? A storage's identity is pinned to it, so if it changes, that pin stops protecting the storage and starts breaking it.</span>
         <span class="lang-zh"><strong>如果你手上有其中任何一種，最有價值的回報是一個數字</strong>：<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換之後還是同一個嗎？storage 的身分釘在它上面，所以如果它會變，那道釘子就不再保護 storage，而是開始破壞它。</span>
     </p>
+</section>
+
+<section class="doc-section" id="reap">
+    <h2 class="section-title"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Run it after a node crash, and on every node before removing a storage. Default is a dry run.</span>
+        <span class="lang-zh">節點當機之後執行它，移除 storage 之前也在每個節點上執行。預設是試跑。</span>
+    </p>
+
+    <pre><code>pve-syno-reap --storage &lt;storage&gt;            <span class="c"># show what is left behind</span>
+pve-syno-reap --storage &lt;storage&gt; --remove   <span class="c"># then act</span>
+pve-syno-reap --all --remove                 <span class="c"># every synologysan storage on this node</span></code></pre>
+
+    <p>
+        <span class="lang-en"><code>pve-syno-reap</code> clears multipath maps this node holds for LUNs the NAS no longer has, and tracking entries left by a crash. <strong>Two things make it necessary, both measured on a three-node cluster.</strong></span>
+        <span class="lang-zh"><code>pve-syno-reap</code> 會清除本節點為 NAS 上已不存在的 LUN 所持有的 multipath map，以及當機留下的追蹤記錄。<strong>有兩件事讓它成為必要，而兩件都是在三節點叢集上量測到的。</strong></span>
+    </p>
+
+    <ul>
+        <li><span class="lang-en">Proxmox VE's only <code>deactivate_volumes</code> call during migration is inside <code>sync_offline_local_volumes</code>, so for a <strong>shared</strong> storage the source node is never told a VM left. A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 leaves pve1 and pve2 each holding a map for a LUN that no longer exists.</span><span class="lang-zh">Proxmox VE 在遷移過程中唯一的 <code>deactivate_volumes</code> 呼叫位於 <code>sync_offline_local_volumes</code> 裡面，所以對<strong>共用</strong> storage 而言，來源節點永遠不會被告知 VM 已經離開。一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，pve1 和 pve2 就會各自留著一個對應已不存在 LUN 的 map。</span></li>
+        <li><span class="lang-en">A hard-reset node never runs <code>deactivate_volume</code> at all, so its tracking file keeps an entry for a LUN it is no longer attached to.</span><span class="lang-zh">被硬重置的節點根本不會執行 <code>deactivate_volume</code>，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。</span></li>
+    </ul>
+
+    <div class="note">
+        <span class="lang-en"><strong>Nothing in Proxmox VE calls <code>deactivate_storage</code></strong> — verified across the whole <code>/usr/share/perl5/PVE</code> tree — so this cleanup is the operator's, not PVE's. Neither leftover is dangerous: every consumer re-checks for a device before acting, and device identity always comes from the kernel's WWID. But they accumulate. The tool never touches a device that is in use, and skips rather than assumes anything whose state it cannot establish.</span>
+        <span class="lang-zh"><strong>Proxmox VE 裡沒有任何東西會呼叫 <code>deactivate_storage</code></strong>——對整個 <code>/usr/share/perl5/PVE</code> 目錄樹驗證過——所以這個清理工作屬於管理者，不屬於 PVE。兩種殘留都不危險：每個使用者在動作之前都會重新檢查裝置，而裝置身分一律來自核心的 WWID。但它們會累積。這個工具絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。</span>
+    </div>
 </section>
 
 <section class="doc-section" id="probe">
