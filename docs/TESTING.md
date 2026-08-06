@@ -609,6 +609,45 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### Node failure, fencing and takeover — the tests that needed a node to lose
+
+Run on pc-pve2, with Jason's permission to disrupt it. The cluster kept quorum
+throughout (2 of 3), and his own HA resource on pve3 was untouched.
+
+| Test | Result |
+|---|---|
+| **Clean reboot** with a VM running and the LUN attached | PVE stopped the VM on shutdown, the plugin untracked; node came back with **no stale map, no stale session, empty tracking**. VM restarted, data intact |
+| **Hard reset** (`sysrq-trigger b`), no cleanup at all | node came back with no stale map or session — the reboot clears kernel state — but a **tracking entry that nothing would ever remove** |
+| **HA fencing**, VM under `ha-manager` | pve2 rebooted and rejoined inside the fence window, so HA restarted the service there rather than relocating. Storage re-attached with no help; data intact after a crash-boot with fsck |
+| **Takeover while the crashed node was still down** | pve1 started the VM in **3.6 s**, with pve2 dead and **its session still registered on the NAS**. Guest booted, old data intact, new data written |
+| pve2's return after the takeover | storage `active`, no map, no session, and it did **not** contest the disk |
+
+The takeover is the one that mattered. A shared target with `max_sessions=0` was
+carrying **two connected sessions** at the moment of the crash, and the surviving
+node attached the LUN without waiting for anything to time out. That is the
+property a production cluster depends on, and it had never been demonstrated.
+
+#### A crash leaves a tracking entry, and it is not an orphan
+
+The hard reset exposed a gap. `WwidState` keeps what this node has attached;
+`deactivate_volume` removes the entry. A node that is hard-reset never runs it, so
+the entry survives — while the LUN still exists on the NAS, so `orphans` correctly
+does **not** report it. Nothing would ever have cleaned it up.
+
+It is not dangerous: every consumer re-checks for a device before acting. But it is
+a record asserting this node holds something it does not, and `deactivate_storage`
+reads a non-empty tracking file as "still in use".
+
+`reap_orphans` now handles it as a distinct case, and the check is
+`map_is_gone` — **not** `device_path_for_wwid`, which collapses "no device" and
+"the stat never came back" into undef by design. Untracking on that would be
+exactly the bug fixed one release earlier. Only a confirmed *gone* untracks
+anything.
+
+It is left to the operator rather than done on the `activate_storage` path, because
+that path may not mutate anything — so after a node crash, `pve-syno-reap` is worth
+running. It is reported in the dry run, so nobody has to guess.
+
 ### The production-readiness battery, and the cost of holding a cluster-wide lock
 
 `cluster_lock_storage` serialises every allocation on a storage **across the whole

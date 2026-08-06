@@ -1,3 +1,15 @@
+jt-pve-storage-synology (0.6.2~beta1-1) unstable; urgency=medium
+
+  * reap_orphans now also clears a tracking entry left by a node crash: a
+    hard-reset node never runs deactivate_volume, and because the LUN still
+    exists the orphan check correctly did not report it. Uses map_is_gone, not
+    device_path_for_wwid, which collapses "no device" and "could not tell".
+  * Verified on hardware: clean reboot, hard reset, HA fencing, and takeover of a
+    LUN by a surviving node while the crashed node's session was still registered
+    on the NAS (3.6s, data intact).
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 06:00:00 +0800
+
 jt-pve-storage-synology (0.6.1~beta1-1) unstable; urgency=medium
 
   * An allocation made three full LUN list calls and opened two DSM sessions, all

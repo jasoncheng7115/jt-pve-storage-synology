@@ -1035,6 +1035,35 @@ sub reap_orphans {
         $live{ lc $w } = 1 if defined $w;
     }
 
+    # STALE TRACKING, which is the crash case and not an orphan.
+    #
+    # A node that is hard-reset never runs `deactivate_volume`, so its tracking
+    # file keeps an entry for a LUN that is no longer attached — while the LUN
+    # itself still exists on the NAS, so `orphans` correctly does not report it.
+    # Measured: pve2 was hard-reset with a VM running, came back with no map and no
+    # session, and a tracking entry that nothing would ever remove.
+    #
+    # It is not dangerous — every consumer re-checks for a device before acting —
+    # but it is a record that says this node holds something it does not, and
+    # `deactivate_storage` reads a non-empty tracking file as "still in use".
+    #
+    # `map_is_gone` and not `device_path_for_wwid`: the latter collapses "no
+    # device" and "the stat never came back" into undef, deliberately, because for
+    # finding a usable path both mean don't. Untracking on that would be the same
+    # mistake as `!map_is_gone`. Only a confirmed 1 counts.
+    my $orphaned = { map { $_ => 1 } @{ $state->orphans(\%live) } };
+    for my $wwid (sort keys %$tracked) {
+        next if $orphaned->{$wwid};
+        my $gone = PVE::Storage::Custom::Synology::Multipath::map_is_gone($wwid);
+        next if !defined $gone || !$gone;
+
+        push @report, { wwid => $wwid, volname => $state->volname_for($wwid) // '?',
+                        action => $dry ? 'would untrack' : 'untracked',
+                        reason => 'the LUN still exists but nothing is attached here'
+                                . ' — a tracking entry left by a crash' };
+        $state->untrack($wwid) if !$dry;
+    }
+
     for my $wwid (@{ $state->orphans(\%live) }) {
         my $volname = $state->volname_for($wwid) // '?';
         my $path = PVE::Storage::Custom::Synology::Multipath::device_path_for_wwid($wwid);

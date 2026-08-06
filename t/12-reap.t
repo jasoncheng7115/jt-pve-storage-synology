@@ -163,4 +163,38 @@ like($detach, qr/rule 12/,
      'with the rule it broke named, so the next reader knows why it is written'
    . ' this way');
 
+# --- stale tracking after a crash, which is not an orphan --------------------
+#
+# A hard-reset node never runs `deactivate_volume`, so its tracking file keeps an
+# entry for a LUN that is no longer attached — while the LUN itself still exists,
+# so `orphans` correctly does not report it. Measured: pve2 was hard-reset with a
+# VM running, came back with no map and no session, and a tracking entry nothing
+# would ever have removed.
+#
+# Not dangerous — every consumer re-checks for a device — but a record that says
+# this node holds something it does not, and `deactivate_storage` reads a
+# non-empty tracking file as "still in use".
+
+like($reap, qr/STALE TRACKING/, 'the crash case is handled separately from orphans');
+like($reap, qr/a tracking entry left by a crash/,
+     'and reported as what it is, not as an orphan');
+
+# It must use the three-valued check, not the one that collapses undef.
+{
+    my ($stale) = $reap =~ /STALE TRACKING(.*?)for my \$wwid \(\@\{ \$state->orphans/s;
+    ok($stale, 'the stale-tracking block is parseable');
+    like($stale, qr/map_is_gone/,
+         'it asks map_is_gone, which distinguishes "gone" from "could not tell"');
+    # Comments stripped first. The block's own comment NAMES device_path_for_wwid
+    # in order to explain why it is not used, and a check that cannot tell code
+    # from the comment about the code is the fifth false positive of this shape in
+    # this project. Strip, then assert.
+    (my $stale_code = $stale) =~ s/^\s*#.*$//mg;
+    unlike($stale_code, qr/device_path_for_wwid/,
+           'and NOT device_path_for_wwid, which collapses both into undef —'
+         . ' untracking on that would repeat the bug this file already records');
+    like($stale, qr/next if !defined \$gone \|\| !\$gone/,
+         'so only a confirmed "gone" untracks anything');
+}
+
 done_testing();

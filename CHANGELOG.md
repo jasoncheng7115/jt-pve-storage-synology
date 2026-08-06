@@ -6,6 +6,44 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.2~beta1] - 2026-08-07
+
+**Node failure, fencing and takeover.** Run on a node the owner allowed to be
+disrupted, with quorum kept throughout.
+
+### Fixed
+
+- **A crash leaves a tracking entry that nothing would ever remove.** A
+  hard-reset node never runs `deactivate_volume`, so `WwidState` keeps an entry for
+  a LUN that is no longer attached — while the LUN still exists on the NAS, so
+  `orphans` correctly does not report it. `reap_orphans` now handles it as a
+  distinct case and says so in its report.
+
+  The check is `map_is_gone`, **not** `device_path_for_wwid`: the latter collapses
+  "no device" and "the stat never came back" into undef by design, and untracking
+  on that would be exactly the bug fixed in 0.6.1~beta1. Only a confirmed *gone*
+  untracks anything.
+
+  Not dangerous before the fix — every consumer re-checks for a device — but it is
+  a record asserting the node holds something it does not, and it is left to
+  `pve-syno-reap` rather than done on the `activate_storage` path, which may not
+  mutate anything. **After a node crash, run the reaper.**
+
+### Verified on hardware
+
+| Test | Result |
+|---|---|
+| Clean reboot, VM running, LUN attached | no stale map, session or tracking; VM restarted, data intact |
+| Hard reset (`sysrq-trigger b`), no cleanup | no stale map or session; the tracking entry above |
+| HA fencing with the VM under `ha-manager` | node rejoined inside the fence window, HA restarted the service, storage re-attached unaided, data intact after a crash-boot |
+| **Takeover while the crashed node was still down** | the surviving node started the VM in **3.6 s** with the dead node's session still registered on the NAS; guest booted, data intact |
+| The crashed node's return | storage `active`, no map, no session, and it did not contest the disk |
+
+The takeover is the one that mattered: a shared target with `max_sessions=0` was
+carrying **two connected sessions** at the moment of the crash, and the surviving
+node attached the LUN without waiting for anything to time out. That is what a
+production cluster depends on and it had never been demonstrated.
+
 ## [0.6.1~beta1] - 2026-08-07
 
 **An allocation held Proxmox VE's cluster-wide storage lock for 3.6 seconds. Now
