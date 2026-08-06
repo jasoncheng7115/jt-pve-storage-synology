@@ -198,7 +198,12 @@ sub wait_unlocked {
         # Gone is not locked. A caller that deleted it races us legitimately.
         return 1 if !defined $lun;
         return 1 if !$lun->{is_action_locked};
-        sleep 1;
+        # Sub-second, and it matters. `sleep 1` stood here, while the register
+        # records the lock clearing in 0.20s after a snapshot and 1.2s after a
+        # 1 GiB create — so a 0.2s wait cost a full second, every time, inside
+        # PVE's cluster lock. `select` is how the rest of this codebase sleeps for
+        # less than a second; `.perlcriticrc` records why.
+        select(undef, undef, undef, 0.2);
     }
 
     # A timeout here means the NAS is still working, not that it failed. Saying
@@ -243,7 +248,9 @@ sub assert_room_for_lun {
     # The NAS did not say. Stop guarding rather than invent a number.
     return 1 if !defined $max;
 
-    my $have = scalar @{ $self->list };
+    # The caller may already hold the listing. alloc_image does, and fetching it
+    # again cost ~0.6s inside PVE's cluster lock for information it had.
+    my $have = defined $opt{count} ? $opt{count} : scalar @{ $self->list };
     return 1 if $have < $max;
 
     die "storage '" . $self->api->storeid . "': the NAS already holds $have"
@@ -258,7 +265,10 @@ sub assert_room_for_lun {
 sub warn_if_near_lun_limit {
     my ($self, %opt) = @_;
     my $max = $self->api->limits->{luns} or return;
-    my $have = scalar @{ $self->list };
+    # Same as assert_room_for_lun: the caller usually already has the listing, and
+    # fetching it again for a warning cost a full round trip inside PVE's cluster
+    # lock. A warning is never worth a second listing.
+    my $have = defined $opt{count} ? $opt{count} : scalar @{ $self->list };
     my $left = $max - $have;
     return if $left > ($opt{margin} // 16);
     return if $self->{warned_lun_limit};
@@ -270,7 +280,8 @@ sub warn_if_near_lun_limit {
 sub create {
     my ($self, %opt) = @_;
 
-    $self->assert_room_for_lun if !$opt{skip_limit_check};
+    $self->assert_room_for_lun(count => $opt{known_lun_count})
+        if !$opt{skip_limit_check};
 
     my $name     = $opt{name};
     my $size     = $opt{size};

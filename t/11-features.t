@@ -137,8 +137,12 @@ like($src, qr/R-25, still open|R-25/,
 # No caller in Proxmox VE 9 passes both, so this is a latent divergence rather
 # than a live bug. It is asserted because the base guards it on purpose.
 {
-    my ($li) = $src =~ /\nsub list_images \{(.*?)\n\}/s;
-    ok($li, 'list_images is there');
+    # The filtering lives in `_images_from_luns`, not `list_images`. It was split
+    # out so that a caller which already holds the LUN listing does not fetch it
+    # again — an allocation used to make three separate `LUN list` calls. This test
+    # was pinned to the old function name and had to follow the code.
+    my ($li) = $src =~ /\nsub _images_from_luns \{(.*?)\n\}/s;
+    ok($li, '_images_from_luns is there');
     like($li, qr/next if !\$vollist && defined \$vmid/,
          'the vmid filter is conditional on no vollist, as in the base class');
     unlike($li, qr/next if defined \$vmid && \$owner ne \$vmid;/,

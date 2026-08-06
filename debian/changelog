@@ -1,3 +1,15 @@
+jt-pve-storage-synology (0.6.1~beta1-1) unstable; urgency=medium
+
+  * An allocation made three full LUN list calls and opened two DSM sessions, all
+    inside PVE's cluster-wide storage lock. Now one of each: 3.6s -> 2.16s, and
+    fifteen concurrent allocations from three nodes no longer fail on the lock.
+  * wait_unlocked polled with sleep 1 while the lock clears in 0.20s. Now 0.2s.
+  * Fix a three-valued answer negated in 0.6.0's own fix: map_is_gone returns
+    1/0/undef and `!map_is_gone(...)` deleted sd devices on an undef, which broke
+    qm rollback after qm stop.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 04:00:00 +0800
+
 jt-pve-storage-synology (0.6.0~beta1-1) unstable; urgency=medium
 
   * New tool pve-syno-reap: clears multipath maps this node holds for LUNs the

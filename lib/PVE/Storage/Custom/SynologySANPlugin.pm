@@ -1152,6 +1152,16 @@ sub list_images {
     my $luns = $lun->list(location => $class->_location($scfg));
     eval { $api->logout };
 
+    return $class->_images_from_luns($storeid, $luns, $vmid, $vollist);
+}
+
+# The LUN listing turned into PVE's image records. Split out of list_images so
+# that a caller which already holds the listing does not have to fetch it again —
+# see alloc_image, which used to pay for three separate `LUN list` calls and two
+# DSM sessions for one allocation.
+sub _images_from_luns {
+    my ($class, $storeid, $luns, $vmid, $vollist) = @_;
+
     my $res = [];
     for my $l (@$luns) {
         # Ownership, decided locally on the name and WITH the storage id. A
@@ -1209,7 +1219,24 @@ sub alloc_image {
     # `//=` never fires and the LUN name comes out as just the prefix. Found by
     # running the actual command.
     $name = undef if defined $name && !length $name;
-    $name //= $class->find_free_diskname($storeid, $scfg, $vmid, $fmt);
+
+    # ONE listing for the whole allocation.
+    #
+    # Measured: an allocation made three separate `LUN list` calls and opened two
+    # DSM sessions — one for `find_free_diskname` (which goes through
+    # `list_images`), one for the ceiling check, one for the listing itself — at
+    # ~0.6s each on a NAS holding only SEVEN LUNs. All of it inside PVE's
+    # `cluster_lock_storage`, which is cluster-wide and serialises every
+    # allocation on the storage. Under twelve concurrent allocations from three
+    # nodes one of them failed on the lock wait; the fix for that is to stop
+    # holding the lock for three seconds when one will do.
+    #
+    # A production NAS holds hundreds of LUNs and this listing grows with all of
+    # them, not just this storage's — the types filter is never sent because it
+    # hides LUNs.
+    my $all = $lun->list(location => $class->_location($scfg));
+
+    $name //= $class->find_free_diskname($storeid, $scfg, $vmid, $fmt, 0, $all);
 
     # Thin LUNs can overcommit the DSM volume, and PVE has no way to express
     # over-subscription — so a full Btrfs volume, which takes every VM on it
@@ -1234,6 +1261,9 @@ sub alloc_image {
     # LUN::create looks the name up after ANY failure, because a create that
     # reports failure can have created the LUN anyway.
     my $obj = $lun->create(
+        # The count comes from the listing already fetched above rather than a
+        # third round trip for the same information.
+        known_lun_count => scalar @$all,
         name        => $lunname,
         size        => $size * 1024,          # PVE passes KiB
         location    => $class->_location($scfg),
@@ -1261,7 +1291,7 @@ sub alloc_image {
           . " so it was removed again: $err";
     }
 
-    $lun->warn_if_near_lun_limit;
+    $lun->warn_if_near_lun_limit(count => scalar @$all);
     eval { $api->logout };
     return $name;
 }
@@ -1341,9 +1371,20 @@ sub free_image {
     return undef;
 }
 
+# The trailing $luns is this plugin's addition and the reason for it is cost.
+#
+# `list_images` opens its own DSM session. Called from inside `alloc_image` —
+# which already has one — that was a second login, a second API discovery and a
+# second logout, all inside PVE's cluster_lock_storage. A caller that already
+# holds the listing hands it over; every other caller gets the previous behaviour
+# unchanged.
 sub find_free_diskname {
-    my ($class, $storeid, $scfg, $vmid, $fmt, $add_fmt_suffix) = @_;
-    my $imgs = $class->list_images($storeid, $scfg, undef, undef, {});
+    my ($class, $storeid, $scfg, $vmid, $fmt, $add_fmt_suffix, $luns) = @_;
+
+    my $imgs = defined $luns
+        ? $class->_images_from_luns($storeid, $luns, undef, undef)
+        : $class->list_images($storeid, $scfg, undef, undef, {});
+
     my @names = map { (split m{:}, $_->{volid}, 2)[1] } @$imgs;
     return PVE::Storage::Plugin::get_next_vm_diskname(
         \@names, $storeid, $vmid, $fmt, $scfg, $add_fmt_suffix);
@@ -1511,7 +1552,14 @@ sub _detach_local {
         #
         # Only on the failure path, deliberately: removing the sd devices on an
         # ordinary VM stop would force a rediscovery that is not needed.
-        if (!PVE::Storage::Custom::Synology::Multipath::map_is_gone($wwid)) {
+        # `map_is_gone` is THREE-VALUED — 1 / 0 / undef — and undef means the stat
+        # never came back. The first version of this wrote `if (!map_is_gone(...))`,
+        # which reads undef as "still there" and would delete the residual paths on
+        # a state nothing had established. That is rule 12 broken inside a fix for
+        # a different bug: a check that cannot answer must not answer, least of all
+        # in the direction of acting.
+        my $gone = PVE::Storage::Custom::Synology::Multipath::map_is_gone($wwid);
+        if (defined $gone && !$gone) {
             PVE::Storage::Custom::Synology::ISCSI::remove_sd_device($_) for @$slaves;
             PVE::Storage::Custom::Synology::Multipath::flush_map($map);
         }

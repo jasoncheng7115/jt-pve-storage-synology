@@ -609,6 +609,69 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### The production-readiness battery, and the cost of holding a cluster-wide lock
+
+`cluster_lock_storage` serialises every allocation on a storage **across the whole
+cluster**. So the time one allocation takes is the time every other node waits, and
+under fifteen concurrent allocations from three nodes one of them failed on the
+lock wait.
+
+Measured, then fixed:
+
+| Per allocation | Before | After |
+|---|---|---|
+| Wall clock | 3.6 s | **2.16 s** |
+| DSM sessions opened | 2 | **1** |
+| HTTP requests | 17 | **12** |
+| Full `LUN list` calls | **3** | **1** |
+
+Three listings for one allocation, at ~0.6 s each on a NAS holding **seven** LUNs —
+and that listing grows with every LUN on the NAS, not just this storage's, because
+the types filter is never sent. Where they came from:
+
+- `find_free_diskname` → `list_images`, which **opens its own DSM session**: a
+  second login, a second API discovery and a second logout, all inside the lock
+- `assert_room_for_lun` → another listing, for a count
+- `warn_if_near_lun_limit` → another listing, for a warning
+
+`alloc_image` now fetches it once and passes it to all three. `find_free_diskname`
+takes an optional listing; every other caller behaves exactly as the base class
+does. And `wait_unlocked` polled with `sleep 1` while the register records the lock
+clearing in **0.20 s** — so a fifth of a second cost a whole one, on every create
+and every snapshot, inside the lock. It polls at 0.2 s now.
+
+Fifteen concurrent allocations from three nodes then completed in 37 s with no
+failures and no duplicate names.
+
+#### A three-valued answer negated, in a fix for a different bug
+
+`_detach_local`'s new residual-path removal was written
+`if (!map_is_gone($wwid))`. `map_is_gone` returns **1 / 0 / undef**, where undef is
+"the stat never came back" — so a bare negation reads "could not tell" as "still
+there" and **deletes the sd devices on a state nothing had established.**
+
+Not theoretical. `qm stop` followed by `qm rollback` failed with:
+
+```
+storage 'pvesyno': no device for 'pve-pvesyno-vm-9990-disk-0' appeared on this
+node after logging in to iqn.2000-01.com.synology:pve-pvesyno-tgt
+```
+
+The devices had been removed on an undef and the rescan did not recover them in
+time. Rule 12 broken inside a fix written the same hour, and only running it showed
+it. The branch now requires `defined $gone && !$gone`.
+
+#### The rest of the battery
+
+| Test | Result |
+|---|---|
+| 15 concurrent allocations, three nodes | 37 s, 15/15, no duplicates |
+| `qm move_disk` to `local-lvm` and back | both directions, guest booted from the moved-back disk |
+| Snapshot of a **running** guest, then rollback | guest boots and sees the pre-snapshot content |
+| DSM management port blocked, guest doing I/O | `inactive` in 6.3 s, warned **once**, **0 I/O errors in the guest**, recovered on the first poll after unblocking |
+| `syno-min-free` above the NAS's free space | allocation refused, with the figures |
+| 1 MiB requested | 1 GiB created — the documented minimum the API does not enforce |
+
 ### Backup, a real guest, and three nodes — the run that closed the last gaps
 
 Everything before this was `pvesm` and `dd`. This was a cirros guest booting from a

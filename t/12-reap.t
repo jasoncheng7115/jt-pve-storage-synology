@@ -93,7 +93,7 @@ like($detach, qr/slaves_of_map/,
      'the slave list is captured before the flush — afterwards there is nothing'
    . ' left to ask which sd devices belonged to the map');
 
-like($detach, qr/if \(!PVE::Storage::Custom::Synology::Multipath::map_is_gone/,
+like($detach, qr/map_is_gone/,
      'and the residual-path removal is conditional on the flush having FAILED');
 
 like($detach, qr/remove_sd_device/, 'it removes the residual paths');
@@ -129,5 +129,38 @@ like($src, qr/NOTHING IN PROXMOX VE CALLS THIS FUNCTION/,
      'and is replaced by what was actually measured');
 like($src, qr/pve-syno-reap.*is/s,
      'with the real cleanup path named');
+
+# --- the three-valued contract, broken inside a fix and caught by running it ---
+#
+# `map_is_gone` returns 1 / 0 / undef, where undef is "the stat never came back".
+# `_detach_local`'s residual-path removal was first written as
+# `if (!map_is_gone($wwid))`, which reads undef as "still there" and deletes the
+# sd devices on a state nothing had established.
+#
+# It was not theoretical. On hardware, `qm stop` followed by `qm rollback` failed
+# with "no device ... appeared on this node after logging in": the devices had been
+# deleted on an undef, and the rescan did not recover them in time. Rule 12 broken
+# inside a fix for a different bug, and only a real run showed it.
+{
+    my $mp = do {
+        open(my $fh, '<', 'lib/PVE/Storage/Custom/Synology/Multipath.pm')
+            or BAIL_OUT('cannot read Multipath');
+        local $/; <$fh>;
+    };
+    my ($gone) = $mp =~ /\nsub map_is_gone \{(.*?)\n\}/s;
+    ok($gone, 'map_is_gone is parseable');
+    like($gone, qr/return undef if !defined \$link/,
+         'it answers undef for a WWID it could not even ask about');
+    like($gone, qr/return undef if !defined \$ok/,
+         'and undef when the stat did not come back');
+}
+
+unlike($detach, qr/if \(!PVE::Storage::Custom::Synology::Multipath::map_is_gone/,
+       'the bare negation of a three-valued answer is gone');
+like($detach, qr/defined \$gone && !\$gone/,
+     'and the destructive branch requires a DEFINITE "still there"');
+like($detach, qr/rule 12/,
+     'with the rule it broke named, so the next reader knows why it is written'
+   . ' this way');
 
 done_testing();

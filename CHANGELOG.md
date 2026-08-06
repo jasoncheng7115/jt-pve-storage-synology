@@ -6,6 +6,59 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.1~beta1] - 2026-08-07
+
+**An allocation held Proxmox VE's cluster-wide storage lock for 3.6 seconds. Now
+2.16.** Under fifteen concurrent allocations from three nodes, one used to fail on
+the lock wait.
+
+### Fixed
+
+- **Three full `LUN list` calls and two DSM sessions per allocation, all inside
+  `cluster_lock_storage`.** That lock serialises every allocation on a storage
+  across the whole cluster, so the time one takes is the time every other node
+  waits. The listing was fetched by `find_free_diskname` (which goes through
+  `list_images` and therefore opens its own session — a second login, a second API
+  discovery, a second logout), again by the LUN-ceiling check for a count, and
+  again by the near-limit warning. `alloc_image` now fetches it once and passes it
+  to all three; `find_free_diskname` takes an optional listing and behaves exactly
+  as the base class does without one.
+
+  | Per allocation | Before | After |
+  |---|---|---|
+  | Wall clock | 3.6 s | **2.16 s** |
+  | DSM sessions | 2 | **1** |
+  | HTTP requests | 17 | **12** |
+  | `LUN list` calls | 3 | **1** |
+
+- **`wait_unlocked` polled with `sleep 1`** while the register records
+  `is_action_locked` clearing in **0.20 s** after a snapshot and 1.2 s after a
+  1 GiB create. A fifth of a second cost a whole one, on every create and every
+  snapshot, inside the cluster lock. It polls at 0.2 s now.
+
+- **A three-valued answer was negated in 0.6.0~beta1's own fix.**
+  `_detach_local`'s residual-path removal was written `if (!map_is_gone($wwid))`,
+  and `map_is_gone` returns 1 / 0 / **undef** — so "could not tell" read as "still
+  there" and the `sd` devices were deleted on a state nothing had established. It
+  was not theoretical: `qm stop` then `qm rollback` failed with *"no device …
+  appeared on this node after logging in"*. The branch now requires
+  `defined $gone && !$gone`.
+
+### Verified on hardware
+
+| Test | Result |
+|---|---|
+| 15 concurrent allocations, three nodes | 37 s, 15/15, no duplicate names |
+| `qm move_disk` off the storage and back | both directions; guest booted from the moved-back disk |
+| Snapshot of a **running** guest, then rollback | guest boots and sees the pre-snapshot content |
+| DSM management port blocked while a guest wrote continuously | `inactive` in 6.3 s, warned **once**, **0 I/O errors in the guest**, recovered on the first poll |
+| `syno-min-free` above the NAS's free space | allocation refused, with the figures |
+| 1 MiB requested | 1 GiB created — the minimum the API does not enforce |
+
+Ended with the NAS on its original four LUNs and three targets, and every node
+with no map, session, node record, credential or drop-in. Another storage's
+credential file in `/etc/pve/priv/storage/` was untouched throughout.
+
 ## [0.6.0~beta1] - 2026-08-06
 
 **Backup, restore, a guest booting from the NAS, live migration across three
