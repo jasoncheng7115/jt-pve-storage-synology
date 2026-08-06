@@ -148,3 +148,7 @@ MIT. See [LICENSE](LICENSE).
 
 This project is not affiliated with or endorsed by Synology Inc. Synology and
 DSM are trademarks of Synology Inc.
+
+## Author
+
+Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;

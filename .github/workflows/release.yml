@@ -51,12 +51,29 @@ jobs:
       - name: Build
         run: dpkg-buildpackage -us -uc -b
 
-      - name: Collect
+      # GitHub rewrites "~" in a release asset's filename to ".", so a checksum
+      # file listing the name dpkg-buildpackage produced cannot be verified
+      # against the file anyone actually downloads: `sha256sum -c SHA256SUMS`
+      # answers "No such file or directory". v0.1.0 and v0.1.1 shipped exactly
+      # that. So rename first, and hash the name that will be served.
+      #
+      # The rename is safe: dpkg reads the version from the package's control
+      # data, never from the filename.
+      - name: Collect, with the name GitHub will actually serve
         run: |
           mkdir -p artifacts
-          cp ../jt-pve-storage-synology_*_all.deb artifacts/
+          for f in ../jt-pve-storage-synology_*_all.deb; do
+            served=$(basename "$f" | tr '~' '.')
+            cp "$f" "artifacts/$served"
+            echo "$(basename "$f")  ->  $served"
+          done
           (cd artifacts && sha256sum *.deb > SHA256SUMS)
           cat artifacts/SHA256SUMS
+
+      # Proves the published checksum file verifies, rather than assuming the
+      # rename above was complete.
+      - name: The checksum file must verify against the collected files
+        run: cd artifacts && sha256sum -c SHA256SUMS
 
       # The changelog entry for this version becomes the release notes, so the
       # notes cannot drift from the package's own record of itself.

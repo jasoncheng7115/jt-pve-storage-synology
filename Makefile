@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.1.1~beta1
+VERSION = 0.1.2~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -189,6 +189,11 @@ release-check: check-multipath-flush check-secrets syntax unit unit-nopve
 	if [ "$(VERSION)" != "$$tool_version" ]; then \
 		echo "  ERROR: Makefile and bin/pve-syno-api-probe disagree"; fail=1; \
 	fi; \
+	for f in CHANGELOG.md CHANGELOG_zh-TW.md; do \
+		if ! grep -q "\[$(VERSION)\]" $$f; then \
+			echo "  ERROR: $$f has no entry for $(VERSION)"; fail=1; \
+		fi; \
+	done; \
 	badge=$$(sed -n 's/.*hero__badge">[[:space:]]*v\([^ <]*\).*/\1/p' docs/index.html | head -1); \
 	echo "  docs site badge:  $$badge"; \
 	if [ "$$badge" != "$(VERSION)" ]; then \

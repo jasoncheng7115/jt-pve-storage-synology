@@ -130,3 +130,7 @@ MIT。見 [LICENSE](LICENSE)。
 
 本專案與 Synology Inc. 無隸屬關係，也未經其背書。Synology 與 DSM 是 Synology Inc.
 的商標。
+
+## 作者
+
+Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;

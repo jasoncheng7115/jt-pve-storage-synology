@@ -1,3 +1,17 @@
+jt-pve-storage-synology (0.1.2~beta1-1) unstable; urgency=low
+
+  * Fix a published SHA256SUMS that could not be verified. GitHub rewrites the
+    "~" in a release asset's filename to ".", so the checksum file named a file
+    nobody could download and `sha256sum -c` answered "No such file or
+    directory". The release workflow now renames the package to the name GitHub
+    will serve before hashing it, and verifies its own checksum file rather than
+    assuming. The .deb itself was always correct: dpkg reads the version from
+    the control data, never from the filename.
+  * Add CHANGELOG.md and CHANGELOG_zh-TW.md; release-check now requires an entry
+    for the version being released.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Thu, 06 Aug 2026 16:30:00 +0800
+
 jt-pve-storage-synology (0.1.1~beta1-1) unstable; urgency=low
 
   * The snapshot restore method is named restore_snapshot, established against
