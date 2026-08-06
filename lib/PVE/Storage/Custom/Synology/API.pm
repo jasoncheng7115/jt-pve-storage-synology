@@ -135,6 +135,9 @@ sub new {
         # A related project measured a 2-second status timeout becoming 21
         # seconds on a dead array precisely because they did.
         all_portals_down => 0,
+        # The pid that built this object. DESTROY below must not act on a
+        # forked child's copy.
+        owner_pid => $$,
     }, $class;
 
     return $self;
@@ -475,6 +478,51 @@ sub logout {
     };
     $self->{sid} = undef;
     $self->{syno_token} = undef;
+    return;
+}
+
+# Log out when the object goes away, however it goes away.
+#
+# Twenty of this plugin's methods build an API object, and nine of them have a
+# `die` between the construction and the `logout` — a rollback that refuses, a
+# resize the NAS rejects, a `path()` on a volume that is gone. Every one of those
+# leaked a DSM session, and R-13 established that a second login does NOT evict
+# the first, so they accumulate on the NAS for as long as DSM keeps them. A
+# repeatedly failing operation is a session leak on a per-attempt basis.
+#
+# Fixing this at the nine call sites was the wrong answer: it is nine chances to
+# forget, and the tenth method has not been written yet. Perl unwinds through
+# DESTROY on the die path, so the object cleans up after itself.
+#
+# Four things this must get right, all of them load-bearing:
+#
+#   1. **`$@` must survive.** Not on the die path — Perl 5.14 and later save and
+#      restore `$@` around destructors called while a `die` propagates, and a test
+#      written to prove otherwise passed with the `local` removed. It is ORDINARY
+#      SCOPE EXIT that is exposed: this plugin is full of
+#      `eval { ... }; if ($@) { ... }`, and an object released between the two
+#      would replace the caller's error with whatever the logout did. Rule 14 in
+#      a place that looks like it could not possibly be reachable.
+#   2. **Not during global destruction.** At interpreter shutdown the HTTP
+#      client and its dependencies may already be gone, and the failure would be
+#      an unhelpful error from inside a module the operator has never heard of.
+#      Nothing needs the logout then: the process is ending.
+#   3. **Not in a forked child.** PVE forks workers. A child inheriting this
+#      object and logging out on exit would invalidate the PARENT's session,
+#      which would look exactly like the NAS dropping sessions at random.
+#   4. **Never die.** A die in DESTROY becomes a warning at best, and during
+#      unwinding it can replace the real error.
+sub DESTROY {
+    my ($self) = @_;
+
+    return if ${^GLOBAL_PHASE} eq 'DESTRUCT';
+    return if !defined $self->{sid};
+    return if ($self->{owner_pid} // 0) != $$;
+
+    # Both of these matter: `local $@` so a failure in here cannot overwrite the
+    # error being propagated, and the eval so it cannot escape at all.
+    local $@;
+    eval { $self->logout };
     return;
 }
 

@@ -37,6 +37,7 @@ use PVE::Storage::Custom::Synology::ISCSI;
 use PVE::Storage::Custom::Synology::Multipath;
 use PVE::Storage::Custom::Synology::WwidState;
 use PVE::Storage::Custom::Synology::Health;
+use PVE::Storage::Custom::Synology::Deferred;
 
 use base qw(PVE::Storage::Plugin);
 
@@ -74,7 +75,144 @@ sub plugindata {
     return {
         content => [ { images => 1, rootdir => 1 }, { images => 1 } ],
         format  => [ { raw => 1 }, 'raw' ],
+
+        # WITHOUT THIS THE DSM PASSWORD IS WRITTEN INTO /etc/pve/storage.cfg.
+        #
+        # That file is `root:www-data 0640`, and — worse — a property PVE does not
+        # know is a secret is returned by `GET /storage/<id>` to any user holding
+        # Datastore.Audit. A read-only auditor would have been handed a DSM
+        # credential with SAN Manager rights.
+        #
+        # PVE has a first-class mechanism and this plugin was not using it.
+        # `sensitive_properties` falls back to a hardcoded list —
+        # `encryption-key keyring master-pubkey password` — when a plugin declares
+        # nothing, and `syno-password` is not in it. So the omission failed
+        # silently and in the least safe direction, which is the only reason it
+        # survived fifteen releases.
+        #
+        # Declaring them here makes PVE strip them from the config and hand them
+        # to the hooks in %sensitive instead; storing them is then this plugin's
+        # job, in /etc/pve/priv (root only, and replicated to every node).
+        'sensitive-properties' => {
+            'syno-password'      => 1,
+            'syno-chap-password' => 1,
+            'syno-otp'           => 1,
+            # A standing second-factor bypass. Exactly as sensitive as the
+            # password, and it was being written to the same place.
+            'syno-device-id'     => 1,
+        },
     };
+}
+
+# ---------------------------------------------------------------------------
+# The credential store
+# ---------------------------------------------------------------------------
+#
+# /etc/pve/priv/storage/<storeid>.syno, which is where PVE's own CIFS, PBS and
+# ESXi plugins keep theirs. Under /etc/pve so it replicates to every node — a
+# shared storage is used from all of them — and inside priv, which the cluster
+# filesystem serves to root only.
+
+# A variable rather than `use constant`, and deliberately: a constant is folded
+# into its call sites at compile time, so a test cannot point the store at a
+# temporary directory — and a credential store with no test is not something to
+# ship. Nothing in production ever assigns to this.
+our $CRED_DIR = '/etc/pve/priv/storage';
+
+sub _cred_file {
+    my ($class, $storeid) = @_;
+    # The storeid reaches a filesystem path, so it is sanitised rather than
+    # trusted: a storage id carrying `../` must not choose the file. PVE's own
+    # id rules are stricter than this, but the check costs nothing and this is
+    # the one place where being wrong writes a credential somewhere else.
+    (my $safe = $storeid // '') =~ s/[^A-Za-z0-9_.-]/_/g;
+    $safe =~ s/\A\.+//;
+    return undef if !length $safe;
+    return "$CRED_DIR/$safe.syno";
+}
+
+sub _read_creds {
+    my ($class, $storeid) = @_;
+    my $file = $class->_cred_file($storeid) or return {};
+    my %c;
+    open(my $fh, '<', $file) or return {};
+    while (my $line = <$fh>) {
+        chomp $line;
+        next if $line =~ /\A\s*(?:#|\z)/;
+        my ($k, $v) = split(/=/, $line, 2);
+        next if !defined $k || !defined $v;
+        # Only keys this plugin writes. A stray line is not an instruction.
+        next if $k !~ /\A(?:password|chap-password|otp|device-id)\z/;
+        $c{$k} = $v;
+    }
+    close($fh);
+    return \%c;
+}
+
+sub _write_creds {
+    my ($class, $storeid, $creds) = @_;
+    my $file = $class->_cred_file($storeid)
+        or die "storage '$storeid': the storage id cannot be used in a filename\n";
+
+    # Nothing to keep: remove the file rather than leaving an empty one, so
+    # "no credential stored" and "an empty credential" are not the same state.
+    my %keep = map { $_ => $creds->{$_} }
+               grep { defined $creds->{$_} && length $creds->{$_} } keys %$creds;
+    if (!%keep) {
+        unlink $file;
+        return;
+    }
+
+    mkdir $CRED_DIR;
+    my $body = join('', map { "$_=$keep{$_}\n" } sort keys %keep);
+    ## no critic (ValuesAndExpressions::ProhibitLeadingZeros)
+    # 0600 is a file mode and octal is the only readable way to write one.
+    # The policy stays on everywhere else, where a leading zero IS a bug.
+    PVE::Tools::file_set_contents($file, $body, 0600);
+    return;
+}
+
+sub _delete_creds {
+    my ($class, $storeid) = @_;
+    my $file = $class->_cred_file($storeid) or return;
+    unlink $file;
+    return;
+}
+
+# The credentials for one storage: the private file first, then the config, so a
+# storage added by an earlier version keeps working.
+#
+# Fifteen releases wrote the password into storage.cfg. Refusing to read it would
+# break every existing installation on upgrade, so it is read and the operator is
+# told once how to move it — and any `pvesm set` on the storage moves it
+# automatically, because on_update_hook_full deletes it from the config.
+sub _creds {
+    my ($class, $storeid, $scfg) = @_;
+    my $c = $class->_read_creds($storeid);
+
+    my %map = (
+        'password'      => 'syno-password',
+        'chap-password' => 'syno-chap-password',
+        'otp'           => 'syno-otp',
+        'device-id'     => 'syno-device-id',
+    );
+    my $from_config = 0;
+    for my $k (keys %map) {
+        next if defined $c->{$k} && length $c->{$k};
+        my $v = $scfg->{ $map{$k} };
+        next if !defined $v || !length $v;
+        $c->{$k} = $v;
+        $from_config = 1 if $k eq 'password' || $k eq 'device-id';
+    }
+
+    PVE::Storage::Custom::Synology::Health::warn_once_for($storeid, 'plaintext-cred',
+        "storage '$storeid': the DSM credential is still stored in"
+      . " /etc/pve/storage.cfg, where it is readable by www-data and returned by"
+      . " the API to any user with Datastore.Audit. Run"
+      . " `pvesm set $storeid --syno-password <password>` once to move it into"
+      . " /etc/pve/priv, which is root-only.\n") if $from_config;
+
+    return $c;
 }
 
 # PVE consults this in parse_config and forces `shared 1`. A LUN on a NAS is
@@ -224,13 +362,18 @@ sub options {
 
 sub _api {
     my ($class, $storeid, $scfg, %opt) = @_;
+    # The credentials never come from $scfg directly any more: they live in
+    # /etc/pve/priv, and $scfg is only the fallback for a storage written by a
+    # version that did not know that. A hook that has just been handed a new
+    # password passes it in as `creds`, because it is not on disk yet.
+    my $c = $opt{creds} // $class->_creds($storeid, $scfg);
     return PVE::Storage::Custom::Synology::API->new(
         portals    => $scfg->{'syno-portal'},
         port       => $scfg->{'syno-port'},
         username   => $scfg->{'syno-username'},
-        password   => $scfg->{'syno-password'},
-        otp        => $scfg->{'syno-otp'},
-        device_id  => $scfg->{'syno-device-id'},
+        password   => $c->{password},
+        otp        => $c->{otp},
+        device_id  => $c->{'device-id'},
         ssl_verify => $scfg->{'syno-ssl-verify'},
         tls_ca     => $scfg->{'syno-tls-ca'},
         storeid    => $storeid,
@@ -285,7 +428,18 @@ sub _ensure_target {
 # discovered later. Everything refused here would otherwise surface at the
 # first snapshot, or never.
 sub on_add_hook {
-    my ($class, $storeid, $scfg, %param) = @_;
+    my ($class, $storeid, $scfg, %sensitive) = @_;
+
+    # The credentials arrive HERE, not in $scfg: PVE strips every property named
+    # in `sensitive-properties` out of the config before writing it.
+    my %creds = (
+        'password'      => $sensitive{'syno-password'},
+        'chap-password' => $sensitive{'syno-chap-password'},
+        'otp'           => $sensitive{'syno-otp'},
+        'device-id'     => $sensitive{'syno-device-id'},
+    );
+    die "storage '$storeid': syno-password is required\n"
+        if !defined $creds{password} || !length $creds{password};
 
     # A storage id that folds onto another one's prefix is indistinguishable
     # from it on the NAS: each would list the other's disks and the ownership
@@ -310,20 +464,27 @@ sub on_add_hook {
         }
     }
 
-    my $api = $class->_api($storeid, $scfg);
+    my $api = $class->_api($storeid, $scfg, creds => \%creds);
     PVE::Storage::Custom::Synology::Health::assert_usable($api,
         location => $class->_location($scfg));
 
     # A one-time code is good once. Capture the device token DSM issues so the
     # operator never types another, and drop the code.
     if (my $token = $api->take_device_token) {
-        $scfg->{'syno-device-id'} = $token;
-        delete $scfg->{'syno-otp'};
+        $creds{'device-id'} = $token;
+        delete $creds{otp};
         print "storage '$storeid': stored the device token DSM issued, so the"
-            . " one-time code is not needed again. Treat it as a credential.\n";
+            . " one-time code is not needed again. It is a standing"
+            . " second-factor bypass and is kept in /etc/pve/priv with the"
+            . " password.\n";
     }
 
     $api->logout;
+
+    # LAST. Every check that can refuse has passed, so nothing is written for a
+    # storage that is not going to exist — the same ordering rule the
+    # activate_storage path follows.
+    $class->_write_creds($storeid, \%creds);
     return;
 }
 
@@ -332,6 +493,16 @@ sub on_add_hook {
 # other disk on the same storage.
 sub on_delete_hook {
     my ($class, $storeid, $scfg) = @_;
+
+    # The credential outlives the storage unless something removes it, and a
+    # stored DSM password belonging to a storage that no longer exists is the
+    # worst of both: nothing uses it and nobody is looking after it. So it goes
+    # whatever happens below — including when the NAS cannot be reached, which is
+    # the path that used to return early and leave it.
+    my $cleanup = PVE::Storage::Custom::Synology::Deferred->new(sub {
+        $class->_delete_creds($storeid);
+        PVE::Storage::Custom::Synology::API::clear_credential_latch(undef, $storeid);
+    });
 
     my $api = eval { $class->_api($storeid, $scfg) } or return;
     my $tgt = $class->_tgt($api);
@@ -364,16 +535,78 @@ sub on_delete_hook {
     return;
 }
 
+# PVE calls _full when the plugin's api() is 13 or higher, and it hands over the
+# LIVE config hash — the one that is written immediately afterwards. That is what
+# makes the migration possible: a plaintext password left in storage.cfg by an
+# earlier version can be moved into /etc/pve/priv and deleted from the config by
+# any `pvesm set` on the storage.
+sub on_update_hook_full {
+    my ($class, $storeid, $scfg, $opts, $delete, $sensitive) = @_;
+    $sensitive //= {};
+
+    my $creds = $class->_update_creds($storeid, $scfg, $sensitive, $delete);
+
+    # Strip anything an older version left in the config. $scfg is written by the
+    # caller after this returns, so deleting here is what actually removes it.
+    delete $scfg->{$_} for qw(syno-password syno-chap-password syno-otp syno-device-id);
+
+    my %merged = (%$scfg, %{ $opts // {} });
+    $class->_revalidate($storeid, \%merged, $creds);
+    return;
+}
+
+# The pre-13 form, kept because api() is negotiated and a node can be older.
 sub on_update_hook {
-    my ($class, $storeid, $scfg, %param) = @_;
-    my $api = $class->_api($storeid, $scfg);
+    my ($class, $storeid, $scfg, %sensitive) = @_;
+    my $creds = $class->_update_creds($storeid, $scfg, \%sensitive, undef);
+    $class->_revalidate($storeid, $scfg, $creds);
+    return;
+}
+
+# Merge what was just supplied over what is already stored, so an update that
+# does not resend the password keeps it.
+sub _update_creds {
+    my ($class, $storeid, $scfg, $sensitive, $delete) = @_;
+
+    my $creds = $class->_creds($storeid, $scfg);
+
+    my %map = (
+        'syno-password'      => 'password',
+        'syno-chap-password' => 'chap-password',
+        'syno-otp'           => 'otp',
+        'syno-device-id'     => 'device-id',
+    );
+    while (my ($prop, $key) = each %map) {
+        next if !exists $sensitive->{$prop};
+        my $v = $sensitive->{$prop};
+        # PVE puts an explicitly deleted property in here as undef.
+        if (!defined $v || !length $v) { delete $creds->{$key} } else { $creds->{$key} = $v }
+    }
+    for my $prop (@{ $delete // [] }) {
+        delete $creds->{ $map{$prop} } if $map{$prop};
+    }
+
+    return $creds;
+}
+
+sub _revalidate {
+    my ($class, $storeid, $scfg, $creds) = @_;
+
+    my $api = $class->_api($storeid, $scfg, creds => $creds);
     PVE::Storage::Custom::Synology::Health::assert_usable($api,
         location => $class->_location($scfg));
     if (my $token = $api->take_device_token) {
-        $scfg->{'syno-device-id'} = $token;
-        delete $scfg->{'syno-otp'};
+        $creds->{'device-id'} = $token;
+        delete $creds->{otp};
     }
     $api->logout;
+
+    # After the checks, as in on_add_hook.
+    $class->_write_creds($storeid, $creds);
+
+    # A configuration change is the operator having had a chance to fix things,
+    # so the credential latch and the once-only warnings both reset.
+    PVE::Storage::Custom::Synology::API::clear_credential_latch($storeid);
     PVE::Storage::Custom::Synology::Health::clear_warnings($storeid);
     return;
 }

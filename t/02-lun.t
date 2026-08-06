@@ -96,4 +96,110 @@ my $unknown = PVE::Storage::Custom::Synology::LUN->new(
 ok($unknown->assert_room_for_lun,
    'an unreported ceiling stops the guard rather than becoming a guessed number');
 
+
+# --- resize: shrink must be refused, not silently declined ----------------
+#
+# `resize` used to short-circuit on `$lun->{size} >= $new_size`, which made a
+# shrink request return the LUN unchanged — a success for something that did not
+# happen. PVE writes the REQUESTED size into the VM configuration regardless of
+# what a plugin returns (`$drive->{size} = $newsize` in API2/Qemu.pm), so the
+# configuration would have claimed a size the NAS does not have.
+
+{
+    package MockAPI;
+    sub new { my ($c,%o)=@_; bless { calls => [], %o }, $c }
+    sub storeid { 'mock' }
+    sub call_ok {
+        my ($self, $api, $method, %p) = @_;
+        push @{ $self->{calls} }, [ $method, \%p ];
+        return { };
+    }
+    sub call { my $s = shift; return { success => 1, data => {} } }
+}
+{
+    package MockLUN;
+    our @ISA = ('PVE::Storage::Custom::Synology::LUN');
+    sub new { my ($c,%o)=@_; bless { api => MockAPI->new, size => $o{size} }, $c }
+    sub api { $_[0]->{api} }
+    sub get { return { uuid => 'u-1', size => $_[0]->{size} } }
+    sub wait_unlocked { return 1 }
+}
+
+my $shrink = MockLUN->new(size => 10 * 1024 ** 3);
+eval { $shrink->resize('u-1', 5 * 1024 ** 3) };
+like($@, qr/refusing to shrink/,
+     'a smaller size is refused rather than reported as done');
+like($@, qr/claiming a size the NAS does not have/,
+     'and the refusal says why it matters, not just that it is refused');
+is(scalar @{ $shrink->api->{calls} }, 0,
+   'nothing was sent to the NAS — the refusal precedes the request');
+
+my $same = MockLUN->new(size => 10 * 1024 ** 3);
+my $r = eval { $same->resize('u-1', 10 * 1024 ** 3) };
+is($@, '', 'an equal size is not an error');
+is(scalar @{ $same->api->{calls} }, 0,
+   'and is idempotent: PVE pads a request up to a multiple of 1024, so asking'
+   . ' twice for the same figure is ordinary');
+
+my $grow = MockLUN->new(size => 10 * 1024 ** 3);
+eval { $grow->resize('u-1', 20 * 1024 ** 3) };
+my @sent = @{ $grow->api->{calls} };
+is(scalar @sent, 1, 'growing sends exactly one call');
+is($sent[0][0], 'set', 'via set');
+is($sent[0][1]{new_size}, 20 * 1024 ** 3, 'with the requested total, not a delta');
+
+
+# --- create: the delete-on-refusal path must prove the object is new ------
+#
+# DSM refusing a create and doing it anyway is a measured behaviour, and the
+# cleanup deletes what a lookup finds. Until the pre-check was added, the only
+# thing separating "delete what DSM just made" from "delete a LUN that was
+# already there" was the error code not being 18990538 — proof by absence, for a
+# destructive action.
+
+{
+    package MockCreateAPI;
+    sub new { my ($c,%o)=@_; bless { calls=>[], %o }, $c }
+    sub storeid { 'mock' }
+    sub limits { { luns => undef } }        # the NAS did not say -> no ceiling guard
+    sub call {
+        my ($self, $api, $method, %p) = @_;
+        push @{ $self->{calls} }, $method;
+        return $self->{create_answer} if $method eq 'create';
+        return { success => 1, data => {} };
+    }
+    sub call_ok { my $s=shift; $s->call(@_); return {} }
+}
+{
+    package MockCreateLUN;
+    our @ISA = ('PVE::Storage::Custom::Synology::LUN');
+    sub new {
+        my ($c,%o)=@_;
+        bless { api => MockCreateAPI->new(create_answer => $o{create_answer}),
+                existing => $o{existing}, deleted => [] }, $c;
+    }
+    sub api { $_[0]->{api} }
+    sub get {
+        my ($self, $key) = @_;
+        return $self->{existing};
+    }
+    sub delete { my ($s,$u,%o)=@_; push @{ $s->{deleted} }, $u; return 1 }
+    sub wait_unlocked { 1 }
+    sub deleted { $_[0]->{deleted} }
+}
+
+# A name that is already taken is refused before anything is sent.
+my $taken = MockCreateLUN->new(
+    existing      => { uuid => 'someone-elses', name => 'pve-s-vm-1-disk-0' },
+    create_answer => { success => 1, data => { uuid => 'new' } },
+);
+eval { $taken->create(name => 'pve-s-vm-1-disk-0', size => 2*1024**3, location => '/volume1') };
+like($@, qr/already\s+exists on the NAS/,
+     'an existing name is refused before the create is attempted');
+is_deeply($taken->api->{calls}, [],
+     'and no create was ever sent — the refusal precedes the request')
+    or diag('calls: ' . join(',', @{ $taken->api->{calls} }));
+is_deeply($taken->deleted, [],
+     'crucially: someone else\'s LUN of that name is NOT deleted');
+
 done_testing();

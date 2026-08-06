@@ -586,6 +586,36 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### The audit's second pass: four more, and where the credentials were
+
+The first pass looked at bounds and guards. The second followed the data, and the
+worst finding was not in the plugin's logic at all.
+
+| Found | Consequence |
+|---|---|
+| **`syno-password` was written into `/etc/pve/storage.cfg`** | that file is `root:www-data 0640`, and a property PVE does not know is a secret is returned by `GET /storage/<id>` to any user with `Datastore.Audit`. A read-only auditor could read a DSM credential with SAN Manager rights. `syno-device-id` — a standing 2FA bypass — was stored the same way |
+| **Nine methods leaked a DSM session on their error paths** | twenty build an API object, nine have a `die` before the `logout`. R-13 established a second login does not evict the first, so they accumulated: one per failed attempt |
+| **A shrink was silently declined, not refused** | PVE writes the *requested* size into the VM configuration whatever the plugin returns, so the configuration would claim a size the NAS does not have |
+| **The delete-on-refusal cleanup proved nothing** | it deleted what a lookup found, and the only thing separating that from a pre-existing LUN was the error code not being 18990538 |
+
+The credential one is the instructive one, because of **why** it was silent.
+`PVE::Storage::Plugin::sensitive_properties` falls back to a hardcoded list when a
+plugin declares nothing — `encryption-key keyring master-pubkey password` — and
+`syno-password` is not in it. A prefixed property name defeats the default, in the
+least safe direction, with no warning at any layer. Verified directly against
+PVE's own machinery rather than by reading:
+
+```
+PVE reports sensitive for synologysan: syno-chap-password syno-device-id
+                                       syno-otp syno-password
+handed to the hook in %sensitive:      syno-device-id, syno-password
+written into storage.cfg:              syno-location, syno-portal, syno-username
+```
+
+They now live in `/etc/pve/priv/storage/<storage>.syno`, 0600. **Anyone upgrading
+must treat the old value as disclosed** — moving a secret that `www-data` could
+read is not the same as protecting it.
+
 ### The third module of this shape, and the prediction that came true
 
 `CLAUDE.md` had said: if a third module of functions-not-methods appears, give it

@@ -29,6 +29,7 @@ my @modules = qw(
     PVE::Storage::Custom::Synology::ISCSI
     PVE::Storage::Custom::Synology::Multipath
     PVE::Storage::Custom::Synology::WwidState
+    PVE::Storage::Custom::Synology::Deferred
 );
 
 require_ok($_) for @modules;

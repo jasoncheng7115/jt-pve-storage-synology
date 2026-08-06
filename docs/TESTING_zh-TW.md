@@ -398,6 +398,28 @@ Target 的 IQN 裡嵌的是**建立當時**的 NAS 主機名稱——測試機�
 
 ---
 
+### 稽核的第二輪：又四個，以及憑證原本在哪裡
+
+第一輪看的是邊界與防護。第二輪跟著資料走，而最糟的發現根本不在 plugin 的邏輯裡。
+
+| 發現 | 後果 |
+|---|---|
+| **`syno-password` 被寫進 `/etc/pve/storage.cfg`** | 那個檔案是 `root:www-data 0640`，而一個 PVE 不知道是機密的屬性，會透過 `GET /storage/<id>` 回傳給任何持有 `Datastore.Audit` 的使用者。一個唯讀的稽核者就能讀到一組具備 SAN Manager 權限的 DSM 憑證。`syno-device-id`——一個常設的 2FA 旁路——也是同樣的存放方式 |
+| **九個方法在錯誤路徑上洩漏 DSM 工作階段** | 二十個方法會建立 API 物件，九個在 `logout` 之前有 `die`。R-13 已確認第二次登入不會踢掉第一次，所以它們會累積：每失敗一次就一個 |
+| **縮小是被無聲略過，而不是被拒絕** | 不管 plugin 回傳什麼，PVE 都會把**要求的**大小寫進 VM 設定，所以設定會宣稱一個 NAS 上並不存在的大小 |
+| **「被拒絕後刪除」的清理什麼都沒證明** | 它會刪掉查詢找到的東西，而區隔它和一個原本就存在的 LUN 的，只有錯誤碼不是 18990538 |
+
+憑證那一項最值得學，因為它**為什麼**是無聲的。當 plugin 什麼都沒宣告時，`PVE::Storage::Plugin::sensitive_properties` 會退回一份寫死的清單——`encryption-key keyring master-pubkey password`——而 `syno-password` 不在裡面。一個帶前置字串的屬性名稱會讓預設值失效，而且是朝著最不安全的方向失效，任何一層都不會警告。這是直接對 PVE 自己的機制驗證的，不是讀出來的：
+
+```
+PVE 對 synologysan 回報為機密的：syno-chap-password syno-device-id
+                                 syno-otp syno-password
+交給 hook 的 %sensitive：       syno-device-id, syno-password
+寫進 storage.cfg 的：           syno-location, syno-portal, syno-username
+```
+
+它們現在放在 `/etc/pve/priv/storage/<storage>.syno`，權限 0600。**任何升級的人都必須把舊的值視為已經洩漏**——搬移一個 `www-data` 讀得到的機密，和保護它並不是同一件事。
+
 ### 這個形狀的第三個模組，以及一個成真的預測
 
 `CLAUDE.md` 曾經寫過：如果出現第三個「是函式而不是方法」的模組，就給它同樣的防護。`Command` 就是那個模組，而防護並不存在。它在寫下第一個測試的那一刻就浮現了，因為 `$C->is_block_device($path)` 是最自然會寫出來的形式：

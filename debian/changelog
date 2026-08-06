@@ -1,3 +1,19 @@
+jt-pve-storage-synology (0.5.3~beta1-1) unstable; urgency=high
+
+  * SECURITY: the DSM credentials are no longer written to /etc/pve/storage.cfg,
+    where they were readable by www-data and returned by the API to any user
+    with Datastore.Audit. They now live in /etc/pve/priv/storage/<id>.syno.
+    Run `pvesm set <storage> --syno-password <pw>` once per storage to migrate,
+    and treat the old value as disclosed.
+  * Release the DSM session in DESTROY: nine methods leaked one on their error
+    paths.
+  * Refuse a shrink instead of silently declining it.
+  * Look a LUN name up before creating it, so the delete-on-refusal cleanup acts
+    only on an object this call made.
+  * Remove the credential file on every exit from on_delete_hook.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 21:00:00 +0800
+
 jt-pve-storage-synology (0.5.2~beta1-1) unstable; urgency=low
 
   * Command's functions now refuse a method call: the shifted arguments made

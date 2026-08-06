@@ -4,6 +4,37 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.5.3~beta1] - 2026-08-06
+
+**一個安全性修正，而且需要已經在使用的人做一個動作。**DSM 密碼原本被寫進 `/etc/pve/storage.cfg`。
+
+### 安全性
+
+- **DSM 憑證不再存放在 `storage.cfg`。**它們改放在 `/etc/pve/priv/storage/<storage>.syno`，權限 `0600`，而該目錄由叢集檔案系統只提供給 root——這也是 Proxmox VE 自己的 CIFS、PBS 和 ESXi plugin 存放憑證的地方。
+
+  `storage.cfg` 是 `root:www-data 0640`，而且更糟的是：一個 Proxmox VE 不知道是機密的屬性，會透過 `GET /storage/<id>` 回傳給**任何持有 `Datastore.Audit` 的使用者**。一個唯讀的稽核者就能讀到一組具備 SAN Manager 權限的 DSM 憑證。而 device token——一個常設的 2FA 旁路——也是用同樣的方式存放的。
+
+  PVE 對這件事有一套正式機制 `sensitive-properties`，而這個 plugin 沒有宣告它。當 plugin 沒有宣告時，`sensitive_properties` 會退回一份寫死的清單（`encryption-key keyring master-pubkey password`），而 `syno-password` 不在裡面——所以這個遺漏是無聲的，而且是朝著最不安全的方向無聲，這也是它能撐過十五個版本的唯一原因。
+
+  **如果你正在升級，請對每個 storage 做一次：**
+
+  ```bash
+  pvesm set <storage> --syno-password '<密碼>'
+  ```
+
+  這會把它搬到私有檔案並從 `storage.cfg` 移除。舊位置仍然會被讀取，所以在你處理到它之前不會壞掉，而 plugin 會警告一次。因為那個值任何以 `www-data` 身分執行的東西都讀得到，**請視為已經洩漏，並更換該 DSM 帳號的密碼**，如果有用 2FA 也請撤銷 device token。完整步驟見 `docs/DSM-ACCOUNT_zh-TW.md`。
+
+### 修正
+
+- **九個方法在錯誤路徑上洩漏 DSM 工作階段。**有二十個方法會建立 API 物件，其中九個在建立與 `logout` 之間有 `die`。R-13 已經確認第二次登入不會踢掉第一次，所以它們會累積在 NAS 上——一個反覆失敗的操作，每試一次就洩漏一個。現在物件會在 `DESTROY` 裡登出，而 Perl 在 die 路徑上也會執行它。在那九個呼叫點各自修一次，等於九次忘記的機會，而且對還沒寫出來的第十個方法沒有任何保護。
+- **縮小被無聲地略過，而不是被拒絕。**`resize` 在 `size >= 要求值` 時直接短路，回傳未變更的 LUN——對一件沒有發生的事回報成功。Proxmox VE 不管 plugin 回傳什麼，都會把**要求的**大小寫進 VM 設定，所以設定會宣稱一個 NAS 上並不存在的大小，而下一次「增加 N」還會從那個數字算起。現在會拒絕，並且說明原因。
+- **「被拒絕後刪除」那條路徑只用「缺少某個錯誤碼」來證明物件是新的。**DSM 拒絕建立卻仍然建立了，是實測到的行為，而清理動作會刪掉查詢找到的東西；而區隔「刪掉 DSM 剛做出來的東西」和「刪掉一個原本就存在的 LUN」的，只有錯誤碼不是 18990538 這一件事。現在 `create` 會先查名稱，若已被占用就直接拒絕，所以清理只會動到它自己建立的物件。R-9 已經確認 `LUN list` 不回報總數，所以一份被無聲截斷的清單是通往錯誤分支的真實路徑。
+- **`on_delete_hook` 會留下憑證檔案**，包含在 NAS 連不上而提早 return 的那條路徑上。現在有一個作用域守衛，在每一條離開路徑上都會移除憑證與鎖定檔。
+
+### 新增
+
+- `t/10-credentials.t` 與 `t/09-session.t`——總共 249 個測試。憑證測試會實際驅動 PVE 自己的 `sensitive_properties` 和 `extract_sensitive_params`，所以斷言的是 PVE 真的把值拿掉了，而不只是 plugin 要求它這樣做。
+
 ## [0.5.2~beta1] - 2026-08-06
 
 **一次稽核查出三件讀程式碼沒有查出來的事。**三件都是同一類：靠推論成立、而不是靠檢查成立的程式碼。

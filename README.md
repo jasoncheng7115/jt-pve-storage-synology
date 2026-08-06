@@ -16,18 +16,32 @@ locally.
 > end to end against a DS918+ on DSM 7.1.1, twice over, leaving nothing behind on
 > the node or the NAS.
 >
-> It is still a prerelease, and the honest reasons are: **one** node, **one**
-> model, **one** DSM version, and no VM has actually booted from it yet. Five
-> bugs were found in the first hour of running it that no amount of reading had
-> shown, so assume there are more.
+> Since then: **two nodes** on different kernels with the same LUN attached, live
+> migration at about 3 ms downtime, a real booted VM holding the disk, and
+> **two-portal multipath** with a path blocked under load — 0 of 60 reads failed
+> and the path came back by itself.
+>
+> It is still a prerelease, and the honest reasons are: **one** model, **one** DSM
+> version, and no HA or dual-controller chassis has ever been near it. Seven bugs
+> were found in the first hour of running it that no amount of reading had shown,
+> and an audit afterwards found four more — including a credential in the wrong
+> file — so assume there are others.
 >
 > It is public at this stage because the discovery tool is useful on its own,
 > and because the honest register of what is and is not known about Synology's
 > SAN API is worth reading before anyone trusts a plugin built on it.
 >
-> **Do not put production data on this yet.** There is nothing to put it on.
+> **Do not put production data on this yet.**
 
 ---
+
+> **Upgrading from a version before 0.5.3~beta1?** Those versions stored the DSM
+> password in `/etc/pve/storage.cfg`, where it was readable by `www-data` and
+> returned by the API to any user with `Datastore.Audit`. Run
+> `pvesm set <storage> --syno-password '<password>'` once per storage to move it
+> into `/etc/pve/priv`, and **treat the old value as disclosed** — change the DSM
+> account's password. Details and the 2FA token case:
+> [docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md).
 
 ## Why this exists, and what makes it awkward
 

@@ -1,0 +1,166 @@
+#!/usr/bin/perl
+
+# Where the DSM password lives.
+#
+# For fifteen releases it lived in /etc/pve/storage.cfg. That file is
+# `root:www-data 0640`, and worse: a property PVE does not know is a secret is
+# returned by `GET /storage/<id>` to any user holding Datastore.Audit — so a
+# read-only auditor was handed a DSM credential with SAN Manager rights.
+#
+# PVE has a first-class mechanism for this and the plugin was not using it.
+# `PVE::Storage::Plugin::sensitive_properties` falls back to a hardcoded list
+# when a plugin declares none — `encryption-key keyring master-pubkey password` —
+# and `syno-password` is not in it. The omission therefore failed silently, and in
+# the least safe direction, which is the only reason it lasted.
+#
+# These tests need no Proxmox VE: they read plugindata and drive the credential
+# file helpers against a temporary directory.
+
+use strict;
+use warnings;
+use Test::More;
+use lib 'lib';
+
+my $HAVE_PVE = eval { require PVE::Storage::Plugin; 1 };
+
+# --- the declaration, which is the whole fix -------------------------------
+#
+# Checked from the source rather than by loading the plugin, so this runs on a
+# machine with no Proxmox VE — which is how CI runs it.
+my $src = do {
+    open(my $fh, '<', 'lib/PVE/Storage/Custom/SynologySANPlugin.pm')
+        or BAIL_OUT('cannot read the plugin');
+    local $/; <$fh>;
+};
+
+my ($pd) = $src =~ /\nsub plugindata \{(.*?)\n\}/s;
+ok($pd, 'plugindata is there');
+
+like($pd, qr/'sensitive-properties'\s*=>/,
+     'plugindata declares sensitive-properties — without it PVE writes the'
+   . ' password into storage.cfg');
+
+for my $prop (qw(syno-password syno-chap-password syno-otp syno-device-id)) {
+    like($pd, qr/'\Q$prop\E'\s*=>\s*1/,
+         "$prop is declared sensitive");
+}
+
+# The device token is a standing second-factor bypass. It was being written to
+# storage.cfg alongside the password, and it is just as good as one.
+like($pd, qr/second-factor bypass/,
+     'and the reason the device token counts as a credential is recorded');
+
+# --- nothing may reach $scfg any more --------------------------------------
+#
+# The hooks used to do `$scfg->{'syno-device-id'} = $token`, which put it
+# straight back into the config PVE was about to write.
+unlike($src, qr/\$scfg->\{'syno-(?:password|device-id|otp|chap-password)'\}\s*=/,
+       'no hook assigns a credential into $scfg, which PVE would then persist');
+
+like($src, qr/delete \$scfg->\{\$_\} for qw\(syno-password/,
+     'and on_update_hook_full strips what an older version left behind');
+
+# --- the file helpers ------------------------------------------------------
+SKIP: {
+    skip 'needs PVE::Tools for file_set_contents', 11 if !eval { require PVE::Tools; 1 };
+    require PVE::Storage::Custom::SynologySANPlugin;
+    my $P = 'PVE::Storage::Custom::SynologySANPlugin';
+
+    my $dir = "/tmp/jt-syno-cred-test.$$";
+    mkdir $dir;
+    # $CRED_DIR is a package variable and not a constant precisely so this works:
+    # a constant would be folded into its call sites at compile time.
+    local $PVE::Storage::Custom::SynologySANPlugin::CRED_DIR = $dir;
+
+    my $file = $P->_cred_file('mystore');
+    is($file, "$dir/mystore.syno", 'the file is named after the storage');
+
+    # A storage id that tries to choose the file must not be able to. What
+    # matters is not that the name contains no dots — `_.._etc_shadow.syno` is a
+    # perfectly harmless flat filename — but that the result never leaves the
+    # directory. The first version of this test asserted the wrong property and
+    # failed on a sanitiser that was working correctly.
+    for my $evil ('../../etc/shadow', 'a/../b', '/etc/shadow') {
+        my $got = $P->_cred_file($evil);
+        next if !defined $got;
+        my ($dir_part) = $got =~ m{\A(.*)/[^/]+\z};
+        is($dir_part, $dir, "'$evil' still resolves inside the credential directory");
+    }
+    is($P->_cred_file('..'), undef, "a storage id of '..' yields no file at all");
+
+    $P->_write_creds('mystore', { password => 's3cret', 'device-id' => 'tok' });
+    ok(-e $file, 'the credential file was written');
+
+    my $mode = (stat($file))[2] & 07777;
+    is($mode, 0600, 'and is readable only by root');
+
+    my $back = $P->_read_creds('mystore');
+    is_deeply($back, { password => 's3cret', 'device-id' => 'tok' },
+              'what was written is what comes back');
+
+    # A stray line in the file is not an instruction.
+    open(my $fh, '>>', $file); print $fh "unexpected-key=whatever\n"; close($fh);
+    my $filtered = $P->_read_creds('mystore');
+    ok(!exists $filtered->{'unexpected-key'},
+       'an unrecognised key is dropped rather than carried into the API call');
+
+    # Nothing to keep means no file, so "no credential" and "empty credential"
+    # are not the same state.
+    $P->_write_creds('mystore', { password => '' });
+    ok(!-e $file, 'writing nothing removes the file instead of leaving it empty');
+
+    $P->_write_creds('mystore', { password => 'x' });
+    $P->_delete_creds('mystore');
+    ok(!-e $file, '_delete_creds removes it');
+
+    unlink glob("$dir/*"); rmdir $dir;
+}
+
+# --- PVE's own machinery, which is the only opinion that counts -------------
+#
+# The declaration is only worth anything if PVE reads it. This drives the actual
+# code path: `sensitive_properties` for the type, then `extract_sensitive_params`,
+# which is what removes the values from the parameters before the config is
+# written. Skipped where there is no Proxmox VE, which is how CI runs.
+SKIP: {
+    skip 'no Proxmox VE on this machine', 5 if !$HAVE_PVE;
+    skip 'needs PVE::Tools', 5 if !eval { require PVE::Tools; PVE::Tools->import('extract_sensitive_params'); 1 };
+
+    require PVE::Storage::Custom::SynologySANPlugin;
+    PVE::Storage::Custom::SynologySANPlugin->register;
+
+    my $s = PVE::Storage::Plugin::sensitive_properties('synologysan');
+    is_deeply([sort @$s],
+              [qw(syno-chap-password syno-device-id syno-otp syno-password)],
+              'PVE itself reports all four as sensitive for this type');
+
+    # The default PVE falls back to when a plugin declares nothing. `syno-password`
+    # is not in it, which is why the omission was silent.
+    my $default = PVE::Storage::Plugin::sensitive_properties('nfs');
+    ok(!grep({ $_ eq 'syno-password' } @$default),
+       'and would NOT have been covered by the fallback list');
+
+    my $param = {
+        'syno-portal'    => '192.0.2.1',
+        'syno-username'  => 'dev',
+        'syno-password'  => 'the-secret',
+        'syno-device-id' => 'a-token',
+        'syno-location'  => '/volume1',
+    };
+    my $taken = PVE::Tools::extract_sensitive_params($param, $s, []);
+
+    is_deeply([sort keys %$taken], ['syno-device-id', 'syno-password'],
+              'both supplied credentials are handed to the hook instead');
+    ok(!exists $param->{'syno-password'},
+       'and the password does not reach the config that gets written');
+    ok(!exists $param->{'syno-device-id'},
+       'nor does the device token, which is a standing second-factor bypass');
+}
+
+# --- the fallback that keeps existing installations working ----------------
+like($src, qr/fifteen releases wrote the password into storage\.cfg/i,
+     'the plaintext fallback is deliberate and documented, not an oversight');
+like($src, qr/Datastore\.Audit/,
+     'and the migration notice tells the operator what the exposure was');
+
+done_testing();

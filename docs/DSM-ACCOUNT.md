@@ -126,6 +126,47 @@ Allow/Block List, and remove the address.
 
 ---
 
+---
+
+## Where the credentials are stored
+
+`/etc/pve/priv/storage/<storage>.syno`, mode `0600`, in a directory the cluster
+filesystem serves to **root only**. It holds the DSM password, the CHAP secret
+and the 2FA device token. Being under `/etc/pve` it replicates to every node,
+which a shared storage needs.
+
+They are declared to Proxmox VE as `sensitive-properties`, which is what makes
+PVE strip them out of the configuration before it is written and hand them to
+the plugin instead. The same mechanism PVE's own CIFS, PBS and ESXi plugins use.
+
+### If you installed a version before 0.5.3~beta1, do this once
+
+Those versions wrote the password into **`/etc/pve/storage.cfg`**. That file is
+`root:www-data 0640`, and a property Proxmox VE does not know is a secret is
+returned by `GET /storage/<id>` to **any user holding `Datastore.Audit`** — so a
+read-only auditor could read a DSM credential with SAN Manager rights.
+
+The plugin still reads a password from there, so nothing breaks on upgrade, and
+it warns once per storage. To move it:
+
+```bash
+pvesm set <storage> --syno-password '<the password>'
+```
+
+That writes it to the private file and **removes it from `storage.cfg`**. Do the
+same for `--syno-chap-password` if you use CHAP. Then confirm:
+
+```bash
+grep -c syno-password /etc/pve/storage.cfg      # expect 0
+ls -l /etc/pve/priv/storage/                     # expect <storage>.syno, 0600
+```
+
+Because the old value was readable by anything running as `www-data`, **treat it
+as disclosed**: change the DSM account's password rather than only moving it. If
+2FA was in use, the device token was exposed too — revoke it in DSM under the
+account's trusted devices and let the plugin obtain a new one with a fresh
+`--syno-otp`.
+
 ## Two-factor authentication
 
 The plugin can work with a 2FA-protected account, and Synology's own CSI
@@ -141,9 +182,11 @@ pvesm set <storage> --syno-otp 123456     # once
 ```
 
 **The device token is a credential.** It is a standing 2FA bypass for that
-account: anything holding it can log in without a code. It is stored with the
-same protection as the password and it must never reach a repository, a
-support ticket, or a screenshot.
+account: anything holding it can log in without a code. It is stored in
+`/etc/pve/priv/storage/<storage>.syno` with the password — see above — and it
+must never reach a repository, a support ticket, or a screenshot. Versions before
+0.5.3~beta1 put it in `storage.cfg` instead; if you used 2FA with one of those,
+revoke the token in DSM.
 
 If you would rather not have a standing bypass on the NAS, leave 2FA off for
 this one dedicated, folder-less, application-less, firewall-pinned account —

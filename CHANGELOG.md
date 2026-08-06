@@ -6,6 +6,76 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.5.3~beta1] - 2026-08-06
+
+**A security fix that needs one action from anyone already running this.** The
+DSM password was being written into `/etc/pve/storage.cfg`.
+
+### Security
+
+- **The DSM credentials are no longer stored in `storage.cfg`.** They live in
+  `/etc/pve/priv/storage/<storage>.syno`, mode `0600`, in a directory the cluster
+  filesystem serves to root only — the same place Proxmox VE's own CIFS, PBS and
+  ESXi plugins keep theirs.
+
+  `storage.cfg` is `root:www-data 0640`, and worse: a property Proxmox VE does
+  not know is a secret is returned by `GET /storage/<id>` to **any user holding
+  `Datastore.Audit`**. A read-only auditor could read a DSM credential with SAN
+  Manager rights. The device token — a standing 2FA bypass — was stored the same
+  way.
+
+  PVE has a first-class mechanism for this, `sensitive-properties`, and this
+  plugin was not declaring it. `sensitive_properties` falls back to a hardcoded
+  list when a plugin declares none (`encryption-key keyring master-pubkey
+  password`), and `syno-password` is not in it — so the omission failed silently
+  and in the least safe direction, which is the only reason it survived fifteen
+  releases.
+
+  **If you are upgrading, do this once per storage:**
+
+  ```bash
+  pvesm set <storage> --syno-password '<the password>'
+  ```
+
+  That moves it to the private file and removes it from `storage.cfg`. The old
+  location is still read, so nothing breaks before you get to it, and the plugin
+  warns once. Because the value was readable by anything running as `www-data`,
+  **treat it as disclosed and change the DSM account's password**, and revoke the
+  2FA device token if you used one. Full procedure in `docs/DSM-ACCOUNT.md`.
+
+### Fixed
+
+- **Nine methods leaked a DSM session on their error paths.** Twenty build an API
+  object; nine have a `die` between the construction and the `logout`. R-13
+  established that a second login does not evict the first, so they accumulated
+  on the NAS — a repeatedly failing operation leaked one per attempt. The object
+  now logs out in `DESTROY`, which Perl runs on the die path too. Fixing it at
+  the nine call sites would have been nine chances to forget and no cover for the
+  tenth method.
+- **A shrink was silently declined instead of refused.** `resize` short-circuited
+  on `size >= requested` and returned the LUN unchanged — a success for something
+  that had not happened. Proxmox VE writes the *requested* size into the VM
+  configuration regardless of what a plugin returns, so the configuration would
+  have claimed a size the NAS does not have, and the next grow-by-N would be
+  computed from it. Refused now, with the reason.
+- **The delete-on-refusal path proved the object was new only by absence.** DSM
+  refusing a create and performing it anyway is measured behaviour, and the
+  cleanup deletes what a lookup finds; the only thing separating that from
+  deleting a pre-existing LUN was the error code not being 18990538. `create` now
+  looks the name up first and refuses outright if it is taken, so the cleanup acts
+  only on an object it made. R-9 established that `LUN list` reports no total, so
+  a silently truncated listing was a real route to the wrong branch.
+- **`on_delete_hook` left the credential file behind**, including on the path
+  where the NAS could not be reached and it returned early. A scope guard now
+  removes the credentials and the latch on every exit.
+
+### Added
+
+- `t/10-credentials.t` and `t/09-session.t` — 249 tests in total. The credential
+  tests drive PVE's own `sensitive_properties` and `extract_sensitive_params`, so
+  what is asserted is that PVE strips the values, not merely that the plugin asked
+  it to.
+
 ## [0.5.2~beta1] - 2026-08-06
 
 **An audit found three things that reading the code had not.** All three are the

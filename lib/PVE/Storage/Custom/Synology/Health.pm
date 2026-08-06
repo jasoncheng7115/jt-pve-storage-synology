@@ -42,6 +42,15 @@ sub _warn_once {
     warn $msg;
 }
 
+# The same once-only warning, for callers outside this module. `_warn_once` is
+# private because the health path is where the pattern matters, but a credential
+# migration notice must not repeat on every poll either.
+sub warn_once_for {
+    my ($storeid, $key, $msg) = @_;
+    _warn_once("$storeid:$key", $msg);
+    return;
+}
+
 sub clear_warnings {
     my ($storeid) = @_;
     delete $warned{$_} for grep { /\A\Q$storeid\E:/ } keys %warned;

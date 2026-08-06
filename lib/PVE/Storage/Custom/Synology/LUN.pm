@@ -284,6 +284,29 @@ sub create {
     # The API accepts a one-byte LUN. The product documents a 1 GB minimum.
     $size = MIN_SIZE if $size < MIN_SIZE;
 
+    # LOOK FIRST, so that the cleanup below is provably acting on an object this
+    # call created.
+    #
+    # DSM refusing a create and performing it anyway is note 1 at the top of this
+    # file, and the cleanup for it deletes what the lookup finds. Until now the
+    # only thing separating "delete the half-made object DSM just made" from
+    # "delete a LUN that was already there" was the error code NOT being 18990538
+    # — proof by absence, for a destructive action. And there is a route to the
+    # wrong branch: R-9 established that `LUN list` reports no total, so a
+    # silently truncated listing would let `find_free_diskname` choose a name that
+    # is already taken, and then only DSM's choice of code stands between the
+    # retry and someone's disk.
+    #
+    # One extra call per allocation buys certainty. This is not a poll path, and
+    # PVE holds `cluster_lock_storage` across the whole allocation, so the
+    # check-then-create pair is not racing anything.
+    my $existed = eval { $self->get($name) };
+    die "storage '" . $self->api->storeid . "': a LUN named '$name' already"
+      . " exists on the NAS. Not creating, and not touching it. If PVE chose"
+      . " this name it means its view of the storage is incomplete — check SAN"
+      . " Manager for a LUN this storage does not know about.\n"
+        if $existed;
+
     my $r = $self->api->call(API_LUN, 'create',
         name        => $name,
         size        => $size,
@@ -311,6 +334,11 @@ sub create {
             }
             # DSM refused and made it anyway. Remove it, so the caller's retry
             # does not find a half-made object it did not ask for.
+            #
+            # Safe to delete because the lookup above proved there was no LUN of
+            # this name before the create — so what is here now is what this call
+            # made. Without that, this branch was trusting DSM to have chosen
+            # 18990538 for every pre-existing name.
             warn "storage '" . $self->api->storeid . "': DSM refused to create"
                . " '$name' ($why) but created it regardless — removing it."
                . " This is a known DSM behaviour, not a plugin error.\n";
@@ -347,7 +375,27 @@ sub resize {
 
     # PVE asks for the new total. Sizes are created exactly on this array, with
     # no rounding at any boundary, so there is no alignment arithmetic to do.
-    return $lun if $lun->{size} >= $new_size;
+    #
+    # Equal is idempotent and returns the LUN unchanged: PVE pads a requested
+    # size up to a multiple of 1024 before calling, so a repeated resize to the
+    # same figure is ordinary rather than exceptional.
+    return $lun if $lun->{size} == $new_size;
+
+    # SMALLER IS REFUSED, LOUDLY. This used to fall into the branch above and
+    # return the LUN unchanged — a silent success for something that did not
+    # happen. That is not survivable here, because PVE writes the REQUESTED size
+    # into the VM configuration regardless of what a plugin returns
+    # (`$drive->{size} = $newsize` in API2/Qemu.pm). So the configuration would
+    # claim a size the array does not have, the guest would see the smaller disk,
+    # and the next grow-by-N would be computed from the figure that was never
+    # real. `qm resize` refuses a shrink itself — but a plugin that relied on its
+    # caller to hold the line is the same mistake as trusting PVE to stop a
+    # rollback on a running VM.
+    die "storage '" . $self->api->storeid . "': refusing to shrink LUN $uuid from"
+      . " $lun->{size} to $new_size bytes. Shrinking a LUN under a filesystem"
+      . " destroys data, and reporting success without doing it would leave the"
+      . " VM configuration claiming a size the NAS does not have.\n"
+        if $lun->{size} > $new_size;
 
     $self->api->call_ok(API_LUN, 'set',
         uuid     => $uuid,
