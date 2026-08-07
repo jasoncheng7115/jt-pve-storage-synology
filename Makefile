@@ -307,6 +307,8 @@ check-tool-paths:
 check-zh:
 	@echo "Checking the Traditional Chinese documents..."
 	@perl tools/check-zh-markdown.pl
+	@perl tools/check-zh-markdown.pl >/dev/null 2>&1 || { \
+		echo "  (run 'make zh-normalise' — it fixes what it can)"; exit 1; }
 
 release-check: check-multipath-flush check-secrets check-tool-paths check-zh syntax unit unit-nopve critic \
                check-doc-urls \
