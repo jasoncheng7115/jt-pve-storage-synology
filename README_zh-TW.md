@@ -144,6 +144,42 @@ SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經�
 
 **如果你手上有其中任何一種，最有價值的回報是一個數字**：`SYNO.Core.ISCSI.Node` 的 uuid 在故障切換之後還是同一個嗎？storage 的身分釘在它上面，所以如果它會變，那道釘子就不再保護 storage，而是開始破壞它。
 
+## 安裝
+
+叢集的每一個節點都要裝。
+
+```bash
+# 解析出最新的發行版，包含預發行版
+url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
+      | grep -o 'https://[^"]*_all\.deb' | head -1)
+curl -fLO "$url"
+dpkg -i jt-pve-storage-synology_*_all.deb
+systemctl restart pvedaemon pveproxy pvestatd
+```
+
+**不要用 `/releases/latest/download/…`**——根本沒有 latest release。這裡每一個 0.x 都標記為預發行版，而 GitHub 的 `latest` 刻意會跳過它們，所以那種網址會回 **404**。等 1.0.0 出來就能用了。從 clone 安裝則是 `make install`。
+
+> **第一次安裝請排維護時段**。`activate_storage` 會寫一個對應 `vendor "SYNOLOGY"` 的 multipath drop-in，而當那個檔案變更時會執行 `multipathd reconfigure`——那是**節點層級**的。它只在檔案第一次出現或變更時執行一次。這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 `no_path_retry "queue"`，會把「失去所有路徑」變成一個殺不掉的行程，而不是一個 I/O 錯誤。
+
+四支這樣的 plugin 可以共存於同一個節點——但 `PVE::SectionConfig::init` **遇到重複的屬性名稱會直接 die**，屆時節點上每一個 storage 都會停止運作。`syno-` 這個前置字串就是為此存在的。
+
+## 設定 storage
+
+在其中一個節點上執行一次就好。這個 storage 依其本質就是共用的。
+
+```bash
+pvesm add synologysan mysyno \
+    --syno-portal   192.0.2.10 \
+    --syno-username pve-storage \
+    --syno-password '<密碼>' \
+    --syno-location /volume1 \
+    --content       images
+```
+
+如果那個儲存空間不是 Btrfs、機型不支援 iSCSI target 或快照、或者這個 storage id 會摺疊成與既有 storage 相同的 LUN 前置字串，`pvesm add` 會當場拒絕。
+
+**密碼不會進到 `/etc/pve/storage.cfg`**。它會寫到 `/etc/pve/priv/storage/<storage>.syno`，權限 `0600`、只有 root、並複寫到每個節點。完整選項清單與移除程序：[文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh#configure)。
+
 ## 探索工具
 
 這個現在就能用，而且值得在其他任何事之前先跑一次。它是**唯讀**的：不建立、不刪除任何東西，跑完會自己登出。對正式機是安全的。

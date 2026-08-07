@@ -235,6 +235,56 @@ register as R-15 and R-16.
 identity is pinned to it, so if it changes, that pin stops protecting the
 storage and starts breaking it.
 
+## Installing
+
+On every node of the cluster.
+
+```bash
+# resolves the newest release, prereleases included
+url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
+      | grep -o 'https://[^"]*_all\.deb' | head -1)
+curl -fLO "$url"
+dpkg -i jt-pve-storage-synology_*_all.deb
+systemctl restart pvedaemon pveproxy pvestatd
+```
+
+**Not `/releases/latest/download/…`** — there is no latest release. Every 0.x here
+is tagged as a prerelease and GitHub's `latest` deliberately skips those, so such a
+URL answers **404**. It will work once 1.0.0 ships. From a clone, `make install`.
+
+> **Schedule the first install.** `activate_storage` writes a multipath drop-in for
+> `vendor "SYNOLOGY"` and, when that file changes, runs `multipathd reconfigure` —
+> which is **node-wide**. It runs once, when the file first appears or changes.
+> The drop-in is mandatory rather than tuning: without it multipath's generic
+> defaults apply, and those include `no_path_retry "queue"`, which turns the loss
+> of every path into an unkillable process instead of an I/O error.
+
+Four of these plugins can share a node — but `PVE::SectionConfig::init` **dies on a
+duplicate property name**, and every storage on the node then stops working. The
+`syno-` prefix exists for that reason.
+
+## Configuring a storage
+
+Once, on one node. The storage is shared by construction.
+
+```bash
+pvesm add synologysan mysyno \
+    --syno-portal   192.0.2.10 \
+    --syno-username pve-storage \
+    --syno-password '<the password>' \
+    --syno-location /volume1 \
+    --content       images
+```
+
+`pvesm add` refuses immediately if the volume is not Btrfs, if the model does not
+support iSCSI targets or snapshots, or if the storage id would fold onto an existing
+storage's LUN prefix.
+
+**The password never lands in `/etc/pve/storage.cfg`.** It goes to
+`/etc/pve/priv/storage/<storage>.syno`, mode `0600`, root only, replicated to every
+node. Full option list and the removal procedure: the
+[documentation site](https://jasoncheng7115.github.io/jt-pve-storage-synology/#configure).
+
 ## The discovery tool
 
 This works today, and it is worth running before anything else. It is

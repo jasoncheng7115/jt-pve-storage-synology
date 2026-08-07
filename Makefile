@@ -21,7 +21,7 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets check-zh zh-normalise critic \
+        check-multipath-flush check-secrets check-zh zh-normalise critic check-doc-urls \
         check-release-archive \
         release-check deb deb-clean clean
 
@@ -209,6 +209,39 @@ check-secrets:
 # `*text*` is English italics, and a space after full-width punctuation is an
 # un-wrapping artefact. All three were found by Jason looking at a rendered
 # page, so they are checked rather than remembered.
+# Every download URL the documentation tells an operator to run must actually
+# resolve.
+#
+# A `wget .../releases/latest/download/jt-pve-storage-synology_all.deb` shipped on
+# the documentation site and answered **404** on the first node someone tried it
+# on. Two reasons, and the second is the one that will not fix itself: the asset
+# name carries the version, and — more importantly — **there is no latest release**
+# because every 0.x here is tagged as a prerelease, which GitHub's `latest`
+# deliberately skips. So that URL will keep 404ing until 1.0.0.
+#
+# Writing a command into documentation without running it is the same fault as
+# believing an array's success reply, and this project has a rule about that.
+#
+# It matches only a `wget` or `curl` USING that path, not any mention of it. The
+# first version matched the string anywhere and condemned the paragraph that
+# explains why not to use it — the sixth time in this project that a guard could
+# not tell a thing from prose about the thing. Strip, scope, or anchor: never just
+# grep the word.
+check-doc-urls:
+	@echo "Checking the documentation's download URLs..."
+	@bad=0; \
+	if grep -rnE '(wget|curl)[^|]*releases/latest/download' docs/ README*.md 2>/dev/null; then \
+		echo "  ERROR: /releases/latest/download 404s while every release is a prerelease"; \
+		bad=1; \
+	fi; \
+	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
+		code=$$(curl -sL -o /dev/null -w '%{http_code}' --max-time 20 "$$u"); \
+		if [ "$$code" != "200" ]; then echo "  ERROR: $$code for $$u"; bad=1; \
+		else echo "  ok $$code  $$u"; fi; \
+	done; \
+	if [ "$$bad" = "1" ]; then exit 1; fi; \
+	echo "  OK: every documented download URL resolves."
+
 # The fixer for what check-zh checks. Kept as a target so nobody re-invents the
 # ad hoc version, which manufactured 116 broken bold runs by stripping the space in
 # 「。** 只有」 — see the header of tools/zh-normalise.pl.
@@ -221,6 +254,7 @@ check-zh:
 	@perl tools/check-zh-markdown.pl
 
 release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve critic \
+               check-doc-urls \
                check-release-archive
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \

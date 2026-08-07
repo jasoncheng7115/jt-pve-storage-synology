@@ -471,10 +471,17 @@
         <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西，所以在正式環境做之前請先讀下面的警告。</span>
     </p>
 
-    <pre><code><span class="c"># on each node</span>
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+    <pre><code><span class="c"># on each node — resolves the newest release, prereleases included</span>
+url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
+      | grep -o 'https://[^"]*_all\.deb' | head -1)
+curl -fLO "$url"
 dpkg -i jt-pve-storage-synology_*_all.deb
 systemctl restart pvedaemon pveproxy pvestatd</code></pre>
+
+    <div class="note">
+        <span class="lang-en"><strong>Why not <code>/releases/latest/download/…</code>?</strong> Because there is no latest release: every 0.x here is tagged as a <em>prerelease</em>, and GitHub's <code>latest</code> deliberately skips those — so every such URL answers <strong>404</strong>. It will start working when 1.0.0 ships. Until then the command above asks the API for the newest release of any kind. To pin a version instead, take the URL straight from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>.</span>
+        <span class="lang-zh"><strong>為什麼不用 <code>/releases/latest/download/…</code>？</strong>因為根本沒有 latest release：這裡每一個 0.x 都標記為<strong>預發行版</strong>，而 GitHub 的 <code>latest</code> 刻意會跳過它們——所以那種網址一律回 <strong>404</strong>。等 1.0.0 出來之後它就會開始有用。在那之前，上面這個命令是去問 API 要「最新的任何一種發行版」。若要固定版本，直接從<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>複製網址。</span>
+    </div>
 
     <p>
         <span class="lang-en">Or from a clone: <code>make install</code>. Every release's <code>.deb</code> is kept in <code>releases/</code> as well, so a tester on an earlier version can fetch exactly what they are running.</span>
