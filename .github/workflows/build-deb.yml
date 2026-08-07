@@ -45,8 +45,19 @@ jobs:
       - name: Perl syntax
         run: make syntax
 
+      # A red run must say WHAT failed, not just that something did. The first
+      # version printed `make unit`'s summary and nothing else, so a failure
+      # that could not be reproduced on a Proxmox VE node — which is every
+      # developer machine here — left the log as the only evidence, and the
+      # logs of a public repository need a token to download. Two releases were
+      # held up working that out.
       - name: Unit tests
-        run: make unit
+        run: |
+          make unit && exit 0
+          echo "::group::verbose rerun"
+          prove -Ilib -v t/*.t || true
+          echo "::endgroup::"
+          exit 1
 
       # Documents come in pairs. A change that updates one language and not
       # the other is the most common way this family of projects has shipped a
