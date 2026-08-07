@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.13 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.14 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -759,7 +759,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </p>
 
     <ul>
-        <li><span class="lang-en">Proxmox VE's only <code>deactivate_volumes</code> call during migration is inside <code>sync_offline_local_volumes</code>, so for a <strong>shared</strong> storage the source node is never told a VM left. A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 leaves pve1 and pve2 each holding a map for a LUN that no longer exists.</span><span class="lang-zh">Proxmox VE 在遷移過程中唯一的 <code>deactivate_volumes</code> 呼叫位於 <code>sync_offline_local_volumes</code> 裡面，所以對<strong>共用</strong> storage 而言，來源節點永遠不會被告知 VM 已經離開。一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，pve1 和 pve2 就會各自留著一個對應已不存在 LUN 的 map。</span></li>
+        <li><span class="lang-en"><strong>Migration used to be a second reason, and is not any more.</strong> A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 once left pve1 and pve2 each holding a map for a LUN that no longer existed. Re-measured on 2026-08-07 across two nodes, offline and online, in both directions: the node a VM leaves holds <strong>no maps, no devices and an empty tracking file</strong>. <code>vm_stop_cleanup</code> calls <code>deactivate_volumes</code> when the VM stops on the source after the switch. The original measurement predates a fix to <code>_detach_local</code>, which used to stop at the first flush.</span><span class="lang-zh"><strong>遷移本來是第二個理由，現在不是了。</strong>一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。2026-08-07 在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點<strong>沒有 map、沒有裝置、追蹤檔是空的</strong>。切換之後 VM 在來源節點停止時，<code>vm_stop_cleanup</code> 會呼叫 <code>deactivate_volumes</code>。原本那次量測早於 <code>_detach_local</code> 的修正——舊版停在第一次 flush。</span></li>
         <li><span class="lang-en">A hard-reset node never runs <code>deactivate_volume</code> at all, so its tracking file keeps an entry for a LUN it is no longer attached to.</span><span class="lang-zh">被硬重置的節點根本不會執行 <code>deactivate_volume</code>，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。</span></li>
     </ul>
 

@@ -6,6 +6,29 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.14] - 2026-08-07
+
+### Documentation
+
+- **The migration leftover no longer happens, and saying it does was sending
+  operators after a ghost.** Four published passages stated that a VM migrated
+  `pve1 → pve2 → pve3` and destroyed on pve3 leaves the earlier nodes each
+  holding a map for a LUN that no longer exists. Re-measured across two nodes,
+  offline and online, in both directions: **the node a VM leaves holds 0 maps,
+  0 by-path devices and an empty tracking file.** `vm_stop_cleanup` calls
+  `deactivate_volumes` when the VM stops on the source after the switch, so the
+  source node *is* told. The original measurement predates the `_detach_local`
+  fix — the version that stopped at the first flush left a map a correct detach
+  does not. `pve-syno-reap` keeps its purpose: a hard-reset node still never runs
+  `deactivate_volume`. What has *not* been re-measured is the exact original
+  scenario, and that is now recorded as an inference rather than a result.
+- Both READMEs list **what has been driven from the web interface on a
+  production five-node cluster** — disks, snapshots, rollback, migration in both
+  directions, clones, templates, all three backup modes and both restore paths —
+  with the two results a block-storage plugin is most likely to get wrong stated
+  separately: nothing was left behind on either side, and deleting a template
+  did not break its linked clone.
+
 ## [0.6.13] - 2026-08-07
 
 ### Fixed

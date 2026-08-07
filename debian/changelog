@@ -1,3 +1,17 @@
+jt-pve-storage-synology (0.6.14-1) unstable; urgency=medium
+
+  * Documentation. The claim that migration leaves a multipath map on the source
+    node was re-measured across two nodes, offline and online, both directions,
+    and did not reproduce: the node a VM leaves holds no maps, no devices and an
+    empty tracking file. The original measurement predates the _detach_local
+    fix. Corrected in both READMEs, both TESTING documents and the site --
+    claiming an old bug still happens sends an operator chasing a ghost.
+  * Both READMEs now list what has been driven from the web interface on a
+    production five-node cluster, including that nothing was left behind on
+    either side and that deleting a template does not break its linked clone.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 15:40:00 +0800
+
 jt-pve-storage-synology (0.6.13-1) unstable; urgency=medium
 
   * Cloning from a snapshot was refused by activate_volume, which broke a

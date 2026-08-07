@@ -448,13 +448,15 @@ pve-syno-reap --storage <storage> --remove   # then act
 pvesm remove <storage>
 ```
 
-`pve-syno-reap` exists because of what a three-node run showed: a VM
-live-migrated pve1 → pve2 → pve3 and destroyed on pve3 left **pve1 and pve2 each
-holding a multipath map and a tracking entry for a LUN that no longer existed**.
-PVE's only `deactivate_volumes` call during migration is inside
-`sync_offline_local_volumes`, so for a shared storage the source node is never
-told. The tool defaults to a dry run, never touches a device that is in use, and
-skips — rather than assumes — anything whose state it cannot establish.
+`pve-syno-reap` exists for the node that is never told anything: **a hard-reset
+node does not run `deactivate_volume` at all**, so its tracking file keeps an
+entry for a LUN it is no longer attached to. The tool defaults to a dry run,
+never touches a device that is in use, and skips — rather than assumes —
+anything whose state it cannot establish.
+
+It was originally written for a second case as well, and **that case has been
+re-measured and no longer occurs** — see *Migration no longer leaves a map
+behind* below.
 
 If a session is still left on a node after the storage is gone from the
 configuration, the tool can no longer find it, and it is manual:
@@ -855,9 +857,26 @@ documented at length, and invoked from nowhere — dead code standing in for a f
 The case: a VM live-migrated pve1 → pve2 → pve3 and destroyed on pve3 left
 **pve1 and pve2 each holding a multipath map and a tracking entry for a LUN that no
 longer existed.** PVE's only `deactivate_volumes` call during migration is inside
-`sync_offline_local_volumes`, so for a shared storage the source node is never
-told. That is PVE's shape, not a bug in it — but a block-device plugin has
-per-node state, and one dead map accumulates per LUN per node that ever saw it.
+`sync_offline_local_volumes`, so — the reasoning went — for a shared storage the
+source node is never told.
+
+### Migration no longer leaves a map behind
+
+**Re-measured on 2026-08-07, and it did not reproduce.** A VM was migrated
+host-108 → host-109 and back, offline and online, in both directions. The node
+the VM left was checked directly and held **0 multipath maps, 0 by-path devices
+and an empty tracking file** — cleaner than the original measurement predicted.
+`vm_stop_cleanup` calls `deactivate_volumes` when the VM stops on the source
+after the switch, so the source node *is* told.
+
+The original measurement predates the `_detach_local` fix described below: the
+version that stopped at the first flush left a map that a correct detach does
+not.
+
+**What has not been re-measured** is the exact original scenario — a VM migrated
+away and then destroyed on a *later* node. Since migrating away now leaves
+nothing behind, there should be no map left to go stale, but that is an inference
+and is recorded as one rather than as a result.
 
 **And `_detach_local` could not clean it up.** When the LUN is deleted from another
 node, this node's iSCSI session is still up, so each `sd` node survives as a dead

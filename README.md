@@ -31,6 +31,42 @@ locally.
 
 ---
 
+## What has been driven on a production cluster
+
+Everything below was run from the **web interface** on a five-node Proxmox VE
+9.2.3 cluster in production, against a DS918+ on DSM 7.1.1, on 2026-08-07. The
+interface matters: `pvedaemon`, `pveproxy`, `vzdump` and `pct` run as
+`#!/usr/bin/perl -T` with **no `PATH`**, and `qm`, `pvesm`, `pvesh` and
+`qmrestore` do not — so an operation verified from a shell is not verified.
+
+| | Verified |
+|---|---|
+| **Disks** | Create · resize · move to another storage and back · detach and remove while the guest is running |
+| **Snapshots** | Take while running · take while stopped · **roll back** · delete · the PVE snapshot name visible in SAN Manager's description |
+| **Guests** | Stop and start · **migrate offline and online, both directions** · full clone · clone from a snapshot · convert to template, then linked clone and full clone from it |
+| **Backup** | All three `vzdump` modes — snapshot, suspend, stop |
+| **Restore** | To a new VM ID · overwriting the original VM |
+| **Cluster** | Five nodes upgraded in place with **no service restart**; `pve-syno-reap` reports each clean |
+
+Two results are worth stating separately because they are what a block-storage
+plugin is most likely to get wrong:
+
+- **Nothing was left behind on either side.** After all of the above, the NAS held
+  five LUNs and five target mappings, every one of them matching a VM
+  configuration — no orphaned LUN, no stale mapping. The node held five multipath
+  maps and five tracking entries, matching.
+- **Deleting a template did not break its linked clone.** The template's LUN was
+  removed while a clone of it was running, and the clone kept running: DSM's clone
+  is a reflink, so there is no dependency to break. Most storages would lose the
+  clone here, and Proxmox VE stops you — it asks the storage, and this one
+  correctly says there is nothing to protect.
+
+**Five defects were found by running it, and all five are fixed** — in 0.6.6
+through 0.6.13, each with a test that fails without the fix. Every one had the
+same shape: code that worked when driven from a shell and failed when driven from
+the interface an operator actually uses. The register of what is and is not
+verified is [docs/TESTING.md](docs/TESTING.md).
+
 ## Why this exists, and what makes it awkward
 
 Synology publishes no specification for the SAN Manager Web API. The only
@@ -531,15 +567,20 @@ pve-syno-reap --storage <storage> --remove   # then act
 pve-syno-reap --all --remove                 # every synologysan storage on this node
 ```
 
-**Run it after a node crash, and on every node before removing a storage.** Two
-things make it necessary, both measured on a three-node cluster:
+**Run it after a node crash, and on every node before removing a storage.**
 
-- Proxmox VE's only `deactivate_volumes` call during migration is inside
-  `sync_offline_local_volumes`, so for a **shared** storage the source node is
-  never told a VM left. A VM migrated `pve1 → pve2 → pve3` and destroyed on pve3
-  leaves pve1 and pve2 each holding a map for a LUN that no longer exists.
-- A hard-reset node never runs `deactivate_volume` at all, so its tracking file
-  keeps an entry for a LUN it is no longer attached to.
+- **A hard-reset node never runs `deactivate_volume` at all**, so its tracking
+  file keeps an entry for a LUN it is no longer attached to. This is what the
+  tool is for, and it is still true.
+- **Migration used to be the second reason, and it is not any more.** A VM
+  migrated `pve1 → pve2 → pve3` and destroyed on pve3 once left pve1 and pve2
+  each holding a map for a LUN that no longer existed. Re-measured on
+  2026-08-07 across two nodes, offline and online, in both directions: the node
+  a VM leaves is left with **no maps, no devices and an empty tracking file**.
+  `vm_stop_cleanup` calls `deactivate_volumes` when the VM stops on the source
+  after the switch, so the source node *is* told. The original measurement
+  predates a fix to `_detach_local`, which used to stop at the first flush and
+  leave a map behind.
 
 Neither is dangerous — every consumer re-checks for a device before acting, and
 device identity always comes from the kernel's WWID — but they accumulate. The

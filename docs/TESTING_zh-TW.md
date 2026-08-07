@@ -295,7 +295,9 @@ pve-syno-reap --storage <storage> --remove   # 然後真的處理
 pvesm remove <storage>
 ```
 
-`pve-syno-reap` 之所以存在，是因為一次三節點測試顯示：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果**pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN**。PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以對共用 storage 而言，來源節點永遠不會被通知。這個工具預設是試跑，絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。
+`pve-syno-reap` 存在的理由是那個「永遠不會被通知」的節點：**被硬重置的節點根本不會執行 `deactivate_volume`**，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。這個工具預設是試跑，絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。
+
+它原本也是為了第二種情況而寫，而**那種情況已經重新量測過，不再發生**——見下面「遷移不再留下 map」。
 
 留下來的是一個死掉的工作階段和一個失敗的 map，指向一個已經不存在的 target。無害，但會累積。**要乾淨地移除一個 storage：**
 
@@ -585,7 +587,15 @@ node after logging in to iqn.2000-01.com.synology:pve-pvesyno-tgt
 
 **`WwidState::orphans`沒有任何呼叫者**。它就是為下面這個情況寫的，註解寫得很長，而完全沒有地方呼叫它——一段代替修正存在的死程式碼。
 
-情況是：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果**pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN**。PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以對共用 storage 而言，來源節點永遠不會被通知。這是 PVE 的形態，不是它的錯——但區塊裝置 plugin 有屬於各節點自己的狀態，而每一顆曾經被某節點看到過的 LUN 都會在該節點累積一個死掉的 map。
+情況是：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果**pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN**。PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以當時的推論是：對共用 storage 而言，來源節點永遠不會被通知。
+
+##### 遷移不再留下 map
+
+**2026-08-07 重新量測，沒有重現**。一台 VM 在 host-108 與 host-109 之間來回遷移，離線與線上、兩個方向都做。直接檢查 VM 離開的那個節點：**0 個 multipath map、0 個 by-path 裝置、追蹤檔是空的**——比原本那次量測預期的還乾淨。切換之後 VM 在來源節點停止時，`vm_stop_cleanup` 會呼叫 `deactivate_volumes`，所以來源節點「是」有被通知的。
+
+原本那次量測早於下面描述的 `_detach_local` 修正：舊版停在第一次 flush，會留下一個正確的卸離不會留下的 map。
+
+**沒有重新量測到的**是原本那個完整情境——一台 VM 遷走之後，在「更後面的」節點上被銷毀。既然遷走本身現在不留任何東西，就不該有 map 留下來變成死的；但那是推論，所以以推論的身分記在這裡，不是以結果的身分。
 
 **而 `_detach_local` 清不掉它**。當 LUN 是從另一個節點被刪除的，這個節點的 iSCSI 工作階段還開著，所以每個 `sd` 節點會以死掉的裝置留下來，而 multipathd 會在它上面重建一個 map——`failed faulty running`，一條路徑，指向什麼都沒有。`free_image` 會先取得 slave 清單、flush、移除殘留路徑、再 flush 一次。`_detach_local` 停在第一次 flush。同一段程序被寫了兩次，而只有一份是對的；reaper 第一次真的執行時回報 **`flush incomplete`**，map 留在那裡。現在它會在——而且只在——flush 失敗時移除殘留路徑，所以一般的 VM 停止流程沒有改變。
 
