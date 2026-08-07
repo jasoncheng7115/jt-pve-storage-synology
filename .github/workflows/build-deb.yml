@@ -59,7 +59,11 @@ jobs:
       # evidence was behind an authenticated download.
       - name: Unit tests
         run: |
-          make unit && exit 0
+          # `if`, not `make unit && exit 0`: GitHub runs a step with `bash -e`,
+          # so a failing left-hand side of `&&` ends the whole script there and
+          # the reporting below never runs. An `if` condition is exempt from
+          # `set -e`, which is the entire reason it is written this way.
+          if make unit; then exit 0; fi
           prove -Ilib -v t/*.t > /tmp/verbose.log 2>&1 || true
           grep -aE "^not ok|^# +Failed|^# +got|^# +expected|Can't locate|Dubious|^Bailout|syntax error|Undefined subroutine" \
             /tmp/verbose.log | head -25 | while IFS= read -r line; do
