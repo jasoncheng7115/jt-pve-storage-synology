@@ -159,6 +159,8 @@ apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
 
+> **每個節點都要裝，否則這個 storage 在網頁介面上看不到**。`pvesm add` 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 `pveproxy` 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 `synologysan` 這個類型，於是**會把這個 storage 從清單裡靜靜略過**。在有裝的節點上它是存在而且可用的，只是沒有被顯示出來——而這個症狀看起來就像 `pvesm add` 失敗了，但它並沒有。每個節點都要裝，而且每一台都要重啟服務，包含你正在瀏覽的那一台。若要先限制在已就緒的節點上：`pvesm set <storage> --nodes nodeA,nodeB`。
+
 > **如果你已經用 `dpkg -i` 失敗過**。本頁先前的版本寫的是 `dpkg -i`。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先執行 `dpkg --remove jt-pve-storage-synology`，然後再跑上面那段。如果清掉之後前置套件還是裝不起來，用 `apt policy kpartx sg3-utils-udev` 檢查——`kpartx` 來自 Debian 的 `trixie/main`，而 `sg3-utils-udev` 來自 Proxmox VE 的套件庫。
 
 `open-iscsi` 和 `multipath-tools` 是 Proxmox VE 節點真的可能沒有的兩個——PVE 不會拉進它們，而安裝 `multipath-tools` 正是那個維護時段真正在做的事。這個套件另外需要的四個 Perl 模組，各自是 86 到 151 個 PVE 套件的相依，所以一定已經在了。
