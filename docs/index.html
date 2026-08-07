@@ -473,10 +473,15 @@
 
     <pre><code><span class="c"># on each node — resolves the newest release, prereleases included</span>
 url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
-      | grep -o 'https://[^"]*_all\.deb' | head -1)
+      | grep -o 'https://[^"]*_all\.deb' | sed -n 1p)
 curl -fLO "$url"
 dpkg -i jt-pve-storage-synology_*_all.deb
 systemctl restart pvedaemon pveproxy pvestatd</code></pre>
+
+    <div class="note">
+        <span class="lang-en"><strong><code>sed -n 1p</code>, not <code>head -1</code>.</strong> Both print the first line, but <code>head</code> exits immediately and closes the pipe, so <code>curl</code> gets EPIPE and prints <code>curl: (23) Failure writing output to destination</code> to stderr — every time, on a command that actually succeeded. <code>sed -n 1p</code> reads to the end, so it stays quiet. A documented command must not look like it failed.</span>
+        <span class="lang-zh"><strong>用 <code>sed -n 1p</code>，不是 <code>head -1</code></strong>。兩者都只印第一行，但 <code>head</code> 會立刻結束並關閉管線，於是 <code>curl</code> 收到 EPIPE，把 <code>curl: (23) Failure writing output to destination</code> 印到 stderr——每一次都印，而那個命令其實是成功的。<code>sed -n 1p</code> 會讀到結尾，所以不會出聲。一個寫進文件的命令不可以看起來像失敗了。</span>
+    </div>
 
     <div class="note">
         <span class="lang-en"><strong>Why not <code>/releases/latest/download/…</code>?</strong> Because there is no latest release: every 0.x here is tagged as a <em>prerelease</em>, and GitHub's <code>latest</code> deliberately skips those — so every such URL answers <strong>404</strong>. It will start working when 1.0.0 ships. Until then the command above asks the API for the newest release of any kind. To pin a version instead, take the URL straight from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>.</span>

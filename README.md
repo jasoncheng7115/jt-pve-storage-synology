@@ -242,7 +242,7 @@ On every node of the cluster.
 ```bash
 # resolves the newest release, prereleases included
 url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
-      | grep -o 'https://[^"]*_all\.deb' | head -1)
+      | grep -o 'https://[^"]*_all\.deb' | sed -n 1p)
 curl -fLO "$url"
 dpkg -i jt-pve-storage-synology_*_all.deb
 systemctl restart pvedaemon pveproxy pvestatd

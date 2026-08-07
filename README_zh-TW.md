@@ -151,7 +151,7 @@ SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經�
 ```bash
 # 解析出最新的發行版，包含預發行版
 url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
-      | grep -o 'https://[^"]*_all\.deb' | head -1)
+      | grep -o 'https://[^"]*_all\.deb' | sed -n 1p)
 curl -fLO "$url"
 dpkg -i jt-pve-storage-synology_*_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
