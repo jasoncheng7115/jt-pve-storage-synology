@@ -1,3 +1,23 @@
+jt-pve-storage-synology (0.6.24-1) unstable; urgency=medium
+
+  * R-10 fully answered, and it was a real risk. With a daily LUN snapshot schedule
+    enabled, DSM's own scheduled snapshot DOES appear in the LUN's list_snapshot. It
+    is distinguishable: taken_by is "scheduler" where this plugin's is
+    jt-pve-storage-synology. Verified end to end -- the NAS held two snapshots on
+    that LUN and volume_snapshot_info reported one to Proxmox VE. The ceiling half
+    holds too: assert_room_for_snapshot uses all => 1 and counted two.
+  * R-14 answered from DSM's interface rather than its API. The account's
+    Applications tab lists twenty applications and not one is SAN Manager, Storage
+    Manager or iSCSI, so there is no finer privilege to grant. Each of those twenty
+    can be denied, which is the smallest configuration that exists.
+  * R-26 added, open: info type=define reports max_snapshot_per_lun 256 AND
+    max_snapshot_per_lun_v2 128, and a DS925+ on DSM 7.3.2 reports the identical
+    pair. The plugin reads the first; which DSM enforces needs a 129th snapshot to
+    settle. Recorded, code unchanged.
+  * The A-E checklist table on the documentation site listed A last.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 20:00:00 +0800
+
 jt-pve-storage-synology (0.6.23-1) unstable; urgency=medium
 
   * --version on both bin scripts. Neither had it: they carried their version

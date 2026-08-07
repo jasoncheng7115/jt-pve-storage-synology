@@ -113,7 +113,7 @@
         <!-- The version sits on this line, immediately after the class, because
              <code>make release-check</code> reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.23 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.24 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -209,12 +209,12 @@
             <th><span class="lang-en">Result</span><span class="lang-zh">結果</span></th>
         </tr></thead>
         <tbody>
+        <tr><td><strong>A1–A4</strong></td><td><span class="lang-en">Add · edit · CHAP · remove a storage — <em>not reachable from the GUI</em>, so <code>pvesm</code> plus a <code>perl -T</code> run on the node</span><span class="lang-zh">新增 · 編輯 · CHAP · 移除 storage ——<strong>GUI 到不了</strong>，所以是 <code>pvesm</code> 加上在節點上跑一次 <code>perl -T</code></span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         <tr><td><strong>B1–B4</strong></td><td><span class="lang-en">Add a disk · resize · move to another storage and back · detach and remove</span><span class="lang-zh">新增磁碟 · 擴充 · 移動到別的 storage 再移回 · 卸離並移除</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         <tr><td><strong>C1–C5</strong></td><td><span class="lang-en">Snapshot running and stopped · <strong>roll back</strong> · delete · the name visible in SAN Manager</span><span class="lang-zh">執行中與關機拍快照 · <strong>倒回</strong> · 刪除 · 名稱在 SAN Manager 看得到</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         <tr><td><strong>D1–D5</strong></td><td><span class="lang-en">Stop and start · migrate away and back, offline and online · full clone · clone from a snapshot · template, then linked and full clone from it</span><span class="lang-zh">關機與啟動 · 遷移離開再遷回（離線與線上）· 完整複製 · 從快照複製 · 轉範本再做連結與完整複製</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         <tr><td><strong>E1–E5</strong></td><td><span class="lang-en">Backup in all three <code>vzdump</code> modes · restore to a new VM ID · restore overwriting the original</span><span class="lang-zh"><code>vzdump</code> 三種模式的備份 · 還原到新的 VM ID · 覆蓋原本的 VM</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
-        <tr><td><strong>A1–A4</strong></td><td><span class="lang-en">Add · edit · CHAP · remove a storage — <em>not reachable from the GUI</em>, so <code>pvesm</code> plus a <code>perl -T</code> run on the node</span><span class="lang-zh">新增 · 編輯 · CHAP · 移除 storage ——<strong>GUI 到不了</strong>，所以是 <code>pvesm</code> 加上在節點上跑一次 <code>perl -T</code></span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
-        </tbody>
+            </tbody>
     </table>
 
     <div class="alert alert--success">

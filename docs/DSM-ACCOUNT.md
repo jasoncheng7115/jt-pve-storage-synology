@@ -144,26 +144,39 @@ deleted with the owner's permission:
 and no smaller working configuration has been demonstrated.** That is a real
 consideration for a production deployment and it is stated here rather than glossed.
 
-#### The check that would settle it, if you want to try
+#### Answered: there is no SAN Manager privilege to grant
 
-In the DSM interface rather than the API:
+On **DSM 7.4.1-90080 (DS918+)**, on 2026-08-07, the account's **Applications** tab was
+read directly. It lists twenty applications:
 
-1. Control Panel → User & Group → create a user, no shared-folder permissions, no
-   home folder.
-2. On the **Applications** tab, allow **DSM** and deny everything else.
-3. Then, from a node:
+> AFP · Active Backup for Business (three entries) · Audio Station · Central
+> Management System · Cloud Sync · DSM · Download Station · FTP · File Station ·
+> Notification Center · Note Station · SFTP · SMB · Synology Photos · Surveillance
+> Station · Synology Drive · Universal Search · rsync · the text editor
 
-   ```bash
-   pve-syno-api-probe --host <nas> --user <that user>
-   ```
+**Not one of them is SAN Manager, Storage Manager or iSCSI.** So the access this
+plugin needs cannot be allowed or denied as an application: it arrives with
+`administrators` and there is nothing smaller to hand out. Together with the API
+findings above — a groupless account and a `users` account both refused at login
+with 402 — that closes the question. It is a reading of DSM's own interface, not an
+inference from the API's silence.
 
-   The probe creates nothing and deletes nothing.
+#### What that means you should do
 
-- If it **logs in**, the DSM application privilege is the gate, and the probe's
-  output will show which iSCSI calls return **105** (insufficient permission). That
-  list is the answer to R-14 and worth reporting back.
-- If it is still refused with **402**, then SAN Manager access on this DSM version
-  requires `administrators`, and the documentation should say so plainly.
+The finding is not only a limitation; it names the smallest configuration that
+actually exists. Every one of those twenty applications **can** be denied to the
+account, so:
+
+1. A **dedicated** administrator, used by nothing but this plugin.
+2. No shared-folder permissions and no home folder.
+3. On the **Applications** tab, deny every application. DSM itself is what the API
+   logs in through, so leave that one alone and deny the rest.
+4. 2FA, if you accept a standing device token in `/etc/pve/priv/storage/<id>.syno`.
+5. An IP restriction in Control Panel → Security → Firewall, pinned to the nodes.
+
+That is as far as it can be reduced on this DSM version, and it is worth doing —
+the point of the finding is that steps 1 to 5 are available even though a
+non-administrator is not.
 
 Until then, treat the account as privileged: dedicated to this plugin, no shared
 folders, no other applications, 2FA if you accept a standing device token, and

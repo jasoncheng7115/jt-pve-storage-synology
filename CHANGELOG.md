@@ -6,6 +6,39 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.24] - 2026-08-07
+
+### Verified
+
+- **R-10 fully answered, and it was a real risk.** With a daily LUN snapshot schedule
+  enabled in SAN Manager, DSM's own scheduled snapshot **does** appear in the LUN's
+  `list_snapshot`. It is distinguishable: `taken_by` is **`scheduler`** where this
+  plugin's is `jt-pve-storage-synology`. Verified end to end — the NAS held **two**
+  snapshots on that LUN and `volume_snapshot_info` reported **one** to Proxmox VE, its
+  own. So PVE cannot show a user's scheduled snapshot as its own, nor delete it, and
+  that is now measured rather than designed. The other half holds too:
+  `assert_room_for_snapshot` uses `all => 1` and counted **two**, which is what the
+  256-per-LUN ceiling shared with the owner's schedule requires.
+- **R-14 answered, from DSM's interface rather than its API.** The account's
+  **Applications** tab lists twenty applications and **not one is SAN Manager, Storage
+  Manager or iSCSI** — so there is no finer privilege to grant and the access comes
+  with `administrators`. The useful half is what that enables: each of those twenty
+  **can** be denied, so a dedicated administrator with every application denied, 2FA
+  and an IP restriction is the smallest configuration that exists. `DSM-ACCOUNT.md`
+  now says that instead of describing a check to run.
+
+### Added
+
+- **R-26, open.** `info type=define` reports **two** snapshot ceilings, not one:
+  `max_snapshot_per_lun` **256** and `max_snapshot_per_lun_v2` **128** — and a DS925+
+  on DSM 7.3.2 reports the identical pair, so it is systematic. The plugin reads the
+  first. Which DSM enforces cannot be settled read-only; it needs a 129th snapshot on
+  one LUN. Recorded rather than guessed at, and the code is unchanged.
+
+### Fixed
+
+- The A–E checklist table on the documentation site listed **A last**. Now A, B, C, D, E.
+
 ## [0.6.23] - 2026-08-07
 
 ### Added

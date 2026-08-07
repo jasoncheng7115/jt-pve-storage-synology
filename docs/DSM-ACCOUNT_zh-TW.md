@@ -104,22 +104,25 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 
 **所以誠實的立場是：這個 plugin 今天使用的帳號是管理員，而沒有任何更小的可用設定被示範過**。這對正式部署是一個真實的考量，而這裡選擇直接說出來，不掩飾。
 
-#### 如果你想試，能夠確定答案的檢查方式
+#### 已解答：沒有「SAN Manager 權限」可以給
 
-在 DSM 介面裡做，而不是透過 API：
+2026-08-07，在 DSM **7.4.1-90080**（DS918+）上直接讀了那個帳號的**應用程式**分頁。它列出二十個應用程式：
 
-1. 控制台 → 使用者與群組 → 建立一個使用者，不給任何共用資料夾權限，不建立家目錄。
-2. 在**應用程式**分頁，允許 **DSM**，其他全部拒絕。
-3. 然後從節點執行：
+> AFP · Active Backup for Business（三項）· Audio Station · Central Management System · Cloud Sync · DSM · Download Station · FTP · File Station · Notification Center · Note Station · SFTP · SMB · Synology Photos · Surveillance Station · Synology Drive · Universal Search · rsync · 文字編輯器
 
-   ```bash
-   pve-syno-api-probe --host <nas> --user <該使用者>
-   ```
+**其中沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI**。所以這個 plugin 需要的存取權不能以「應用程式」的形式允許或拒絕：它是隨 `administrators` 一起來的，沒有更小的東西可以發放。加上前面那些 API 的發現——沒有群組的帳號和放在 `users` 裡的帳號都在登入時被 402 拒絕——這個問題就結束了。這是讀 DSM 自己的介面得到的結論，不是從 API 的沉默推論出來的。
 
-   這個探測工具不會建立也不會刪除任何東西。
+#### 這代表你該做什麼
 
-- 如果它**登入成功**，那麼閘門就是 DSM 應用程式權限，而探測的輸出會顯示哪些 iSCSI 呼叫回傳 **105**（權限不足）。那份清單就是 R-14 的答案，值得回報。
-- 如果它仍然以 **402** 被拒，那麼在這個 DSM 版本上存取 SAN Manager 就是需要 `administrators`，而文件應該直接這樣寫。
+這個發現不只是一項限制，它同時指出了「現存最小的組態」長什麼樣。那二十個應用程式**每一個都可以**對這個帳號拒絕，所以：
+
+1. 一個**專用**的管理員帳號，除了這個 plugin 之外不給任何東西用。
+2. 不給共用資料夾權限，不建立家目錄。
+3. 在**應用程式**分頁把每一個應用程式都拒絕。API 是透過 DSM 本身登入的，所以那一項留著，其餘全部拒絕。
+4. 開 2FA——前提是你接受在 `/etc/pve/priv/storage/<id>.syno` 裡存放一個常設的裝置權杖。
+5. 在控制台 → 安全性 → 防火牆裡以 IP 限制，鎖到那幾個節點。
+
+在這個 DSM 版本上能縮到的就是這樣，而且值得做——這個發現的重點正是：即使非管理員不可行，第 1 到第 5 步仍然是可用的。
 
 在那之前，請把這個帳號視為有特權的：專供這個 plugin 使用、沒有共用資料夾、沒有其他應用程式、如果你接受常設裝置權杖就開 2FA，並且在防火牆中以 IP 鎖定。
 
