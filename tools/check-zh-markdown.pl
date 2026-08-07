@@ -187,9 +187,25 @@ if (-e 'docs/index.html') {
     while (my $line = <$fh>) {
         $n++;
         next if $line !~ /class="lang-zh"/;
-        complain('docs/index.html', $n, '<em> inside a Chinese span',
-            'italics are English typography. Use <strong> or 「」.')
-            if $line =~ /<em>/;
+
+        # Only <em> INSIDE the Chinese span, not anywhere on a line that happens to
+        # contain one. The first version asked both questions of the whole line, so
+        # a line carrying an English span and a Chinese span together was condemned
+        # for an <em> that belonged to the English one — where italics are correct
+        # typography and removing them would damage the text.
+        #
+        # It found no false positive for weeks only because the existing markup put
+        # each language on its own line. The first line written with both spans
+        # together tripped it, and the tempting fix was to mangle correct English.
+        #
+        # A guard whose remedy is to damage right text is worse than no guard: this
+        # project has now met that in check-zh's own code-span handling, in
+        # t/07-imports.t, in t/12-reap.t and here.
+        for my $span ($line =~ /class="lang-zh">(.*?)<\/span>/g) {
+            complain('docs/index.html', $n, '<em> inside a Chinese span',
+                'italics are English typography. Use <strong> or 「」.')
+                if $span =~ /<em>/;
+        }
     }
     close($fh);
 }

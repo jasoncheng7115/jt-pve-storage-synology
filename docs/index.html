@@ -133,9 +133,9 @@
     <h2 class="section-title"><span class="lang-en">Status and risk</span><span class="lang-zh">狀態與風險</span></h2>
 
     <div class="alert alert--warning">
-        <strong><span class="lang-en">The plugin works, and it is still a prerelease.</span><span class="lang-zh">plugin 可以用了，而且它仍然是預發行版。</span></strong>
-        <span class="lang-en"><code>pvesm add synologysan</code> works, and every lifecycle operation has been driven end to end against a DS918+ on DSM 7.1.1, twice, leaving nothing behind. The honest reasons it is still a prerelease: <strong>one</strong> node, <strong>one</strong> model, <strong>one</strong> DSM version, and no VM has booted from it yet. Five bugs surfaced in the first hour of running it that no amount of reading had shown — assume there are more.</span>
-        <span class="lang-zh"><code>pvesm add synologysan</code> 可以用了，而且每一個生命週期操作都已對一台 DS918+（DSM 7.1.1）完整跑過兩輪，沒有留下任何東西。它仍然是預發行版的誠實理由是：<strong>一個</strong>節點、<strong>一個</strong>機型、<strong>一個</strong> DSM 版本，而且還沒有任何 VM 從它開機過。開始實際運行的第一個小時就冒出五個讀程式碼讀不出來的缺陷——請假設還有更多。</span>
+        <strong><span class="lang-en">The plugin works on a cluster, and it is still a prerelease.</span><span class="lang-zh">plugin 在叢集上可以用了，而且它仍然是預發行版。</span></strong>
+        <span class="lang-en">Everything below has been driven against a DS918+ on DSM 7.1.1: a guest <strong>booting from the NAS</strong>, backed up in all three <code>vzdump</code> modes and restored byte-identical, <strong>live-migrated across three nodes</strong> (5&nbsp;ms and 87&nbsp;ms downtime), and a crashed node's LUN <strong>taken over by a surviving node in 3.6&nbsp;s</strong> while the dead node's session was still registered. Two-portal multipath lost <strong>0 of 60 reads</strong> during a path failure. The honest reasons it is still a prerelease: <strong>one</strong> model, <strong>one</strong> DSM version, no Synology HA chassis has ever been near it, and the DSM account still needs administrator rights. Around twenty-five defects surfaced from running it that no amount of reading had shown — including two releases that could not add a storage at all — so assume there are more.</span>
+        <span class="lang-zh">以下每一項都已對一台 DS918+（DSM 7.1.1）實際跑過：一台 guest <strong>從 NAS 開機</strong>、以三種 <code>vzdump</code> 模式備份並還原成完全相同的位元組、<strong>跨三個節點即時遷移</strong>（中斷 5 毫秒與 87 毫秒），以及一個當掉節點的 LUN <strong>由存活節點在 3.6 秒內接手</strong>，而當時死掉節點的工作階段仍然登記在 NAS 上。兩個 portal 的 multipath 在路徑故障期間<strong>60 次讀取失敗 0 次</strong>。它仍然是預發行版的誠實理由是：<strong>一個</strong>機型、<strong>一個</strong> DSM 版本、從來沒有任何 Synology HA 機箱接近過它，而且那個 DSM 帳號目前仍需要管理員權限。從實際運行中冒出大約二十五個讀程式碼讀不出來的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。</span>
     </div>
 
     <p>
@@ -548,7 +548,12 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </p>
 
     <p>
-        <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
+        <div class="note">
+        <span class="lang-en"><strong>Probed on hardware, and it went further than expected.</strong> A temporary account was created on the test NAS, probed and deleted. DSM 7.1.1 offers exactly three groups — <code>administrators</code>, <code>http</code>, <code>users</code> — and <strong>none is iSCSI-specific</strong>. With no groups the account was refused at <strong>login</strong> with error <strong>402</strong>; as a member of <code>users</code>, also <strong>402</strong>. So a plain account does not get as far as being denied the storage calls. <code>SYNO.Core.User get</code> exposes no privilege fields, and the group API reports success while declining to add to <code>administrators</code> — so the minimum cannot be isolated through the API, and the probing stopped rather than guessing at an undocumented model on a production NAS. <strong>The account in use is an administrator and no smaller working configuration has been demonstrated.</strong></span>
+        <span class="lang-zh"><strong>已在硬體上探測，而結果比預期更進一步。</strong>在測試用 NAS 上建立一個臨時帳號、探測、然後刪除。DSM 7.1.1 只提供三個群組——<code>administrators</code>、<code>http</code>、<code>users</code>——而<strong>沒有任何一個是 iSCSI 專用的</strong>。完全沒有群組時，該帳號在<strong>登入</strong>就被拒絕，錯誤 <strong>402</strong>；加入 <code>users</code> 之後，也是 <strong>402</strong>。所以一個普通帳號根本走不到「被拒絕儲存呼叫」那一步。<code>SYNO.Core.User get</code> 沒有公開任何權限欄位，而群組 API 回報成功卻沒有真的加進 <code>administrators</code>——所以無法透過 API 隔離出最小集合，而探測就此停止，不去對一台正式 NAS 上未公開的模型做猜測。<strong>使用中的帳號是管理員，而沒有任何更小的可用設定被示範過。</strong></span>
+    </div>
+
+    <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
     </p>
 </section>
 
@@ -626,7 +631,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     <ul>
         <li><span class="lang-en"><strong>R-1</strong> — the output of <code>--probe-methods</code> on any DSM</span><span class="lang-zh"><strong>R-1</strong>——任何 DSM 上 <code>--probe-methods</code> 的輸出</span></li>
         <li><span class="lang-en">A LUN's uuid together with its WWID from a host that has it attached, to test the derivation rule against a second sample</span><span class="lang-zh">一顆 LUN 的 uuid，加上在掛著它的主機上讀到的 WWID，用第二個樣本檢驗那條衍生規則</span></li>
-        <li><span class="lang-en">Whether a non-administrator account can reach the SAN APIs at all</span><span class="lang-zh">非管理員帳號到底能不能呼叫 SAN API</span></li>
+        <li><span class="lang-en">Whether granting a non-administrator only the <strong>DSM application privilege</strong> in Control Panel lets it authenticate — and if so, which iSCSI calls then answer <strong>105</strong>. Probed here with a temporary account: with no groups, and as a member of <code>users</code>, it was refused at <em>login</em> with <strong>402</strong>, so it never reached the storage calls</span><span class="lang-zh">在控制台只給非管理員<strong>DSM 應用程式權限</strong>，它能不能通過認證——如果可以，接著哪些 iSCSI 呼叫會回 <strong>105</strong>。這裡用一個臨時帳號探測過：完全沒有群組時、以及加入 <code>users</code> 之後，都在「登入」這一步就被拒絕，錯誤 <strong>402</strong>，所以它根本沒有走到儲存呼叫</span></li>
         <li><span class="lang-en">Anything the probe reports that contradicts this page</span><span class="lang-zh">探索工具回報的任何與本頁矛盾的內容</span></li>
     </ul>
 </section>
