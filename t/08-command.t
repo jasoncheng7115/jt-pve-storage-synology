@@ -183,8 +183,11 @@ subtest 'a command that cannot be found fails loudly, and names itself' => sub {
 subtest 'run_cmd still runs a real command, resolved' => sub {
     local %ENV = (%ENV);
     delete $ENV{PATH};
+    # `echo`, not `sh -c 'echo hello'`: the argument allowlist refuses a shell
+    # snippet, and correctly so — a space is not a character this plugin ever
+    # puts in an argument.
     my ($out, $err, $rc) = PVE::Storage::Custom::Synology::Command::run_cmd(
-        [ 'sh', '-c', 'echo hello' ], timeout => 10);
+        [ 'echo', 'hello' ], timeout => 10);
     is($rc, 0, 'it ran with no PATH in the environment');
     like($out, qr/hello/, 'and produced its output');
 };

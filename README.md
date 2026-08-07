@@ -250,9 +250,20 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
-apt install ./jt-pve-storage-synology_all.deb
+wget -O jt-pve-storage-synology_all.deb \
+  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install -y ./jt-pve-storage-synology_all.deb
+
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # check what you got
 ```
+
+> **The `-O` is not decoration.** Without it, `wget` refuses to overwrite a file
+> that is already there and saves the download as
+> `jt-pve-storage-synology_all.deb.1` instead — then `apt install
+> ./jt-pve-storage-synology_all.deb` installs the **old** file sitting in `/tmp`
+> from last time. Reported on a real node, where it silently downgraded 0.6.7 to
+> 0.6.5: `apt` prints a `DOWNGRADING:` line, and with `-y` it does not stop to
+> ask. That is why the version check is the last line of the block.
 
 No service restart is needed, and that was measured rather than assumed. The package
 installs into `/usr/share/perl5/PVE`, which `pve-manager` watches with an
@@ -261,8 +272,52 @@ output — and its postinst runs `reload-or-try-restart` on `pvedaemon`, `pvesta
 `pveproxy`, `spiceproxy` and `pvescheduler`. A reload is enough: with the package
 removed `pvedaemon` does not list `synologysan` among the storage types it accepts,
 and installing it makes the daemon validate `synologysan` options immediately — with
-its PID unchanged throughout. If something blocks `deb-systemd-invoke`,
-`systemctl restart pvedaemon pveproxy pvestatd` is the fallback.
+its PID unchanged throughout — `exec(2)` keeps the PID while replacing the running
+program, which is exactly what `pvedaemon restart` does when the trigger HUPs it:
+
+```
+pvedaemon[1333139]: received signal HUP
+pvedaemon[1333139]: server shutdown (restart)
+systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
+pvedaemon[1333139]: restarting server
+pvedaemon[1333139]: starting 3 worker(s)
+```
+
+So this holds for an **upgrade** as much as a first install: the master re-execs and
+forks fresh workers that read the new modules from disk. Workers already serving a
+request finish on the old code — about five seconds, in the run above — so an
+operation started during the upgrade may complete on the version you just replaced.
+If something blocks `deb-systemd-invoke`, `systemctl restart pvedaemon pveproxy
+pvestatd` is the fallback.
+
+## Upgrading
+
+The same commands. `apt install` on a newer `.deb` upgrades in place, the same
+trigger reloads the daemons, and **no restart is needed** — see the journal above.
+
+```bash
+cd /tmp
+rm -f jt-pve-storage-synology_all.deb*
+wget -O jt-pve-storage-synology_all.deb \
+  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install -y ./jt-pve-storage-synology_all.deb
+
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'
+```
+
+Three things that are only true of an upgrade:
+
+- **The `rm -f` is the important line**, for the reason in the box above. An upgrade
+  is exactly when a stale `.deb` from the previous upgrade is sitting there.
+- **Do every node before you trust the result.** A storage operation runs where the
+  guest is, so a half-upgraded cluster behaves differently depending on which node a
+  VM happens to be on. There is no downgrade path for a storage that has already
+  been used, but there is nothing to migrate either: the plugin keeps no on-disk
+  state beyond `/etc/pve/priv/storage/<storage>.syno` and the per-node WWID list
+  under `/var/lib`, and both are read by every version.
+- **Nothing needs to be stopped.** Running guests keep their devices: the package
+  replaces Perl modules, and it does not touch iSCSI sessions, multipath maps or the
+  drop-in in `/etc/multipath/conf.d`.
 
 
 > **Keep the version the same on every node.** A storage operation runs on the node

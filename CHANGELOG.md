@@ -6,6 +6,35 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.9] - 2026-08-07
+
+### Fixed
+
+- **Taint mode.** `pvedaemon` is `#!/usr/bin/perl -T`, so every value the plugin
+  reads from a file is tainted and Perl refuses to `exec` with it:
+  *Insecure dependency in exec while running with -T switch*. The multipath map
+  name is read from `/sys/block/dm-N/dm/name` and goes straight into
+  `multipathd resize map <name>`, so **every resize started from the web
+  interface failed** — the second barrier behind the missing `PATH` fixed in
+  0.6.7, and invisible until that one was out of the way.
+  `slaves_of_map` already took its device names from what a regex *matched*
+  rather than what it read, and its comment calls that "the taint discipline and
+  the correctness check in one" — applied there and nowhere else. Arguments are
+  now validated against an allowlist and untainted at the command runner, and a
+  value the plugin could not have produced is **refused** rather than stripped.
+- Taint mode also requires a clean environment before `exec`, so `IFS`,
+  `CDPATH`, `ENV` and `BASH_ENV` are removed for the child alongside the
+  absolute `PATH` 0.6.7 added.
+
+### Added
+
+- **`t/13-taint.t` runs under `-T`**, so `make test` finally reaches the
+  environment a daemon actually runs in. Nothing in this project reproduced it
+  before: `qm`, `pvesm` and `pvesh` are all plain `#!/usr/bin/perl`, which is
+  why two rounds of hardware verification passed while the web interface went
+  on failing. The shebang is the fixture — a case in any other file does not
+  cover it. Shown to fail on a deliberate regression.
+
 ## [0.6.8] - 2026-08-07
 
 ### Fixed

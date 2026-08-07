@@ -1,3 +1,15 @@
+jt-pve-storage-synology (0.6.9-1) unstable; urgency=medium
+
+  * Untaint every command argument. pvedaemon is `#!/usr/bin/perl -T`, so a
+    value read from sysfs -- the multipath map name -- cannot be passed to
+    exec: "Insecure dependency in exec while running with -T switch". Every
+    operation started from the web interface hit this; every hardware test
+    missed it, because qm, pvesm and pvesh are all plain perl with no -T.
+  * t/13-taint.t runs under -T so `make test` reaches the daemon's
+    environment. Shown to fail on a deliberate regression.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 12:35:00 +0800
+
 jt-pve-storage-synology (0.6.8-1) unstable; urgency=medium
 
   * The host cache flush around a snapshot and a rollback now reports when it

@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.8 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.9 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -472,8 +472,17 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
-apt install ./jt-pve-storage-synology_all.deb</code></pre>
+wget -O jt-pve-storage-synology_all.deb \
+  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install -y ./jt-pve-storage-synology_all.deb
+
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   <span class="c"># check what you got</span></code></pre>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">The <code>-O</code> is not decoration</span><span class="lang-zh">那個 <code>-O</code> 不是裝飾</span></strong>
+        <span class="lang-en">Without it, <code>wget</code> will not overwrite a file that is already there — it saves the download as <code>jt-pve-storage-synology_all.deb.1</code> instead, and <code>apt install ./jt-pve-storage-synology_all.deb</code> then installs the <strong>old</strong> file left in <code>/tmp</code> from last time.<br><br>Reported on a real node, where it silently <strong>downgraded 0.6.7 to 0.6.5</strong>. <code>apt</code> does print a <code>DOWNGRADING:</code> line, and with <code>-y</code> it does not stop to ask. That is why the version check is the last line of the block.</span>
+        <span class="lang-zh">少了它，<code>wget</code> 不會覆蓋已經存在的檔案——它會把下載的東西存成 <code>jt-pve-storage-synology_all.deb.1</code>，接著 <code>apt install ./jt-pve-storage-synology_all.deb</code> 裝的就是上次留在 <code>/tmp</code> 裡的<strong>舊檔案</strong>。<br><br>這在實機上發生過，把 <strong>0.6.7 靜靜降級成 0.6.5</strong>。<code>apt</code> 確實會印一行 <code>DOWNGRADING:</code>，而加了 <code>-y</code> 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。</span>
+    </div>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">Keep the version the same on every node</span><span class="lang-zh">每個節點的版本要一致</span></strong>
@@ -483,8 +492,8 @@ apt install ./jt-pve-storage-synology_all.deb</code></pre>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">Every node, or the storage is invisible in the web interface</span><span class="lang-zh">每個節點都要裝，否則這個 storage 在網頁介面上看不到</span></strong>
-        <span class="lang-en"><code>pvesm add</code> writes to the cluster configuration, so one node is enough to create the storage —but the web interface is served by <strong>whichever node your browser is connected to</strong>, and <code>pveproxy</code> loads its plugin list at startup. A node without the plugin does not know the <code>synologysan</code> type and <strong>silently omits the storage from the list</strong>. The storage exists and works on the nodes that do have it; it just is not shown. That reads exactly like <code>pvesm add</code> having failed, and it did not.<br><br>So: install on every node, and <code>systemctl restart pvedaemon pveproxy pvestatd</code> on each —including the one you are browsing from. To limit the storage to the nodes that are ready, <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>.</span>
-        <span class="lang-zh"><code>pvesm add</code> 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 <code>pveproxy</code> 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 <code>synologysan</code> 這個類型，於是<strong>會把這個 storage 從清單裡靜靜略過</strong>。在有裝的節點上這個 storage 是存在而且可用的，只是沒有被顯示出來。這個症狀看起來就像 <code>pvesm add</code> 失敗了，但它並沒有。<br><br>所以：每個節點都要裝，而且每一台都要 <code>systemctl restart pvedaemon pveproxy pvestatd</code>——包含你正在瀏覽的那一台。若要先限制在已就緒的節點上，用 <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>。</span>
+        <span class="lang-en"><code>pvesm add</code> writes to the cluster configuration, so one node is enough to create the storage —but the web interface is served by <strong>whichever node your browser is connected to</strong>, and <code>pveproxy</code> loads its plugin list at startup. A node without the plugin does not know the <code>synologysan</code> type and <strong>silently omits the storage from the list</strong>. The storage exists and works on the nodes that do have it; it just is not shown. That reads exactly like <code>pvesm add</code> having failed, and it did not.<br><br>So: install on every node, including the one you are browsing from. The package's own trigger reloads <code>pveproxy</code>, so no manual restart is needed. To limit the storage to the nodes that are ready, <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>.</span>
+        <span class="lang-zh"><code>pvesm add</code> 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由<strong>你的瀏覽器所連上的那個節點</strong>提供的，而 <code>pveproxy</code> 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 <code>synologysan</code> 這個類型，於是<strong>會把這個 storage 從清單裡靜靜略過</strong>。在有裝的節點上這個 storage 是存在而且可用的，只是沒有被顯示出來。這個症狀看起來就像 <code>pvesm add</code> 失敗了，但它並沒有。<br><br>所以：每個節點都要裝，包含你正在瀏覽的那一台。套件自己的 trigger 會重新載入 <code>pveproxy</code>，不需要手動重啟。若要先限制在已就緒的節點上，用 <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>。</span>
     </div>
 
     <div class="alert alert--warning">
@@ -494,9 +503,46 @@ apt install ./jt-pve-storage-synology_all.deb</code></pre>
     </div>
 
     <div class="note">
-        <span class="lang-en"><strong>No service restart is needed, and this was measured rather than assumed.</strong> The package installs into <code>/usr/share/perl5/PVE</code>, which <code>pve-manager</code> watches with an <code>interest-noawait</code> trigger —that is the <em>Processing triggers for pve-manager</em> line in the output. Its postinst runs <code>reload-or-try-restart</code> on <code>pvedaemon</code>, <code>pvestatd</code>, <code>pveproxy</code>, <code>spiceproxy</code> and <code>pvescheduler</code>.<br><br>A reload is enough: with the package removed, <code>pvedaemon</code> does not list <code>synologysan</code> among the storage types it accepts; install it and the daemon validates <code>synologysan</code> options immediately —with its <strong>PID unchanged</strong> throughout. If something in your environment blocks <code>deb-systemd-invoke</code>, <code>systemctl restart pvedaemon pveproxy pvestatd</code> is the fallback.</span>
-        <span class="lang-zh"><strong>不需要重啟服務，而這是實測出來的，不是假設的。</strong>這個套件會安裝到 <code>/usr/share/perl5/PVE</code> 底下，而 <code>pve-manager</code> 用一個 <code>interest-noawait</code> trigger 監看那個路徑——那就是輸出裡「Processing triggers for pve-manager」那一行。它的 postinst 會對 <code>pvedaemon</code>、<code>pvestatd</code>、<code>pveproxy</code>、<code>spiceproxy</code>、<code>pvescheduler</code> 執行 <code>reload-or-try-restart</code>。<br><br>reload 就夠了：把套件移除後，<code>pvedaemon</code> 的可用 storage 類型清單裡沒有 <code>synologysan</code>；裝回去之後，daemon 立刻就會驗證 <code>synologysan</code> 的選項——而全程它的 <strong>PID 都沒有變</strong>。如果你的環境有什麼東西擋住 <code>deb-systemd-invoke</code>，備援做法是 <code>systemctl restart pvedaemon pveproxy pvestatd</code>。</span>
+        <span class="lang-en"><strong>No service restart is needed, and this was measured rather than assumed.</strong> The package installs into <code>/usr/share/perl5/PVE</code>, which <code>pve-manager</code> watches with an <code>interest-noawait</code> trigger —that is the <em>Processing triggers for pve-manager</em> line in the output. Its postinst runs <code>reload-or-try-restart</code> on <code>pvedaemon</code>, <code>pvestatd</code>, <code>pveproxy</code>, <code>spiceproxy</code> and <code>pvescheduler</code>.<br><br>A reload is enough because <code>pvedaemon</code>'s <code>ExecReload</code> is <code>pvedaemon restart</code>, which <code>exec(2)</code>s the daemon —replacing the running program while keeping the PID.</span>
+        <span class="lang-zh"><strong>不需要重啟服務，而這是實測出來的，不是假設的。</strong>這個套件會安裝到 <code>/usr/share/perl5/PVE</code> 底下，而 <code>pve-manager</code> 用一個 <code>interest-noawait</code> trigger 監看那個路徑——那就是輸出裡「Processing triggers for pve-manager」那一行。它的 postinst 會對 <code>pvedaemon</code>、<code>pvestatd</code>、<code>pveproxy</code>、<code>spiceproxy</code>、<code>pvescheduler</code> 執行 <code>reload-or-try-restart</code>。<br><br>reload 就夠了，因為 <code>pvedaemon</code> 的 <code>ExecReload</code> 就是 <code>pvedaemon restart</code>，而它對自己做的是 <code>exec(2)</code>——換掉整個執行中的程式，但保留 PID。</span>
     </div>
+
+    <pre><code>pvedaemon[1333139]: received signal HUP
+pvedaemon[1333139]: server shutdown (restart)
+systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
+pvedaemon[1333139]: restarting server
+pvedaemon[1333139]: starting 3 worker(s)</code></pre>
+
+    <p>
+        <span class="lang-en">Same PID throughout, so this holds for an <strong>upgrade</strong> as much as a first install: the master re-execs and forks fresh workers that read the new modules from disk. Workers already serving a request finish on the old code —about five seconds in the run above —so an operation started during the upgrade may complete on the version you just replaced. If something in your environment blocks <code>deb-systemd-invoke</code>, <code>systemctl restart pvedaemon pveproxy pvestatd</code> is the fallback.</span>
+        <span class="lang-zh">全程都是同一個 PID，所以這對<strong>升級</strong>和第一次安裝一樣成立：主行程重新 exec，然後 fork 出全新的 worker，從磁碟讀取新的模組。已經在處理請求的舊 worker 會用舊的程式碼跑完——上面那次大約五秒——所以升級當下已經開始的操作，可能會在你剛換掉的那一版上完成。如果你的環境有什麼東西擋住 <code>deb-systemd-invoke</code>，備援做法是 <code>systemctl restart pvedaemon pveproxy pvestatd</code>。</span>
+    </p>
+
+    <h3 class="subsection-title" id="upgrade"><span class="lang-en">Upgrading</span><span class="lang-zh">更新</span></h3>
+
+    <p>
+        <span class="lang-en">The same commands. <code>apt install</code> on a newer <code>.deb</code> upgrades in place, the same trigger reloads the daemons, and <strong>no restart is needed</strong> —see the journal above.</span>
+        <span class="lang-zh">指令和安裝一樣。<code>apt install</code> 遇到比較新的 <code>.deb</code> 就是就地升級，同一個 trigger 會重新載入 daemon，<strong>不需要重啟</strong>——理由見上面那段 journal。</span>
+    </p>
+
+    <pre><code>cd /tmp
+rm -f jt-pve-storage-synology_all.deb*
+wget -O jt-pve-storage-synology_all.deb \
+  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install -y ./jt-pve-storage-synology_all.deb
+
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
+
+    <p>
+        <span class="lang-en">Three things that are only true of an upgrade:</span>
+        <span class="lang-zh">有三件事只有升級時才成立：</span>
+    </p>
+
+    <ul>
+        <li><span class="lang-en"><strong>The <code>rm -f</code> is the important line</strong>, for the reason in the box above. An upgrade is exactly when a stale <code>.deb</code> from the previous upgrade is sitting there.</span><span class="lang-zh"><strong><code>rm -f</code> 那一行才是重點</strong>，理由就是上面那個框。升級正好就是「上一次升級留下的 <code>.deb</code> 還躺在那裡」的時候。</span></li>
+        <li><span class="lang-en"><strong>Do every node before you trust the result.</strong> A storage operation runs where the guest is, so a half-upgraded cluster behaves differently depending on which node a VM happens to be on. There is nothing to migrate: the plugin keeps no on-disk state beyond <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> and the per-node WWID list under <code>/var/lib</code>, and every version reads both.</span><span class="lang-zh"><strong>每個節點都做完，才能相信結果。</strong>storage 操作是在 guest 所在的節點上跑的，所以升級到一半的叢集，行為會隨著 VM 剛好在哪一台而不同。沒有東西需要搬移：這個 plugin 除了 <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> 和 <code>/var/lib</code> 底下的逐節點 WWID 清單之外不保存任何磁碟狀態，而每一版都讀得懂這兩者。</span></li>
+        <li><span class="lang-en"><strong>Nothing needs to be stopped.</strong> Running guests keep their devices: the package replaces Perl modules, and does not touch iSCSI sessions, multipath maps or the drop-in in <code>/etc/multipath/conf.d</code>.</span><span class="lang-zh"><strong>不需要停掉任何東西。</strong>執行中的 guest 會保有它們的裝置：這個套件換掉的是 Perl 模組，它不會動到 iSCSI 工作階段、multipath 對應，或 <code>/etc/multipath/conf.d</code> 裡的 drop-in。</span></li>
+    </ul>
 
     <div class="note">
         <span class="lang-en"><code>cd /tmp</code> is not cosmetic clutter: apt's <code>_apt</code> user cannot read <code>/root</code>, so downloading there makes apt fall back to running unsandboxed and print a <em>Download is performed unsandboxed as root</em> notice. Harmless, but it is noise on a page that is trying to be copied verbatim.</span>

@@ -296,6 +296,54 @@ sub tool_path {
     return undef;
 }
 
+# ---------------------------------------------------------------------------
+# TAINT MODE, WHICH IS NOT OPTIONAL: pvedaemon IS `#!/usr/bin/perl -T`
+# ---------------------------------------------------------------------------
+#
+# So every value this plugin reads from a file, a socket or the environment is
+# tainted, and Perl refuses to `exec` with a tainted argument:
+#
+#   Insecure dependency in exec while running with -T switch at IPC/Open3.pm
+#
+# The map name is the one that found this. It comes from
+# /sys/block/dm-N/dm/name — a file read, therefore tainted — and goes straight
+# into `multipathd resize map <name>`. `slaves_of_map` had the answer already:
+# it takes the device name from what a regex MATCHED rather than from what it
+# read, and its comment calls that "the taint discipline and the correctness
+# check in one". Applied there and nowhere else. The third time in this module
+# that the right pattern existed and covered a minority of the call sites.
+#
+# Untainting here rather than at each source is deliberate, and it is safe for a
+# reason specific to how these commands are run: the list form of `exec` never
+# involves a shell, so there is no metacharacter to escape and the only question
+# is whether the bytes are ones this plugin could legitimately have produced.
+# The allowlist answers exactly that question, and anything outside it is a
+# refusal rather than a silent strip — a value this plugin did not construct has
+# no business reaching a command, and turning it into a different value would be
+# worse than stopping.
+#
+# WWIDs, device names, map names, sysfs paths, sizes and iscsiadm's own flags
+# all fit. A newline, a NUL, a quote, a backtick, a `$` or a space does not.
+my $ARG_OK = qr{\A[A-Za-z0-9_./:=,+\@%^-]*\z};
+
+sub _untaint_arg {
+    my ($arg, $prog) = @_;
+    $prog = defined $prog ? $prog : 'a command';
+    croak "Command failed: '$prog' was given an undefined argument"
+        if !defined $arg;
+
+    # The captured value is the untainted one. Matching without capturing would
+    # leave the original tainted, which is the mistake that makes a validating
+    # untaint look like it worked.
+    if ($arg =~ /($ARG_OK)/) {
+        return $1;
+    }
+
+    croak "Command failed: refusing to run '$prog' with the argument '$arg'."
+        . " It contains a character this plugin never produces, so it did not"
+        . " come from anywhere trustworthy.";
+}
+
 sub _run_cmd {
     _not_a_method($_[0]);
     my ($cmd, %opts) = @_;
@@ -307,6 +355,7 @@ sub _run_cmd {
 
     my @argv = @{ $cmd // [] };
     croak "Command failed: no command given" if !@argv;
+    @argv = map { _untaint_arg($_, $argv[0]) } @argv;
     my $prog = tool_path($argv[0]);
     # Loud, and named. "not installed" and "not on the PATH of whoever started
     # this daemon" are the same symptom to the caller, and both are worth the
@@ -333,7 +382,14 @@ sub _run_cmd {
         # Belt and braces for anything the child itself execs. The absolute path
         # above is what makes THIS command run; this is so a helper it spawns
         # does not hit the same wall.
+        #
+        # Under -T this is also mandatory rather than defensive: Perl refuses to
+        # exec at all with a tainted or relative $ENV{PATH}, and it insists the
+        # four variables below are unset. These are built from literals here, so
+        # they are untainted by construction.
         local $ENV{PATH} = join(':', @TOOL_DIRS);
+        local @ENV{qw(IFS CDPATH ENV BASH_ENV)};
+        delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
 
         $pid = open3(my $in, my $out, $err, @argv);
         close($in);

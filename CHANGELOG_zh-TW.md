@@ -4,6 +4,17 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.9] - 2026-08-07
+
+### 修正
+
+- **Taint 模式。**`pvedaemon` 的 shebang 是 `#!/usr/bin/perl -T`，所以這個 plugin 從檔案讀進來的每一個值都是受污染的，而 Perl 拒絕用它 `exec`：「Insecure dependency in exec while running with -T switch」。multipath 的 map 名稱是從 `/sys/block/dm-N/dm/name` 讀來的，然後直接送進 `multipathd resize map <name>`，所以**每一個從網頁介面開始的擴充都失敗**——這是 0.6.7 修掉的「沒有 PATH」後面的第二道關卡，在前一道清掉之前根本看不到。`slaves_of_map` 本來就是從 regex **比對到**的結果取裝置名稱，而不是從讀到的東西取，它的註解把那叫做「taint 紀律與正確性檢查合而為一」——套用在那裡，其他地方都沒有。現在參數會在指令執行器上以允許清單驗證並解除污染，而一個這個 plugin 不可能產生的值會被**拒絕**，不是被清洗。
+- taint 模式在 `exec` 之前也要求環境是乾淨的，所以除了 0.6.7 加的絕對 `PATH` 之外，`IFS`、`CDPATH`、`ENV` 與 `BASH_ENV` 也會為子行程移除。
+
+### 新增
+
+- **`t/13-taint.t` 在 `-T` 底下執行**，所以 `make test` 終於能碰到 daemon 真正執行的那個環境。這個專案先前完全沒有重現過它：`qm`、`pvesm` 與 `pvesh` 全都是普通的 `#!/usr/bin/perl`，這正是為什麼兩輪實機驗證都通過、而網頁介面照樣失敗。那行 shebang 就是測試夾具——把案例加到其他檔案裡並不能涵蓋它。已經在刻意製造的回歸上示範過會失敗。
+
 ## [0.6.8] - 2026-08-07
 
 ### 修正

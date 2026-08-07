@@ -122,6 +122,28 @@ for my $file (@files) {
                 . " un-wrapping artefact.");
         }
 
+        # 3a. Half-width punctuation where the Chinese text needs full-width.
+        #
+        # CLAUDE.md has said "full-width punctuation in Chinese" since the first
+        # day and nothing checked it, so it held only for as long as whoever was
+        # typing remembered. It stopped holding the moment a paragraph was
+        # generated rather than typed: six half-width commas went into
+        # README_zh-TW.md in one edit and check-zh passed them.
+        #
+        # Only a mark that DIRECTLY FOLLOWS a Chinese character is a finding.
+        # That is the whole of the precision here: `awk '/^ii/{print $3}'`,
+        # `nodeA,nodeB` and `0.6.7, 0.6.8` are all correct and all contain the
+        # same characters. A rule that asked about the line rather than about the
+        # character to the left would condemn every command example on the page.
+        # Code spans are already replaced above, but the anchor is what makes it
+        # safe in prose too.
+        my $width_probe = $bare;
+        $width_probe =~ s/`[^`]*`/X/g;
+        if ($width_probe =~ /([\x{4E00}-\x{9FFF}])([,;:!?])/) {
+            complain($file, $n, "half-width '$2' straight after '$1'",
+                "Chinese text takes full-width punctuation: ，；：！？");
+        }
+
         # 4. A bold run that cannot close, so it renders as literal asterisks.
         #
         # CommonMark: a `**` run preceded by Unicode punctuation is right-flanking

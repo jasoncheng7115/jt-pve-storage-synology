@@ -156,16 +156,53 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
-apt install ./jt-pve-storage-synology_all.deb
+wget -O jt-pve-storage-synology_all.deb \
+  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install -y ./jt-pve-storage-synology_all.deb
+
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # 確認裝到的是哪一版
 ```
 
-不需要重啟服務，而這是實測出來的，不是假設的。這個套件會安裝到 `/usr/share/perl5/PVE` 底下，而 `pve-manager` 用一個 `interest-noawait` trigger 監看那個路徑——就是輸出裡「Processing triggers for pve-manager」那一行——它的 postinst 會對 `pvedaemon`、`pvestatd`、`pveproxy`、`spiceproxy`、`pvescheduler` 執行 `reload-or-try-restart`。reload 就夠了：把套件移除後，`pvedaemon` 的可用 storage 類型清單裡沒有 `synologysan`；裝回去之後 daemon 立刻就會驗證 `synologysan` 的選項——而全程它的 PID 都沒有變。如果有什麼東西擋住 `deb-systemd-invoke`，備援做法是 `systemctl restart pvedaemon pveproxy pvestatd`。
+> **那個 `-O` 不是裝飾**。少了它，`wget` 不會覆蓋已經存在的檔案，而是把下載的東西存成 `jt-pve-storage-synology_all.deb.1`——接著 `apt install ./jt-pve-storage-synology_all.deb` 裝的就是上次留在 `/tmp` 裡的**舊檔案**。這在實機上發生過，把 0.6.7 靜靜降級成 0.6.5：`apt` 會印一行 `DOWNGRADING:`，而加了 `-y` 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。
+
+**不需要重啟服務**，而這是實測出來的，不是假設的。這個套件會安裝到 `/usr/share/perl5/PVE` 底下，而 `pve-manager` 用一個 `interest-noawait` trigger 監看那個路徑——就是輸出裡「Processing triggers for pve-manager」那一行——它的 postinst 會對 `pvedaemon`、`pvestatd`、`pveproxy`、`spiceproxy`、`pvescheduler` 執行 `reload-or-try-restart`。
+
+reload 就夠了，因為 `pvedaemon` 的 `ExecReload` 就是 `pvedaemon restart`，而它對自己做的是 `exec(2)`——換掉整個執行中的程式、但保留 PID：
+
+```
+pvedaemon[1333139]: received signal HUP
+pvedaemon[1333139]: server shutdown (restart)
+systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
+pvedaemon[1333139]: restarting server
+pvedaemon[1333139]: starting 3 worker(s)
+```
+
+所以這對**升級**和第一次安裝一樣成立：主行程重新 exec，然後 fork 出全新的 worker，從磁碟讀取新的模組。已經在處理請求的舊 worker 會用舊的程式碼跑完——上面那次是大約五秒——所以升級當下已經開始的操作，可能會在你剛換掉的那一版上完成。如果有什麼東西擋住 `deb-systemd-invoke`，備援做法是 `systemctl restart pvedaemon pveproxy pvestatd`。
+
+## 更新
+
+指令和安裝一樣。`apt install` 遇到比較新的 `.deb` 就是就地升級，同一個 trigger 會重新載入 daemon，**不需要重啟**——理由見上面那段 journal。
+
+```bash
+cd /tmp
+rm -f jt-pve-storage-synology_all.deb*
+wget -O jt-pve-storage-synology_all.deb \
+  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install -y ./jt-pve-storage-synology_all.deb
+
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'
+```
+
+有三件事只有升級時才成立：
+
+- **`rm -f` 那一行才是重點**，理由就是上面那個框。升級正好就是「上一次升級留下的 `.deb` 還躺在那裡」的時候。
+- **每個節點都做完，才能相信結果**。storage 操作是在 guest 所在的節點上跑的，所以升級到一半的叢集，行為會隨著 VM 剛好在哪一台而不同。已經用過的 storage 沒有降級路徑，但也沒有東西需要搬移：這個 plugin 除了 `/etc/pve/priv/storage/<storage>.syno` 和 `/var/lib` 底下的逐節點 WWID 清單之外不保存任何磁碟狀態，而這兩者每一版都讀得懂。
+- **不需要停掉任何東西**。執行中的 guest 會保有它們的裝置：這個套件換掉的是 Perl 模組，它不會動到 iSCSI 工作階段、multipath 對應，或 `/etc/multipath/conf.d` 裡的 drop-in。
 
 
 > **每個節點的版本要一致**。一個 storage 操作是在**擁有那個 guest 的節點**上執行的，用的是**那個節點上的** plugin——不是你瀏覽時所連的那一台。所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同，而症狀很難懂：你明明裝好的修正，對某些 guest 就是不存在。在每個節點上用 `dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'` 確認。
 
-> **每個節點都要裝，否則這個 storage 在網頁介面上看不到**。`pvesm add` 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 `pveproxy` 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 `synologysan` 這個類型，於是**會把這個 storage 從清單裡靜靜略過**。在有裝的節點上它是存在而且可用的，只是沒有被顯示出來——而這個症狀看起來就像 `pvesm add` 失敗了，但它並沒有。每個節點都要裝，而且每一台都要重啟服務，包含你正在瀏覽的那一台。若要先限制在已就緒的節點上：`pvesm set <storage> --nodes nodeA,nodeB`。
+> **每個節點都要裝，否則這個 storage 在網頁介面上看不到**。`pvesm add` 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 `pveproxy` 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 `synologysan` 這個類型，於是**會把這個 storage 從清單裡靜靜略過**。在有裝的節點上它是存在而且可用的，只是沒有被顯示出來——而這個症狀看起來就像 `pvesm add` 失敗了，但它並沒有。所以每個節點都要裝，包含你正在瀏覽的那一台。套件的 trigger 會自己重新載入 `pveproxy`，不需要手動重啟。若要先限制在已就緒的節點上：`pvesm set <storage> --nodes nodeA,nodeB`。
 
 > **如果你已經用 `dpkg -i` 失敗過**。本頁先前的版本寫的是 `dpkg -i`。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先執行 `dpkg --remove jt-pve-storage-synology`，然後再跑上面那段。如果清掉之後前置套件還是裝不起來，用 `apt policy kpartx sg3-utils-udev` 檢查——`kpartx` 來自 Debian 的 `trixie/main`，而 `sg3-utils-udev` 來自 Proxmox VE 的套件庫。
 
