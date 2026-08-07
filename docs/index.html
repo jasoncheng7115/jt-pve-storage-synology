@@ -468,7 +468,7 @@
   <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
 <span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
 
-<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{{print $3}}'</span>   <span class="comment"># check what you got</span></code></pre>
+<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{print $3}'</span>   <span class="comment"># check what you got</span></code></pre>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">The <code>-O</code> is not decoration</span><span class="lang-zh">那個 <code>-O</code> 不是裝飾</span></strong>
@@ -499,7 +499,7 @@
   <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
 <span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
 
-<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{{print $3}}'</span></code></pre>
+<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{print $3}'</span></code></pre>
 
     <p>
         <span class="lang-en"><strong>Do every node before you trust the result</strong> —a storage operation runs where the guest is, so a half-upgraded cluster behaves differently depending on which node a VM happens to be on. Running guests keep their devices: the package replaces Perl modules and does not touch iSCSI sessions, multipath maps or the drop-in.</span>
