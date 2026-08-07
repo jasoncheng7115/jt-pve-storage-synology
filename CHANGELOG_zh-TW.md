@@ -4,6 +4,25 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.12] - 2026-08-07
+
+### 修正
+
+- **倒回失敗、訊息是「no device appeared」，原因是 DSM 要求節點登出**。失敗當下的 journal：
+
+  ```
+  iscsid: connection1:0 Target requests logout within 10 seconds
+  iscsid: connection1:0 is operational after recovery (1 attempts)
+  iscsid: connection1:0 Target requests logout within 10 seconds
+  iscsid: connection1:0 is operational after recovery (1 attempts)
+  ```
+
+  **DSM 在從快照還原 LUN 時會把工作階段拆掉**，七秒內兩次。`activate_volume` 只重新掃描工作階段**一次**，然後等二十秒等裝置出現——所以在那段震盪中間發出的掃描什麼也沒做到，而後面的等待永遠不可能成功。LUN 是對應好的，工作階段也回來了，手動掃描一次就立刻好了。現在改成每五秒重新發出一次、最多四十五秒，而且久到會被察覺時會警告一次。
+
+  這是 `grow_map` 的教訓換一個層級，而且是同一天第三次：**發出一次指令然後輪詢它的效果，和「一邊輪詢一邊重發」不是同一件事。**
+
+- **`t/07-imports.t` 沒有掃描 plugin 本身**，而那是這個專案最大的檔案——它被漏掉是因為載入它需要 Proxmox VE。它漏掉了同一小時內加進 `activate_volume` 的一個 `_warn_once` 呼叫：`perl -c` 靜靜編譯過去、測試也過了，而那個函式只存在於 `Health.pm` 而且是私有的。它會在執行期、在啟用路徑上、在倒回過程中死掉。現在只要有 Proxmox VE 就會掃描 plugin，而且已經示範過這道防護會在那個呼叫上失敗。
+
 ## [0.6.11] - 2026-08-07
 
 ### 修正

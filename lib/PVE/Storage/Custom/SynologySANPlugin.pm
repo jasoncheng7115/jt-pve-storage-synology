@@ -1421,6 +1421,15 @@ sub find_free_diskname {
 # Attaching
 # ---------------------------------------------------------------------------
 
+# How long to keep asking the session for a device before giving up, and how
+# long to wait between asks. The total is what an operator waits when something
+# is genuinely wrong; the interval is what decides whether a session that
+# bounced mid-operation is picked up at all.
+use constant {
+    DISCOVERY_TIMEOUT         => 45,
+    DISCOVERY_RESCAN_INTERVAL => 5,
+};
+
 sub activate_volume {
     my ($class, $storeid, $scfg, $volname, $snapname, $cache, $hints) = @_;
 
@@ -1461,12 +1470,53 @@ sub activate_volume {
         # after the first — so the session has to be rescanned or no device ever
         # appears. One session, never `-m session --rescan`, which would rescan
         # every other vendor's storage on this node too.
-        PVE::Storage::Custom::Synology::ISCSI::rescan_session($t->{iqn}, $portal)
-            if $had_session;
-
+        #
+        # RESCANNED REPEATEDLY, not once, because the session can be bouncing
+        # underneath us. Measured on host-108, in the journal, during a
+        # rollback:
+        #
+        #   iscsid: connection1:0 Target requests logout within 10 seconds
+        #   iscsid: connection1:0 is operational after recovery (1 attempts)
+        #   iscsid: connection1:0 Target requests logout within 10 seconds
+        #   iscsid: connection1:0 is operational after recovery (1 attempts)
+        #
+        # **DSM asks the initiator to log out when it restores a snapshot**, and
+        # it did so twice over seven seconds. A single rescan issued in the
+        # middle of that achieves nothing, and the twenty seconds of waiting
+        # that followed could never succeed because nothing asked again. The
+        # rollback then failed with "no device appeared" while the LUN was
+        # mapped, the session was up, and one rescan by hand fixed it instantly.
+        #
+        # This is `grow_map`'s lesson at a different layer, and the third time
+        # today: issuing a command once and then polling for its effect is not
+        # the same as polling AND re-issuing.
         my $cand = PVE::Storage::Custom::Synology::ISCSI::by_path_for(
             $portal, $t->{iqn}, $index);
-        my $dev = PVE::Storage::Custom::Synology::ISCSI::wait_for_by_path($cand);
+
+        my $dev;
+        my $warned_slow = 0;
+        my $deadline = time + DISCOVERY_TIMEOUT;
+        while (1) {
+            PVE::Storage::Custom::Synology::ISCSI::rescan_session(
+                $t->{iqn}, $portal) if $had_session;
+            $dev = PVE::Storage::Custom::Synology::ISCSI::wait_for_by_path(
+                $cand, timeout => DISCOVERY_RESCAN_INTERVAL);
+            last if defined $dev;
+            last if time >= $deadline;
+
+            # Said once per activation, and only when it is actually taking
+            # time: an operator watching a rollback should know why it is not
+            # instant. A plain lexical, not Health's `_warn_once` — that one is
+            # private to Health and this file does not import it, which `perl
+            # -c` would have compiled without a word.
+            if (!$warned_slow) {
+                $warned_slow = 1;
+                warn "storage '$storeid': the device for '$name' has not"
+                   . " appeared yet; still rescanning the session. DSM asks"
+                   . " initiators to log out while it restores a snapshot, so"
+                   . " this is expected right after a rollback.\n";
+            }
+        }
         next if !defined $dev;
 
         # THE CHECK. mapping_index is reused, so the path that led here proves

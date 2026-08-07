@@ -32,7 +32,28 @@ my @modules = qw(
     PVE::Storage::Custom::Synology::Deferred
 );
 
+# THE PLUGIN ITSELF WAS NOT ON THIS LIST, and it is the largest file in the
+# project. It was left off because it needs Proxmox VE to load, and this test
+# resolves a name with `$mod->can`. The cost of that omission was measured on
+# 2026-08-07: a call to `_warn_once` was added to `activate_volume`, `perl -c`
+# compiled it without a word, this test passed, and the sub lives only in
+# Health.pm where it is private. It would have died at runtime, on the
+# activation path, during a rollback.
+#
+# So the plugin is scanned when Proxmox VE is present and skipped when it is
+# not. A check that runs on the developer's node and not in CI is worth far more
+# than one that runs nowhere.
+my $plugin = 'PVE::Storage::Custom::SynologySANPlugin';
+my $have_pve = eval { require PVE::Storage::Plugin; 1 } ? 1 : 0;
+
 require_ok($_) for @modules;
+
+if ($have_pve && eval { require PVE::Storage::Custom::SynologySANPlugin; 1 }) {
+    push @modules, $plugin;
+    pass("$plugin is scanned too");
+} else {
+    diag("$plugin skipped: no Proxmox VE on this machine");
+}
 
 # Perl's own named operators and keywords, which look like calls to a regex.
 my %not_a_sub = map { $_ => 1 } qw(
@@ -110,6 +131,7 @@ for my $mod (@modules) {
     for my $fn (sort keys %called) {
         next if $not_a_sub{$fn};
         next if $code =~ /^\s*sub \Q$fn\E\b/m;   # defined in this file
+        next if $code =~ /^\s*use constant\b[^;]*\b\Q$fn\E\s*=>/ms;  # a constant
         next if $mod->can($fn);                  # imported, or inherited
         push @problems, "$path calls $fn() but cannot reach it";
     }

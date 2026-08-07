@@ -6,6 +6,40 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.12] - 2026-08-07
+
+### Fixed
+
+- **A rollback failed with "no device appeared" because DSM had asked the node
+  to log out.** From the journal, during the failed rollback:
+
+  ```
+  iscsid: connection1:0 Target requests logout within 10 seconds
+  iscsid: connection1:0 is operational after recovery (1 attempts)
+  iscsid: connection1:0 Target requests logout within 10 seconds
+  iscsid: connection1:0 is operational after recovery (1 attempts)
+  ```
+
+  **DSM tears the session down while it restores a LUN from a snapshot**, twice
+  over seven seconds. `activate_volume` rescanned the session **once** and then
+  waited twenty seconds for the device — so a rescan issued in the middle of
+  that bounce achieved nothing and the wait could never succeed. The LUN was
+  mapped, the session came back up, and a single rescan by hand fixed it
+  instantly. The rescan is now re-issued every five seconds for up to
+  forty-five, with one warning if it takes long enough to notice.
+
+  This is `grow_map`'s lesson at a different layer, and the third time in one
+  day: **issuing a command once and then polling for its effect is not the same
+  as polling and re-issuing.**
+
+- **`t/07-imports.t` did not scan the plugin**, which is the largest file in the
+  project — it was left off because it needs Proxmox VE to load. It missed a
+  call to `_warn_once` added to `activate_volume` the same hour: `perl -c`
+  compiled it silently, the test passed, and the sub exists only in `Health.pm`
+  where it is private. It would have died at runtime, on the activation path,
+  during a rollback. The plugin is now scanned wherever Proxmox VE is present,
+  and the guard was shown to fail on that exact call.
+
 ## [0.6.11] - 2026-08-07
 
 ### Fixed

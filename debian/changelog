@@ -1,3 +1,18 @@
+jt-pve-storage-synology (0.6.12-1) unstable; urgency=medium
+
+  * DSM asks the initiator to LOG OUT while it restores a snapshot -- twice,
+    over seven seconds, measured in the journal. activate_volume rescanned the
+    session once and then waited twenty seconds, so a rescan issued while the
+    session was bouncing achieved nothing and the wait could never succeed.
+    A rollback failed with "no device appeared" while the LUN was mapped and
+    one rescan by hand fixed it instantly. It now re-issues the rescan every
+    five seconds for up to forty-five.
+  * t/07-imports.t now scans the plugin itself, which it never did -- the
+    largest file in the project. It missed an unreachable _warn_once() call
+    added on the activation path the same hour.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 14:20:00 +0800
+
 jt-pve-storage-synology (0.6.11-1) unstable; urgency=medium
 
   * Rollback was refused on every cleanly stopped VM. flush_device_cache
