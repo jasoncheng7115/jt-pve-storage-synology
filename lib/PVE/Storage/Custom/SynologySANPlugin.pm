@@ -1560,8 +1560,64 @@ sub activate_volume {
         # `find_multipaths yes` a single-path device gets NO map, and the path
         # this plugin returns would point at nothing. Found by adding a second
         # node whose policy differed from the first's.
-        PVE::Storage::Custom::Synology::Multipath::ensure_map($wwid, $dev);
+        my $mapped = PVE::Storage::Custom::Synology::Multipath::ensure_map($wwid, $dev);
         PVE::Storage::Custom::Synology::Multipath::claim_path($dev);
+
+        # R-27. THE KERNEL AND MULTIPATHD DISAGREE ABOUT WHAT THIS DEVICE IS.
+        #
+        # After a LUN is deleted the NAS reuses its mapping index, and the node
+        # reuses the sd node with it: the kernel re-reads the VPD on rescan and
+        # updates /sys/block/<sd>/device/wwid to the NEW LUN — which is why we
+        # got this far, since device_is_lun reads sysfs and confirmed it — while
+        # multipathd never re-reads the path and goes on holding a map for the
+        # LUN that is gone. Measured side by side on 2026-08-07:
+        #
+        #   kernel  /sys/block/sde/device/wwid : naa.60014052e46494ed5667d4a29dbe0dd9
+        #   multipathd show paths, same device : 36001405bbc484c9dc23cd4accd8f7fd1
+        #
+        # So `ensure_map` waits for a map multipathd will never build, and every
+        # `qm move_disk` back onto this storage and every `qmrestore` fails —
+        # four times in a row, each with a fresh WWID.
+        #
+        # Talking multipathd out of it does not work, and all three attempts are
+        # recorded rather than hidden: dropping the path, flushing the corpse map
+        # by name, and re-adding the path leaves the corpse in place. The only
+        # remedy that was measured to work is to make the KERNEL rediscover the
+        # device, which is what this does.
+        #
+        # Safe because both of these hold, and neither is incidental:
+        #   1. $dev came from by_path_for(portal, OUR target iqn, index), so it is
+        #      on this plugin's own target by construction. Another vendor's
+        #      device cannot be here.
+        #   2. It has already been confirmed as OUR LUN by the kernel's own WWID.
+        #      We are removing our own device in order to get it back.
+        #
+        # Once. If rediscovery does not produce the map, the cause is not this,
+        # and retrying would be a loop that hides whatever it really is.
+        if (!$mapped) {
+            warn "storage '$storeid': multipath built no map for '$name' although"
+               . " the kernel confirms the device. multipathd holds a stale view"
+               . " of a path whose LUN was deleted and whose mapping index the NAS"
+               . " has reused; asking the kernel to rediscover the device.\n";
+
+            PVE::Storage::Custom::Synology::ISCSI::remove_sd_device($dev);
+            PVE::Storage::Custom::Synology::ISCSI::rescan_session(
+                $t->{iqn}, $portal);
+
+            my $again = PVE::Storage::Custom::Synology::ISCSI::wait_for_by_path(
+                $cand, timeout => DISCOVERY_TIMEOUT);
+            # Re-confirmed, not assumed: rediscovery is exactly the moment the
+            # index could hand us a different LUN.
+            my $ok = defined $again
+                ? PVE::Storage::Custom::Synology::Multipath::device_is_lun($again, $wwid)
+                : undef;
+            if (defined $ok && $ok) {
+                $dev = $again;
+                PVE::Storage::Custom::Synology::Multipath::ensure_map($wwid, $dev);
+                PVE::Storage::Custom::Synology::Multipath::claim_path($dev);
+            }
+        }
+
         $found = $dev;
     }
 

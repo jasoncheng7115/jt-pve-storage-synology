@@ -6,6 +6,28 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.25] - 2026-08-07
+
+### Fixed
+
+- **`qm move_disk` back onto this storage and `qmrestore` failed on any node that
+  had previously deleted a LUN there** — four times in a row, each with a fresh
+  WWID, on two release-checklist rows. After a LUN is deleted the NAS reuses its
+  mapping index and the node reuses the sd node with it: the kernel re-reads the
+  VPD on rescan and updates `/sys/block/<sd>/device/wwid` to the **new** LUN, while
+  **multipathd never re-reads the path** and goes on holding a map for the LUN that
+  is gone. `ensure_map` then waited for a map that could never be built.
+  `activate_volume` now asks the **kernel** to rediscover the device — remove the sd
+  node, rescan the session, re-confirm the WWID, ask for the map again. Never a data
+  risk: the plugin refused rather than using the device.
+
+### Found by
+
+- **Re-running the A–E operational checklist against a release that had already
+  shipped.** 0.6.21 to 0.6.24 went out on `make release-check` alone; the first
+  re-run found the above. That re-run is now a line in the audit checklist, and it
+  runs on a separate cluster.
+
 ## [0.6.24] - 2026-08-07
 
 ### Verified

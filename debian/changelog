@@ -1,3 +1,20 @@
+jt-pve-storage-synology (0.6.25-1) unstable; urgency=medium
+
+  * qm move_disk back onto this storage and qmrestore failed on any node that had
+    previously deleted a LUN there -- four times in a row, each with a fresh WWID,
+    on two release-checklist rows. After a LUN is deleted the NAS reuses its
+    mapping index and the node reuses the sd node with it: the kernel re-reads the
+    VPD on rescan and updates /sys/block/<sd>/device/wwid to the new LUN, while
+    multipathd never re-reads the path and keeps a map for the LUN that is gone.
+    ensure_map then waited for a map that could never be built. activate_volume now
+    asks the kernel to rediscover the device: remove the sd node, rescan the
+    session, re-confirm the WWID, ask for the map again. Never a data risk -- the
+    plugin refused rather than using the device.
+  * Found by re-running the A-E operational checklist against a release that had
+    already shipped. 0.6.21 to 0.6.24 went out on make release-check alone.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 21:00:00 +0800
+
 jt-pve-storage-synology (0.6.24-1) unstable; urgency=medium
 
   * R-10 fully answered, and it was a real risk. With a daily LUN snapshot schedule
