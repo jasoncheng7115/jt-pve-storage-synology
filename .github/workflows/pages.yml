@@ -13,7 +13,20 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  # TRUE, and this was measured rather than guessed.
+  #
+  # With `false`, a run that never finishes holds the group for ever. On
+  # 2026-08-07 run 27 sat in `waiting` on a pending `github-pages` deployment for
+  # over eight hours — wait_timer 0, an EMPTY approvers list, so nothing would
+  # ever release it — and every later run either queued behind it or was
+  # cancelled. The documentation site stayed four versions behind while the
+  # repository was correct the whole time.
+  #
+  # For a documentation site the newest content should win, so superseding a
+  # deployment that has not completed is the behaviour that matches the intent.
+  # GitHub's starter workflow ships `false` because it is written for deployments
+  # you may not want to interrupt; this is a static page.
+  cancel-in-progress: true
 
 jobs:
   deploy:
