@@ -79,6 +79,8 @@
         <div class="sidebar__heading">
             <span class="lang-en">Use it</span><span class="lang-zh">使用</span>
         </div>
+        <a href="#install" class="sidebar__link"><span class="lang-en">Installing</span><span class="lang-zh">安裝</span></a>
+        <a href="#configure" class="sidebar__link"><span class="lang-en">Configuring a storage</span><span class="lang-zh">設定 storage</span></a>
         <a href="#reap" class="sidebar__link"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></a>
         <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
         <a href="#limits" class="sidebar__link"><span class="lang-en">How many LUNs</span><span class="lang-zh">最多幾個 LUN</span></a>
@@ -106,9 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.3~beta1 <span class="hero__badge-sep">·</span>
-            <span class="lang-en">prerelease</span><span class="lang-zh">預發行版</span>
-        </div>
+        <div class="hero__badge">v0.6.3~beta1 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -119,9 +119,9 @@
             <span class="lang-zh">一顆 VM 磁碟就是 NAS 上一個精簡配置 LUN，所以 DSM 自己的快照、複本與容量都作用在操作者心裡想的那個單位上——沒有 LVM 夾層，也不把一個共用 LUN 在本機切開。</span>
         </p>
         <div class="hero__actions">
-            <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology" class="btn btn--primary" target="_blank" rel="noopener">GitHub</a>
-            <a href="TESTING.md" class="btn btn--outline">
-                <span class="lang-en">Verified / not verified</span><span class="lang-zh">驗證登記簿</span>
+            <a href="#install" class="btn btn--primary"><span class="lang-en">Installation guide</span><span class="lang-zh">安裝指南</span></a>
+            <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology" class="btn btn--outline" target="_blank" rel="noopener">
+                <span class="lang-en">GitHub</span><span class="lang-zh">GitHub</span>
             </a>
         </div>
     </div>
@@ -176,7 +176,7 @@
 <section class="doc-section" id="verified">
     <h2 class="section-title"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">Read-only, against a DS918+ on DSM 7.1.1. Full detail in the register.</span>
+        <span class="lang-en">Against a DS918+ on DSM 7.1.1 — read-only discovery first, then writes, then a guest, then a three-node cluster with node failures. Full detail in the register.</span>
         <span class="lang-zh">在一台 DS918+（DSM 7.1.1）上以唯讀方式取得。完整內容見登記簿。</span>
     </p>
 
@@ -258,25 +258,30 @@
 
     <div class="module-list">
         <div class="module-item">
-            <div class="module-item__name">R-5 <span class="status-badge status-badge--partial"><span class="lang-en">one sample</span><span class="lang-zh">只有一個樣本</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">The uuid-to-WWID rule reproduces one observed value exactly. A second sample from any other DSM would confirm or break it</span><span class="lang-zh">uuid 到 WWID 的規則精確重現了一個實測值。任何另一台 DSM 的第二個樣本就能確認或推翻它</span></div>
+            <div class="module-item__name">R-9 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分已答</span></span></div>
+            <div class="module-item__desc"><span class="lang-en"><code>offset</code> and <code>limit</code> are ignored and no total is reported, so the listing returns everything it has — and nothing in the answer proves that. Only a second read can catch a short one, and the code that reads this list decides what may be deleted</span><span class="lang-zh"><code>offset</code> 和 <code>limit</code> 被忽略，也不回報總數，所以清單回傳的是它有的全部——而答案裡沒有任何東西可以證明這件事。只有第二次讀取才能抓到短少，而讀這份清單的正是決定什麼可以刪的程式碼</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">R-2</div>
-            <div class="module-item__desc"><span class="lang-en">Whether unmapping replaces a LUN's target list or adds to it — if it replaces, unmapping one node could unmap all of them</span><span class="lang-zh">解除對應是取代整份 target 清單還是加入——若是取代，解除一個節點可能把全部一起解掉</span></div>
+            <div class="module-item__name">R-11 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分已答</span></span></div>
+            <div class="module-item__desc"><span class="lang-en"><code>mapping_index</code> <strong>is</strong> reused — measured — which is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured: it needs hundreds of LUNs on one target</span><span class="lang-zh"><code>mapping_index</code> <strong>確實</strong>會重用——已量測——這正是裝置身分來自核心 WWID 而非路徑的原因。上限本身仍未量測：那需要在一個 target 上放上百顆 LUN</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">R-9 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分解答</span></span></div>
-            <div class="module-item__desc"><span class="lang-en"><code>offset</code> and <code>limit</code> are ignored and no total is reported, so the listing returns everything it has — and nothing in the answer proves that. Only a second read can catch a short one</span><span class="lang-zh"><code>offset</code> 與 <code>limit</code> 被忽略，也不回報總數，所以清單會回傳它手上的全部——而回應裡沒有任何東西能證明這一點。只有第二次讀取才抓得到短少的答案</span></div>
+            <div class="module-item__name">R-14 <span class="status-badge status-badge--partial"><span class="lang-en">narrowed</span><span class="lang-zh">已縮小</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">The minimum DSM privileges. Probed on hardware: DSM 7.1.1 has three groups and none is iSCSI-specific, and a non-administrator is refused at <strong>login</strong> with <strong>402</strong> — so it never reaches the storage calls. What remains is a Control Panel check that only the DSM interface can answer</span><span class="lang-zh">最小的 DSM 權限。已在硬體上探測：DSM 7.1.1 只有三個群組，沒有一個是 iSCSI 專用的，而非管理員在「登入」就被拒絕，錯誤 <strong>402</strong>——所以它根本走不到儲存呼叫。剩下的是一個只有 DSM 介面能回答的控制台檢查</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">R-12</div>
-            <div class="module-item__desc"><span class="lang-en">Whether DSM tolerates concurrent requests. Cinder wraps every single request in a process-wide lock, which it did not do for fun</span><span class="lang-zh">DSM 能不能承受並行請求。Cinder 把每一個請求都包在行程級鎖裡，它不是沒事那樣做的</span></div>
+            <div class="module-item__name">R-15 / R-16</div>
+            <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> — no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a failover decides whether pinning a storage to it protects or breaks it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換後是否存活，決定了把 storage 釘在它上面是保護還是破壞</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">R-13</div>
-            <div class="module-item__desc"><span class="lang-en">Whether a second login on one account evicts the first. If it does, every node in a cluster would evict every other, on every poll</span><span class="lang-zh">同一帳號第二次登入會不會擠掉第一次。若會，叢集裡每個節點會在每次輪詢互相擠掉對方</span></div>
+            <div class="module-item__name">R-25</div>
+            <div class="module-item__desc"><span class="lang-en">The unit of a snapshot's <code>create_time</code>. Believed to be epoch seconds; a code comment asserted it had been measured and no such measurement existed. It cannot be settled read-only — <strong>a LUN carries no <code>create_time</code> field at all</strong>. Nothing in Proxmox VE 9 reads the value, and the plugin yields no timestamp rather than an implausible one</span><span class="lang-zh">快照 <code>create_time</code> 的單位。相信是 epoch 秒；一段程式碼註解曾聲稱量測過，而那個量測並不存在。它無法用唯讀方式確定——<strong>LUN 根本沒有 <code>create_time</code> 這個欄位</strong>。Proxmox VE 9 裡沒有任何東西會讀這個值，而 plugin 對不合理的值會回傳「沒有時間戳」</span></div>
         </div>
+    </div>
+
+    <div class="note">
+        <span class="lang-en"><strong>R-2, R-5, R-12 and R-13 used to be on this list and are now answered.</strong> Unmapping is surgical and mapping adds, so per-node mapping is safe. The uuid-to-WWID rule is confirmed on two independent samples against the kernel's own <code>scsi_id</code>. Sixteen simultaneous creates all succeeded, and fifteen concurrent allocations from three nodes produced no duplicate names. And a second login does not evict the first, so a cluster sharing one account is fine.</span>
+        <span class="lang-zh"><strong>R-2、R-5、R-12、R-13 曾經在這份清單上，現在都已經有答案。</strong>解除對應是精準的、對應是累加的，所以逐節點對應是安全的。uuid 到 WWID 的規則在兩個獨立樣本上、對照核心自己的 <code>scsi_id</code> 確認過。十六個同時建立全部成功，而三個節點同時發出十五個配置沒有產生重複名稱。而第二次登入不會踢掉第一次，所以一個叢集共用一個帳號是沒問題的。</span>
     </div>
 
     <p class="mt-3">
@@ -459,6 +464,102 @@
     </p>
 </section>
 
+<section class="doc-section" id="install">
+    <h2 class="section-title"><span class="lang-en">Installing</span><span class="lang-zh">安裝</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">On every node of the cluster. The first install changes one node-wide thing, so read the warning below before doing it in production.</span>
+        <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西，所以在正式環境做之前請先讀下面的警告。</span>
+    </p>
+
+    <pre><code><span class="c"># on each node</span>
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+dpkg -i jt-pve-storage-synology_*_all.deb
+systemctl restart pvedaemon pveproxy pvestatd</code></pre>
+
+    <p>
+        <span class="lang-en">Or from a clone: <code>make install</code>. Every release's <code>.deb</code> is kept in <code>releases/</code> as well, so a tester on an earlier version can fetch exactly what they are running.</span>
+        <span class="lang-zh">或者從 clone 安裝：<code>make install</code>。每一個版本的 <code>.deb</code> 也都保留在 <code>releases/</code> 裡，所以跑舊版本的測試者可以拿到他實際在跑的那一個。</span>
+    </p>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Schedule the first install.</span><span class="lang-zh">第一次安裝請排維護時段。</span></strong>
+        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> — which is <strong>node-wide</strong>. The stanza matches only Synology devices, but the reconfigure re-reads configuration for every map on the node. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing. The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
+        <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——那是<strong>節點層級</strong>的。那段設定只匹配 Synology 裝置，但 reconfigure 會重讀節點上每一個 map 的設定。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
+    </div>
+
+    <div class="note">
+        <span class="lang-en"><strong>Four of these plugins can share a node</strong> — this one and the DellEMC, NetApp and PureStorage siblings are developed together on a node that has all of them. But <code>PVE::SectionConfig::init</code> <strong>dies on a duplicate property name</strong>, and the failure is not scoped to the offending plugin: every storage on the node stops working. The <code>syno-</code> prefix exists for that reason.</span>
+        <span class="lang-zh"><strong>四支 plugin 可以共存於同一個節點</strong>——這一支和 DellEMC、NetApp、PureStorage 三支相關專案就是在一台同時裝了全部的節點上開發的。但 <code>PVE::SectionConfig::init</code> <strong>遇到重複的屬性名稱會直接 die</strong>，而且失敗範圍不限於出問題的那一支：節點上每一個 storage 都會停止運作。<code>syno-</code> 這個前置字串就是為此存在的。</span>
+    </div>
+</section>
+
+<section class="doc-section" id="configure">
+    <h2 class="section-title"><span class="lang-en">Configuring a storage</span><span class="lang-zh">設定 storage</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Run this once, on one node. The storage is shared by construction, so every node picks it up.</span>
+        <span class="lang-zh">在其中一個節點上執行一次就好。這個 storage 依其本質就是共用的，每個節點都會接手。</span>
+    </p>
+
+    <pre><code>pvesm add synologysan mysyno \
+    --syno-portal   192.0.2.10 \
+    --syno-username pve-storage \
+    --syno-password '&lt;the password&gt;' \
+    --syno-location /volume1 \
+    --content       images</code></pre>
+
+    <p>
+        <span class="lang-en"><code>pvesm add</code> refuses immediately if the volume is not Btrfs, if the model does not support iSCSI targets or snapshots, or if the storage id would fold onto an existing storage's LUN prefix. It is meant to fail there rather than at your first snapshot.</span>
+        <span class="lang-zh">如果那個儲存空間不是 Btrfs、機型不支援 iSCSI target 或快照、或者這個 storage id 會摺疊成與既有 storage 相同的 LUN 前置字串，<code>pvesm add</code> 會當場拒絕。它就是要在這裡失敗，而不是等到你第一次拍快照。</span>
+    </p>
+
+    <div class="note">
+        <span class="lang-en"><strong>The password never lands in <code>/etc/pve/storage.cfg</code>.</strong> It is declared to Proxmox VE as a sensitive property, so PVE strips it out and hands it to the plugin, which writes it to <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> — mode <code>0600</code>, root only, and replicated to every node by the cluster filesystem. <strong>If you installed a version before 0.5.3~beta1, run <code>pvesm set &lt;storage&gt; --syno-password '&lt;password&gt;'</code> once to move it, and treat the old value as disclosed.</strong></span>
+        <span class="lang-zh"><strong>密碼不會進到 <code>/etc/pve/storage.cfg</code>。</strong>它對 Proxmox VE 宣告為機密屬性，所以 PVE 會把它拿掉並交給 plugin，由 plugin 寫入 <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code>——權限 <code>0600</code>、只有 root、並由叢集檔案系統複寫到每個節點。<strong>如果你裝過 0.5.3~beta1 之前的版本，請執行一次 <code>pvesm set &lt;storage&gt; --syno-password '&lt;密碼&gt;'</code> 把它搬過去，並且把舊的值視為已經洩漏。</strong></span>
+    </div>
+
+    <h3 class="subsection-title"><span class="lang-en">Every option</span><span class="lang-zh">所有選項</span></h3>
+
+    <div class="table-wrap">
+    <table>
+        <thead><tr>
+            <th><span class="lang-en">Option</span><span class="lang-zh">選項</span></th>
+            <th><span class="lang-en">Default</span><span class="lang-zh">預設</span></th>
+            <th><span class="lang-en">What it is for</span><span class="lang-zh">用途</span></th>
+        </tr></thead>
+        <tbody>
+        <tr><td><code>syno-portal</code></td><td><em>required</em></td><td><span class="lang-en">DSM management address. A comma-separated list is tried in order and rotated on failure</span><span class="lang-zh">DSM 管理位址。逗號分隔的清單會依序嘗試，失敗時輪替</span></td></tr>
+        <tr><td><code>syno-username</code></td><td><em>required</em></td><td><span class="lang-en">DSM account. Not your <code>admin</code> account</span><span class="lang-zh">DSM 帳號。不要用你的 <code>admin</code> 帳號</span></td></tr>
+        <tr><td><code>syno-password</code></td><td><em>required</em></td><td><span class="lang-en">Stored in <code>/etc/pve/priv</code>, never in the config</span><span class="lang-zh">存放在 <code>/etc/pve/priv</code>，絕不在設定檔裡</span></td></tr>
+        <tr><td><code>syno-location</code></td><td><em>required</em></td><td><span class="lang-en">The DSM volume, e.g. <code>/volume1</code>. Must be Btrfs</span><span class="lang-zh">DSM 儲存空間，例如 <code>/volume1</code>。必須是 Btrfs</span></td></tr>
+        <tr><td><code>syno-data-portals</code></td><td><span class="lang-en">management address</span><span class="lang-zh">管理位址</span></td><td><span class="lang-en">iSCSI data addresses, comma-separated. <strong>Two on separate subnets is what makes multipath real</strong></span><span class="lang-zh">iSCSI 資料位址，逗號分隔。<strong>兩個在不同子網才會有真正的 multipath</strong></span></td></tr>
+        <tr><td><code>syno-target-mode</code></td><td><code>shared</code></td><td><span class="lang-en">One target for the storage. <code>per-volume</code> gives each disk its own and hits the target ceiling at half the LUN ceiling</span><span class="lang-zh">整個 storage 一個 target。<code>per-volume</code> 讓每顆磁碟各有一個，會在 LUN 上限的一半就撞到 target 上限</span></td></tr>
+        <tr><td><code>syno-min-free</code></td><td><code>10</code> GiB</td><td><span class="lang-en">Refuse to allocate below this. Thin LUNs can overcommit the volume, and a full Btrfs volume takes every VM on it</span><span class="lang-zh">低於此值就拒絕配置。精簡 LUN 會超額配置儲存空間，而寫滿的 Btrfs 會拖垮上面每一台 VM</span></td></tr>
+        <tr><td><code>syno-no-path-retry</code></td><td><code>18</code></td><td><span class="lang-en">multipath <code>no_path_retry</code>. A number, <strong>never <code>queue</code></strong></span><span class="lang-zh">multipath 的 <code>no_path_retry</code>。一個數字，<strong>絕不是 <code>queue</code></strong></span></td></tr>
+        <tr><td><code>syno-status-timeout</code></td><td><code>5</code> s</td><td><span class="lang-en">Health-path timeout. It runs every few seconds per node, so a slow one delays every other storage</span><span class="lang-zh">健康檢查逾時。它每幾秒就在每個節點跑一次，慢了會拖延節點上其他所有 storage</span></td></tr>
+        <tr><td><code>syno-chap-username</code><br><code>syno-chap-password</code></td><td>—</td><td><span class="lang-en">Set both or neither. A username with no secret is refused: an empty CHAP secret admits anyone while reporting that CHAP is on</span><span class="lang-zh">兩個要一起設。只設帳號不設密鑰會被拒絕：空的 CHAP 密鑰會誰都放進來，卻回報 CHAP 是開著的</span></td></tr>
+        <tr><td><code>syno-otp</code></td><td>—</td><td><span class="lang-en">One-time code, once. The device token DSM issues is stored and the option can then be removed</span><span class="lang-zh">一次性代碼，只需一次。DSM 發出的 device token 會被存起來，之後就可以移除這個選項</span></td></tr>
+        <tr><td><code>syno-ssl-verify</code><br><code>syno-tls-ca</code></td><td><code>0</code></td><td><span class="lang-en">Off by default because DSM ships a self-signed certificate. Turn it on with your own CA</span><span class="lang-zh">預設關閉，因為 DSM 出廠是自簽憑證。用你自己的 CA 時再開啟</span></td></tr>
+        <tr><td><code>syno-port</code></td><td><code>5001</code></td><td><span class="lang-en">DSM port. HTTPS only — plain HTTP is refused</span><span class="lang-zh">DSM 連接埠。只走 HTTPS——純 HTTP 一律拒絕</span></td></tr>
+        <tr><td><code>syno-iqn-prefix</code></td><td><code>iqn.2000-01.com.synology:</code></td><td><span class="lang-en">Prefix for generated target IQNs</span><span class="lang-zh">產生 target IQN 時使用的前置字串</span></td></tr>
+        </tbody>
+    </table>
+    </div>
+
+    <h3 class="subsection-title"><span class="lang-en">Removing a storage</span><span class="lang-zh">移除 storage</span></h3>
+
+    <pre><code><span class="c"># 1. on EVERY node, while the storage still exists</span>
+pve-syno-reap --storage mysyno
+pve-syno-reap --storage mysyno --remove
+
+<span class="c"># 2. then, on one node</span>
+pvesm remove mysyno</code></pre>
+
+    <p>
+        <span class="lang-en"><code>on_delete_hook</code> runs on <strong>one</strong> node — the one where <code>pvesm remove</code> was typed. The others are never told, and <strong>nothing in Proxmox VE calls <code>deactivate_storage</code></strong> to clean them up. So the per-node step above is the procedure, not a formality.</span>
+        <span class="lang-zh"><code>on_delete_hook</code> 只在<strong>一個</strong>節點上執行——就是打 <code>pvesm remove</code> 的那個。其他節點不會被通知，而且 <strong>Proxmox VE 裡沒有任何東西會呼叫 <code>deactivate_storage</code></strong> 去清理它們。所以上面那個逐節點步驟是真正要做的程序，不是形式。</span>
+    </p>
+</section>
+
 <section class="doc-section" id="reap">
     <h2 class="section-title"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></h2>
     <p class="section-subtitle">
@@ -573,7 +674,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
         </tr>
         <tr>
             <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
-            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> — a DS918+ says 256, not the 512 on the datasheet</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>——DS918+ 說 256，不是規格表上的 512</span></td>
+            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> — and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>——而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
         </tr>
         <tr>
             <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
@@ -593,26 +694,23 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
 
     <div class="module-list">
         <div class="module-item">
-            <div class="module-item__name">0.1.x <span class="status-badge status-badge--supported"><span class="lang-en">current</span><span class="lang-zh">目前</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">Specification, project rules, the read-only probe. Closing the register against hardware</span><span class="lang-zh">規格、專案規則、唯讀探索工具。在實機上把登記簿問完</span></div>
+            <div class="module-item__name">0.1.x – 0.3.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">Specification, project rules, the read-only probe, and the API layer — sessions, discovery, JSON parameters, error codes, portal failover — then LUN and target handling, with the iSCSI, multipath and WWID-tracking layers ported from the related projects rather than rewritten</span><span class="lang-zh">規格、專案規則、唯讀探索工具，以及 API 層——工作階段、探索、JSON 參數、錯誤碼、portal 換手——然後是 LUN 與 target 處理，而 iSCSI、multipath、WWID 追蹤三層是從相關專案移植而非重寫</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">0.2.0 – 0.3.0</div>
-            <div class="module-item__desc"><span class="lang-en">The API layer — sessions, discovery, JSON parameters, error codes, portal failover — then LUN and target handling, with the iSCSI, multipath and WWID-tracking layers ported from the related projects rather than rewritten</span><span class="lang-zh">API 層——工作階段、探索、JSON 參數、錯誤碼、portal 換手——然後是 LUN 與 target 處理，而 iSCSI、multipath、WWID 追蹤三層從相關專案移植而非重寫</span></div>
+            <div class="module-item__name">0.4.x – 0.5.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">The plugin itself: the volume lifecycle, snapshots, rollback, clones and resize, all driven through <code>pvesm</code> against the NAS. Then two nodes, live migration, and real two-portal multipath with a path failed under load</span><span class="lang-zh">plugin 本體：磁碟生命週期、快照、倒回、複本與擴充，全部透過 <code>pvesm</code> 對 NAS 實際跑過。然後是兩個節點、即時遷移，以及在負載下斷掉一條路徑的真正雙 portal multipath</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">0.4.0 – 0.6.0</div>
-            <div class="module-item__desc"><span class="lang-en">The plugin itself: read-only paths first, then provisioning and the volume lifecycle, then snapshots, clones and resize</span><span class="lang-zh">plugin 本體：先唯讀路徑，再配置與磁碟的生命週期，再快照、複本與擴充</span></div>
-        </div>
-        <div class="module-item">
-            <div class="module-item__name">0.7.0</div>
-            <div class="module-item__desc"><span class="lang-en">Rollback, if R-1 has been answered by then — or documented as unsupported, honestly</span><span class="lang-zh">倒回，前提是 R-1 屆時已有答案——否則就誠實記載為不支援</span></div>
+            <div class="module-item__name">0.6.x <span class="status-badge status-badge--supported"><span class="lang-en">current</span><span class="lang-zh">目前</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">Credentials out of <code>storage.cfg</code> and into <code>/etc/pve/priv</code>; backup, restore and a guest booting from the NAS; three nodes at once; node crash, HA fencing and takeover; the orphan reaper; and the ceilings enforced before the NAS refuses</span><span class="lang-zh">憑證從 <code>storage.cfg</code> 搬進 <code>/etc/pve/priv</code>；備份、還原，以及一台從 NAS 開機的 guest；三個節點同時運作；節點當機、HA 圍籬與接手；孤兒回收工具；以及在 NAS 拒絕之前就先擋下的各項上限</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">1.0.0</div>
-            <div class="module-item__desc"><span class="lang-en">A hardware test pass across multiple nodes, with failure injection. Every 0.x before it is a prerelease</span><span class="lang-zh">跨多節點的實機測試全過，含故障注入。在它之前的每一個 0.x 都是預發行版</span></div>
+            <div class="module-item__desc"><span class="lang-en">A second model and a second DSM version, and the minimum DSM privileges settled. Everything else on the <a href="#open">still-open</a> list either answered or documented as unanswerable. Every 0.x before it is a prerelease</span><span class="lang-zh">第二個機型與第二個 DSM 版本，以及確定最小的 DSM 權限。<a href="#open">尚未確認</a>清單上的其他每一項，不是有答案，就是被記載為無法回答。在它之前的每一個 0.x 都是預發行版</span></div>
         </div>
     </div>
+
 </section>
 
 <section class="doc-section doc-section--accent" id="contribute">
