@@ -254,6 +254,8 @@ pvesm status --storage mysyno          # 確認
 
 plugin 把 DSM 儲存空間的 `size_total_byte` 與 `size_free_byte` **原封不動、以位元組**回報，兩個數字都沒有做任何運算。之後全都是顯示的事。Proxmox VE 的 storage 摘要用 SI 單位格式化位元組，除以 1000；DSM 的 Storage Manager 除以 1024，卻一樣寫「TB」。所以同一個儲存空間會讀成：
 
+![上方 Proxmox VE 顯示 28.12%（4.32 TB 於 15.36 TB），下方 DSM 儲存空間管理員顯示 3.9 TB / 14 TB、28%——同一個儲存空間，同樣的位元組](docs/images/capacity-units-zh.png)
+
 | | 總容量 | 已使用 |
 |---|---|---|
 | Proxmox VE | 15.36 TB | 4.32 TB |

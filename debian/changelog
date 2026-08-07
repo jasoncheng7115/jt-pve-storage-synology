@@ -1,3 +1,15 @@
+jt-pve-storage-synology (0.6.10-1) unstable; urgency=medium
+
+  * The other half of taint mode: file operations. A storeid reaches a
+    filename in four places and all four sanitised it with s///, which does
+    not untaint -- so writing the credential file, deleting it and clearing
+    the credential latch all died with "Insecure dependency in unlink" from
+    pvedaemon. One Naming::filename_component now does the sanitising and the
+    untainting together, and t/13-taint.t covers all four.
+  * Show the capacity-units comparison in the READMEs and on the site.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 12:45:00 +0800
+
 jt-pve-storage-synology (0.6.9-1) unstable; urgency=medium
 
   * Untaint every command argument. pvedaemon is `#!/usr/bin/perl -T`, so a

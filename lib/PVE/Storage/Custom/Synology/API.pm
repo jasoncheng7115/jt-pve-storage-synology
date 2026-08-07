@@ -28,6 +28,8 @@ package PVE::Storage::Custom::Synology::API;
 use strict;
 use warnings;
 
+use PVE::Storage::Custom::Synology::Naming;
+
 use Fcntl qw(O_WRONLY O_CREAT O_EXCL);
 use JSON qw(decode_json encode_json);
 use LWP::UserAgent;
@@ -155,9 +157,8 @@ sub storeid { return $_[0]->{storeid} }
 
 sub _latch_file {
     my ($self) = @_;
-    (my $safe = $self->{storeid}) =~ s/[^A-Za-z0-9_.-]/_/g;
-    $safe =~ s/\A\.+//;
-    return undef if !length $safe;
+    my $safe = PVE::Storage::Custom::Synology::Naming::filename_component(
+        $self->{storeid}) or return undef;
     return LATCH_DIR . "/$safe.credential-refused";
 }
 
@@ -187,9 +188,8 @@ sub clear_credential_latch {
     my ($class_or_self, $storeid) = @_;
     $storeid = $class_or_self->{storeid} if ref $class_or_self;
     return if !defined $storeid;
-    (my $safe = $storeid) =~ s/[^A-Za-z0-9_.-]/_/g;
-    $safe =~ s/\A\.+//;
-    return if !length $safe;
+    my $safe = PVE::Storage::Custom::Synology::Naming::filename_component($storeid)
+        or return;
     unlink LATCH_DIR . "/$safe.credential-refused";
     return;
 }

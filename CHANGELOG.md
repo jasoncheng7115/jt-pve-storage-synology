@@ -6,7 +6,39 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
-## [0.6.9] - 2026-08-07
+## [0.6.10] - 2026-08-07
+
+### Fixed
+
+- **The other half of taint mode: file operations.** 0.6.9 untainted what reaches
+  a *command*; `open` for writing, `unlink`, `mkdir` and `rename` are restricted
+  just as hard, and a storage id reaches a filename in **four** places — the
+  credential store, the WWID state file, the credential latch and its clearer.
+  All four sanitised the id with `s///`, which **does not untaint**: only a
+  capture does. Probed under `-T` with a tainted storeid, three of the four died
+  with *Insecure dependency in unlink*, and they are exactly the paths
+  `pvesm add` and `pvesm set` take from the web interface. There is now one
+  `Naming::filename_component`, and it validates and untaints in the same
+  operation — which is how `slaves_of_map` has always done it.
+
+  This was found by asking "where else?" straight after 0.6.9 rather than
+  waiting for a report. The same procedure written four times is the recurring
+  shape: `_fuser`/`scsi_id` against five bare command names, `slaves_of_map`
+  against every other tainted argument, and now this.
+
+### Documentation
+
+- The capacity-units comparison is now **shown**: Proxmox VE reporting
+  `28.12% (4.32 TB of 15.36 TB)` above DSM's `3.9 TB / 14 TB, 28%`, which is
+  the same volume and the same bytes.
+
+## [0.6.9] - 2026-08-07 — tagged, never published
+
+Its CI run failed and no release was ever created, so nothing was downloadable
+under this version and the tag has been withdrawn. Everything below shipped in
+**0.6.10**; the section is kept because the changes are real and the reason the
+release did not happen is worth recording — `t/13-taint.t` carried `-T` in its
+shebang, which depends on the harness noticing it and passing the switch on.
 
 ### Fixed
 

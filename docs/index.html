@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.9 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.10 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -641,6 +641,13 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
         <span class="lang-en">It does —the two count in different units and both call them TB. The plugin reports the DSM volume's <code>size_total_byte</code> and <code>size_free_byte</code> <strong>verbatim, in bytes</strong>, and does no arithmetic on either. Everything after that is display: Proxmox VE's storage summary divides by 1000 and writes TB, DSM's Storage Manager divides by 1024 and also writes TB.</span>
         <span class="lang-zh">其實是對得上的——兩邊用不同的單位在算，而且都寫成 TB。plugin 把 DSM 儲存空間的 <code>size_total_byte</code> 與 <code>size_free_byte</code> <strong>原封不動、以位元組</strong>回報，兩個數字都沒有做任何運算。之後全都是顯示的事：Proxmox VE 的 storage 摘要除以 1000 寫成 TB，DSM 的 Storage Manager 除以 1024 也寫成 TB。</span>
     </p>
+
+    <div class="diagram">
+        <img src="images/capacity-units-en.png" class="lang-en"
+             alt="Proxmox VE reporting 28.12% (4.32 TB of 15.36 TB) above, DSM Storage Manager reporting 3.9 TB / 14 TB and 28% below — the same volume, the same bytes">
+        <img src="images/capacity-units-zh.png" class="lang-zh"
+             alt="上方 Proxmox VE 顯示 28.12%（4.32 TB 於 15.36 TB），下方 DSM 儲存空間管理員顯示 3.9 TB / 14 TB、28%——同一個儲存空間，同樣的位元組">
+    </div>
 
     <table>
         <thead><tr>

@@ -439,6 +439,8 @@ is display. Proxmox VE's storage summary formats bytes with SI units, dividing
 by 1000; DSM's Storage Manager divides by 1024 and still writes "TB". So the
 same volume reads:
 
+![Proxmox VE reporting 28.12% (4.32 TB of 15.36 TB) above, DSM Storage Manager reporting 3.9 TB / 14 TB and 28% below — the same volume, the same bytes](docs/images/capacity-units-en.png)
+
 | | Total | Used |
 |---|---|---|
 | Proxmox VE | 15.36 TB | 4.32 TB |

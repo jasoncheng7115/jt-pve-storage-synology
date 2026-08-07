@@ -121,13 +121,11 @@ our $CRED_DIR = '/etc/pve/priv/storage';
 
 sub _cred_file {
     my ($class, $storeid) = @_;
-    # The storeid reaches a filesystem path, so it is sanitised rather than
-    # trusted: a storage id carrying `../` must not choose the file. PVE's own
-    # id rules are stricter than this, but the check costs nothing and this is
-    # the one place where being wrong writes a credential somewhere else.
-    (my $safe = $storeid // '') =~ s/[^A-Za-z0-9_.-]/_/g;
-    $safe =~ s/\A\.+//;
-    return undef if !length $safe;
+    # Sanitised and untainted by Naming::filename_component — a storage id
+    # carrying `../` must not choose the file, and under pvedaemon's -T an
+    # un-untainted one cannot be written to at all.
+    my $safe = PVE::Storage::Custom::Synology::Naming::filename_component($storeid)
+        or return undef;
     return "$CRED_DIR/$safe.syno";
 }
 

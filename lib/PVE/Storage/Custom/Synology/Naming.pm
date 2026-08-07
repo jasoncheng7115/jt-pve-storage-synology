@@ -57,6 +57,38 @@ use constant {
 # marks a snapshot name it forbids users from typing, and a colon is the
 # separator inside a volid. Keeping them out of a generated name means a
 # generated name can never be confused with either.
+# THE STOREID AS A FILENAME COMPONENT — sanitised AND untainted, in one place.
+#
+# Four modules built this string independently: the credential store, the WWID
+# state file, the credential latch and its clearer. All four sanitised the same
+# way and none of them untainted, because `s///` does not untaint — only a
+# capture does. Under `pvedaemon`'s `-T` that is the difference between a file
+# being written and:
+#
+#   Insecure dependency in unlink while running with -T switch
+#
+# The sanitising was never the weak part: PVE's own storage-id rules are
+# stricter than this, and a `../` could not have got through. What was missing
+# is that Perl has no way to know that, and telling it requires the match to
+# CAPTURE. So the validation and the untainting are the same operation here,
+# which is how `slaves_of_map` has always done it.
+#
+# Returns undef when nothing usable is left — the callers all treat that as
+# "this storage cannot have a file", which is the safe answer.
+sub filename_component {
+    _not_a_method($_[0]);
+    my ($storeid) = @_;
+    return undef if !defined $storeid;
+
+    (my $safe = $storeid) =~ s/[^A-Za-z0-9_.-]/_/g;
+    $safe =~ s/\A\.+//;
+
+    # The capture is the untaint. Matching without capturing would leave the
+    # value tainted and the whole point of this function unmet.
+    return undef if $safe !~ /\A([A-Za-z0-9_.-]+)\z/;
+    return $1;
+}
+
 sub fold_storeid {
     _not_a_method($_[0]);
     my ($storeid) = @_;

@@ -26,6 +26,8 @@ package PVE::Storage::Custom::Synology::WwidState;
 use strict;
 use warnings;
 
+use PVE::Storage::Custom::Synology::Naming;
+
 use Fcntl qw(:flock O_RDWR O_CREAT);
 
 use constant {
@@ -39,11 +41,10 @@ sub new {
     my ($class, $storeid) = @_;
     die "a state file needs a storage id\n" if !defined $storeid || !length $storeid;
 
-    # The storeid reaches a filesystem path here, so it is sanitised rather than
-    # trusted: a storage id carrying `../` must not be able to choose the file.
-    (my $safe = $storeid) =~ s/[^A-Za-z0-9_.-]/_/g;
-    $safe =~ s/\A\.+//;
-    die "storage id '$storeid' cannot be used in a filename\n" if !length $safe;
+    # Sanitised and untainted in one place — see Naming::filename_component for
+    # why the untainting is not optional under pvedaemon's -T.
+    my $safe = PVE::Storage::Custom::Synology::Naming::filename_component($storeid);
+    die "storage id '$storeid' cannot be used in a filename\n" if !defined $safe;
 
     return bless {
         storeid => $storeid,
