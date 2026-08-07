@@ -16,7 +16,7 @@
 
 ## 大家引用的那個數字是「產品線」的，不是你那台機型的
 
-Synology 的**SAN Manager 技術規格**頁面寫著：
+Synology 的 **SAN Manager 技術規格**頁面寫著：
 
 | | |
 |---|---|
@@ -29,7 +29,7 @@ Synology 的**SAN Manager 技術規格**頁面寫著：
 
 ——[SAN Manager 技術規格，DSM 7.1](https://www.synology.com/zh-tw/dsm/7.1/software_spec/san_manager)（[DSM 7.3](https://www.synology.com/zh-tw/dsm/7.3/software_spec/san_manager) 頁面文字相同）
 
-所以**512 和 256 是整條產品線的上限**。除非你那台 NAS 自己的規格表這樣寫，否則那不是你的數字。
+所以 **512 和 256 是整條產品線的上限**。除非你那台 NAS 自己的規格表這樣寫，否則那不是你的數字。
 
 ### 第二個機型、第二個 DSM 版本，回報方式完全一樣
 

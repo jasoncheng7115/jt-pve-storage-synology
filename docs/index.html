@@ -333,7 +333,7 @@
     <div class="alert alert--warning">
         <strong><span class="lang-en">The LUN ceiling is your VM-disk ceiling. Count it before you buy.</span><span class="lang-zh">LUN 上限就是你的 VM 磁碟數上限。買之前先算。</span></strong>
         <span class="lang-en">This is not a size limit, it is a <strong>count</strong>. One VM disk is one LUN, so a NAS that publishes 256 LUNs holds <strong>256 VM disks in total</strong> —for the whole cluster, not per node, and shared with every LUN already on that NAS for anything else. A VM with a system disk and a data disk spends two of them, so 256 is roughly <strong>128 such VMs</strong>. On a model that publishes 4, it is <strong>two</strong>.<br><br>The plugin reads the number from your NAS and refuses before the array does, counting every LUN on it rather than only its own. So the failure is an error message at allocation time, not a surprise — but the planning is still yours.</span>
-        <span class="lang-zh">這不是容量限制，是<strong>數量</strong>限制。一顆 VM 磁碟就是一個 LUN，所以一台公布 256 個 LUN 的 NAS，總共只能放<strong>256 顆 VM 磁碟</strong>——是整個叢集共用，不是每個節點各算，而且要和那台 NAS 上為別的用途建的每一個 LUN 一起分。一台有系統碟加資料碟的 VM 就用掉兩個，所以 256 大約是 <strong>128 台這樣的 VM</strong>。在公布 4 個的機型上，是<strong>兩台</strong>。<br><br>Plugin 會從你的 NAS 讀那個數字，並且在陣列拒絕之前先拒絕，而且數的是那台 NAS 上的每一個 LUN，不只是它自己建的。所以撞到上限時看到的是配置當下的錯誤訊息，不是意外——但規劃還是你的事。</span>
+        <span class="lang-zh">這不是容量限制，是<strong>數量</strong>限制。一顆 VM 磁碟就是一個 LUN，所以一台公布 256 個 LUN 的 NAS，總共只能放 <strong>256 顆 VM 磁碟</strong>——是整個叢集共用，不是每個節點各算，而且要和那台 NAS 上為別的用途建的每一個 LUN 一起分。一台有系統碟加資料碟的 VM 就用掉兩個，所以 256 大約是 <strong>128 台這樣的 VM</strong>。在公布 4 個的機型上，是<strong>兩台</strong>。<br><br>Plugin 會從你的 NAS 讀那個數字，並且在陣列拒絕之前先拒絕，而且數的是那台 NAS 上的每一個 LUN，不只是它自己建的。所以撞到上限時看到的是配置當下的錯誤訊息，不是意外——但規劃還是你的事。</span>
     </div>
 
     <p>
@@ -596,7 +596,7 @@
 
     <div class="note">
         <span class="lang-en">The same page is a quick way to confirm the storage is doing what it should: a LUN this plugin created reads <strong>Btrfs, second-level snapshot</strong> and offers snapshots, while a thick-provisioned LUN shows <em>&ldquo;Thick Provisioning LUN does not support snapshots&rdquo;</em>. That is the difference <code>pvesm add</code> refuses an ext4 volume over.</span>
-        <span class="lang-zh">同一個頁面也是確認 storage 運作正常的快方法：這個 plugin 建立的 LUN 會顯示<strong>Btrfs、秒級快照</strong>並且支援快照，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。這正是 <code>pvesm add</code> 之所以會拒絕 ext4 儲存空間的那個差別。</span>
+        <span class="lang-zh">同一個頁面也是確認 storage 運作正常的快方法：這個 plugin 建立的 LUN 會顯示 <strong>Btrfs、秒級快照</strong>並且支援快照，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。這正是 <code>pvesm add</code> 之所以會拒絕 ext4 儲存空間的那個差別。</span>
     </div>
 
         <h3 class="subsection-title"><span class="lang-en">Cloning from a snapshot</span><span class="lang-zh">從快照複製</span></h3>
@@ -729,7 +729,7 @@
     </p>
 
     <ul>
-        <li><span class="lang-en"><strong>Migration used to be a second reason, and is not any more.</strong> A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 once left pve1 and pve2 each holding a map for a LUN that no longer existed. Re-measured on  across two nodes, offline and online, in both directions: the node a VM leaves holds <strong>no maps, no devices and an empty tracking file</strong>. <code>vm_stop_cleanup</code> calls <code>deactivate_volumes</code> when the VM stops on the source after the switch. The original measurement predates a fix to <code>_detach_local</code>, which used to stop at the first flush.</span><span class="lang-zh"><strong>遷移本來是第二個理由，現在不是了。</strong>一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。 在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點<strong>沒有 map、沒有裝置、追蹤檔是空的</strong>。切換之後 VM 在來源節點停止時，<code>vm_stop_cleanup</code> 會呼叫 <code>deactivate_volumes</code>。原本那次量測早於 <code>_detach_local</code> 的修正——舊版停在第一次 flush。</span></li>
+        <li><span class="lang-en"><strong>Migration used to be a second reason, and is not any more.</strong> A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 once left pve1 and pve2 each holding a map for a LUN that no longer existed. Re-measured on  across two nodes, offline and online, in both directions: the node a VM leaves holds <strong>no maps, no devices and an empty tracking file</strong>. <code>vm_stop_cleanup</code> calls <code>deactivate_volumes</code> when the VM stops on the source after the switch. The original measurement predates a fix to <code>_detach_local</code>, which used to stop at the first flush.</span><span class="lang-zh"><strong>遷移本來是第二個理由，現在不是了。</strong>一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點<strong>沒有 map、沒有裝置、追蹤檔是空的</strong>。切換之後 VM 在來源節點停止時，<code>vm_stop_cleanup</code> 會呼叫 <code>deactivate_volumes</code>。原本那次量測早於 <code>_detach_local</code> 的修正——舊版停在第一次 flush。</span></li>
         <li><span class="lang-en">A hard-reset node never runs <code>deactivate_volume</code> at all, so its tracking file keeps an entry for a LUN it is no longer attached to.</span><span class="lang-zh">被硬重置的節點根本不會執行 <code>deactivate_volume</code>，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。</span></li>
     </ul>
 

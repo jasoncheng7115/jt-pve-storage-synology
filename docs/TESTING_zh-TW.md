@@ -530,7 +530,7 @@ root_path    description    version  is_app_consistent  is_user_locked
 | HTTP 請求 | 17 | **12** |
 | 完整 `LUN list` 呼叫 | **3** | **1** |
 
-一次配置做三次列舉，而在只有**七**顆 LUN 的 NAS 上每次約 0.6 秒——而那份清單會隨著 NAS 上**所有**LUN 成長，不只是這個 storage 的，因為 types 過濾條件從來不送。它們來自：
+一次配置做三次列舉，而在只有**七**顆 LUN 的 NAS 上每次約 0.6 秒——而那份清單會隨著 NAS 上**所有** LUN 成長，不只是這個 storage 的，因為 types 過濾條件從來不送。它們來自：
 
 - `find_free_diskname` → `list_images`，而它會**自己開一個 DSM 工作階段**：第二次登入、第二次 API 探索、第二次登出，全都在鎖裡面
 - `assert_room_for_lun` → 又一次列舉，只為了一個數量
@@ -586,9 +586,9 @@ node after logging in to iqn.2000-01.com.synology:pve-pvesyno-tgt
 
 #### 兩個缺陷，而第二個是同一段工作被寫了兩次
 
-**`WwidState::orphans`沒有任何呼叫者**。它就是為下面這個情況寫的，註解寫得很長，而完全沒有地方呼叫它——一段代替修正存在的死程式碼。
+**`WwidState::orphans` 沒有任何呼叫者**。它就是為下面這個情況寫的，註解寫得很長，而完全沒有地方呼叫它——一段代替修正存在的死程式碼。
 
-情況是：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果**pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN**。PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以當時的推論是：對共用 storage 而言，來源節點永遠不會被通知。
+情況是：一台 VM 即時遷移 pve1 → pve2 → pve3，然後在 pve3 上被銷毀，結果 **pve1 和 pve2 各自留下一個 multipath map 和一筆追蹤記錄，對應一顆已經不存在的 LUN**。PVE 在遷移過程中唯一的 `deactivate_volumes` 呼叫位於 `sync_offline_local_volumes` 裡面，所以當時的推論是：對共用 storage 而言，來源節點永遠不會被通知。
 
 ##### 遷移不再留下 map
 
@@ -724,7 +724,7 @@ Perl 把類別名稱綁到了 `$path`，把剩下那個參數綁到 `%opts`。�
 | R-2 | ~~`unmap_target` 是取代整份 target 清單還是加入~~ **已解答：`map_target` 是加入，`unmap_target` 只移除指定的那些**。仍然會送聯集，因為一版韌體上的一次測量不是承諾 | 若是取代，解除一個節點可能把全部一起解掉——Unity 就是那樣 |
 | R-3 | ~~LUN 名稱長度上限與合法字元~~ **已解答**。200 可接受；`_`、空格、`+`、`@` 被拒絕；255 字元的名稱會「被拒絕但仍建立」| 見上方寫入測試各節。底線被拒絕這件事，改變了 storage id 折進名稱的方式 |
 | R-4 | ~~容量對齊粒度~~ **已解答：每個容量都精確，完全不進位**。但文件寫的 1 GB 最小值**並未被 API 強制**，所以由 plugin 自己守 | 拿到比要求的小，代表檔案系統會寫滿然後失敗。在這裡風險反轉了：沒有任何東西阻止一顆荒謬的小 LUN |
-| R-5 | ~~LUN 的 `vpd_unit_sn` 在 Linux 變成什麼 WWID~~ **已解答，並在兩個獨立樣本上確認。**`WWID = "3" + "6001405" + uuid 把 `-` 換成 `d` 後的前 25 字元`，並以掛載中的 LUN 用 `scsi_id` 驗證 | 決定節點怎麼認自己的裝置。仍然只當交叉核對：plugin 依據的是核心自己的答案 |
+| R-5 | ~~LUN 的 `vpd_unit_sn` 在 Linux 變成什麼 WWID~~ **已解答，並在兩個獨立樣本上確認。**`WWID = "3" + "6001405" + uuid(- 換成 d)，取前 25 字元`，並以掛載中的 LUN 用 `scsi_id` 驗證 | 決定節點怎麼認自己的裝置。仍然只當交叉核對：plugin 依據的是核心自己的答案 |
 | R-6 | ~~有快照的 LUN 能否刪除、有複本的快照能否刪除~~ **已解答：兩者都不拒絕，已對應的 LUN 也不拒絕**。快照跟著它的 LUN 走，不會變成孤兒 | 不需要清依賴——但「刪除前先解除對應」完全變成 plugin 的責任 |
 | R-7 | ~~複本是精簡的還是完整複製~~ **已解答：精簡。**`clone_snapshot` 給出 `allocated_size: 0` 的 `BLUN` | 連結複本與範本是真的便宜 |
 | R-8 | ~~`is_action_locked` 會維持多久~~ **已解答**：1 GiB 建立後 1.2 秒、複製空 LUN 0.0 秒、**複製內含 512 MiB 的 LUN 3.5 秒**、任何大小的快照 0.20 秒。建立後立刻刪除仍然成功 | 大型複製會超過天真的等待——CSI 自己的上限只有 20 秒，而幾百 GiB 的複製可能超過 |

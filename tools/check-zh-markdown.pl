@@ -15,6 +15,11 @@
 #   3. A space after full-width punctuation (、。，；：——) is an artefact, not
 #      typography. It is what a careless un-wrapping leaves behind.
 #
+#   5. A Latin letter or digit set directly against an ideograph. 「總共只能放256 顆」
+#      and 「會顯示Btrfs」 both shipped. A space belongs there, and the reason it is
+#      easy to miss is that the two are usually separated by a tag or a code span
+#      in the source, so the gap only disappears once it is rendered.
+#
 # Run by `make check-zh`, which `make test` and `make release-check` include.
 
 use strict;
@@ -35,7 +40,11 @@ use utf8;
 binmode(STDOUT, ':encoding(UTF-8)');
 
 my @files = @ARGV;
-@files = (glob('*_zh-TW.md'), glob('docs/*_zh-TW.md')) if !@files;
+# docs/index.html was NOT on this list, and it is the Chinese document with the
+# most readers. Both of the Latin-adjacency misses that prompted rule 5 were on
+# the page, and both were found by hand rather than by this script. When a guard
+# has a list, ask what is not on it.
+@files = (glob('*_zh-TW.md'), glob('docs/*_zh-TW.md'), 'docs/index.html') if !@files;
 
 my $fail = 0;
 
@@ -61,6 +70,25 @@ for my $file (@files) {
     close($fh);
     chomp @lines;
 
+    # On the documentation site only the Chinese spans are Chinese prose, and the
+    # English ones would trip every rule here. Rule 1 does not apply either — HTML
+    # collapses a newline to a space by design, so a wrapped Chinese span is not
+    # the same defect it is in Markdown. Line numbers are preserved so a finding
+    # still points at the right line of the file.
+    my $html = ($file =~ /\.html\z/);
+    if ($html) {
+        @lines = map {
+            my @z = (/<span class="lang-zh">(.*?)<\/span>/g);
+            # Joined with §, not a space. A line often carries several Chinese
+            # spans, and gluing them with a space put one span's closing 」
+            # against the next span's first character — which rule 3 then
+            # reported as an artefact that did not exist. Third time today that
+            # a separator or placeholder manufactured its own finding, so: pick
+            # one that belongs to none of the classes the rules inspect.
+            @z ? join("\x{00a7}", @z) : '';
+        } @lines;
+    }
+
     my $in_fence = 0;
 
     for my $i (0 .. $#lines) {
@@ -75,8 +103,9 @@ for my $file (@files) {
         next if $bare =~ /^[#|]/;                       # heading or table row
 
         # 1. A wrap between two ideographs. Checked against the NEXT line,
-        #    because that is where the rendered space appears.
-        if ($i < $#lines) {
+        #    because that is where the rendered space appears. Markdown only:
+        #    in HTML a newline inside a span is collapsed by the renderer.
+        if (!$html && $i < $#lines) {
             my $next = $lines[$i + 1];
             my $nbare = $next;
             $nbare =~ s/^(?:>\s*)+//;
@@ -142,6 +171,39 @@ for my $file (@files) {
         if ($width_probe =~ /([\x{4E00}-\x{9FFF}])([,;:!?])/) {
             complain($file, $n, "half-width '$2' straight after '$1'",
                 "Chinese text takes full-width punctuation: ，；：！？");
+        }
+
+        # 5. Latin or a digit jammed against an ideograph.
+        #
+        # Checked on the RENDERED text, so inline markup is removed first — the
+        # miss is invisible in the source precisely because a tag or a code span
+        # sits in the gap. The placeholder is a character in NEITHER class:
+        # substituting a Latin word would manufacture matches, and deleting the
+        # span would join the text either side, which is the mistake rule 3 and
+        # rule 4 each made once already.
+        # Reduced to WHAT THE READER SEES, which for this rule means markup is
+        # DELETED rather than stood in for. The first version replaced an HTML tag
+        # with § — and § belongs to neither class, so it hid the very adjacency
+        # the rule exists to find: 「會顯示<strong>Btrfs」 passed. A placeholder is
+        # right for rule 3, where a code span's CONTENT must not join the text
+        # either side, and wrong here, where the tag itself renders as nothing.
+        # Same decision, opposite answer, because the rules ask different
+        # questions.
+        my $flat = $bare;
+        $flat =~ s/`([^`]*)`/$1/g;               # a code span renders its text
+        $flat =~ s/\*\*|\*|~~//g;                # bold, italic, strikethrough
+        $flat =~ s/\[([^\]]*)\]\([^)]*\)/$1/g;    # a link keeps its text
+        # A break renders as a BREAK, so it separates: 「</code><br><br>在這個」 is
+        # correctly spaced and deleting the tag reported it as touching. Only tags
+        # that render as nothing may be deleted.
+        $flat =~ s{<br\s*/?>|</(?:p|div|li|h[1-6]|td|th)>}{ }gi;
+        $flat =~ s/<[^>]+>//g;                   # what is left renders as nothing
+        $flat =~ s/&[a-z]+;|&\#\d+;/ /g;          # an entity: nbsp IS a space
+        if (my ($a, $b) = $flat =~ /($IDEO)([A-Za-z0-9])|([A-Za-z0-9])($IDEO)/) {
+            my ($x, $y) = defined $a ? ($a, $b) : ($3, $4);
+            complain($file, $n,
+                "no space between Chinese and Latin here",
+                "'$x$y' renders with the two touching. Put a space between them.");
         }
 
         # 4. A bold run that cannot close, so it renders as literal asterisks.
