@@ -6,6 +6,30 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.22] - 2026-08-07
+
+### Fixed
+
+- **The snapshot ceiling counted the array DSM handed over, not the total DSM
+  reported.** `list_snapshot` returns a `count` beside the `snapshots` array, and
+  `snapshot_list` never read it — so a short listing would have made
+  `assert_room_for_snapshot` find room where there was none, and under-counting
+  there fails in the direction of **taking** the snapshot. It now refuses when the
+  two disagree, and says the count is the problem rather than blaming the ceiling.
+  Firmware that reports no `count` is unaffected, which is covered by its own test.
+
+### Verified
+
+- **R-9 re-measured read-only against DSM 7.4.1**, and answered per listing rather
+  than as one question. `LUN list` and `Target list` **ignore `offset`/`limit`
+  entirely** — `limit=1` returns the same full list as no parameters — and report no
+  total. `LUN list_snapshot` is the exception: it does report a total, and that
+  total agreed with the row count on all nine LUNs, including one holding a
+  snapshot. Parameters being ignored is the strong evidence, since a paged API
+  honours `limit`; measured at 9 LUNs, 4 targets and 1 snapshot, and a threshold
+  above those counts cannot be ruled out from one measurement. That is why the
+  agreement is checked in code rather than assumed.
+
 ## [0.6.21] - 2026-08-07
 
 ### Fixed

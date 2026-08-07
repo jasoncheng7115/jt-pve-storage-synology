@@ -276,5 +276,83 @@ is_deeply($taken->deleted, [],
     is($err, '', 'no reported ceiling means the guard stands down, not a refusal');
 }
 
+# --- the total DSM reports beside the snapshot listing ------------------------
+#
+# `list_snapshot` is the only listing on this API that reports its own total
+# (measured read-only on DSM 7.4.1, 2026-08-07: `LUN list` and `Target list`
+# ignore offset/limit and report nothing at all). A total beside a list is the
+# shape of a pageable API, and the caller that needs it is the ceiling check —
+# which counted the ARRAY. A short array under-counts, and under-counting there
+# fails in the direction of TAKING the snapshot.
+
+{
+    package CountAPI;
+    my $MINE = $PVE::Storage::Custom::Synology::LUN::TAKEN_BY;
+    sub new { my ($c,%o)=@_; bless { %o, sent=>[] }, $c }
+    sub storeid { 'cnt' }
+    sub limits { { luns=>undef, targets=>undef, snapshots_per_lun=>$_[0]->{max} } }
+    sub call {
+        my ($s,$a,$m,%p)=@_;
+        push @{$s->{sent}}, $m;
+        return { success=>1, data=>{} } if $m ne 'list_snapshot';
+        my @rows = map { { name=>"s$_", uuid=>"u$_", taken_by=>$MINE } }
+                   1 .. $s->{rows};
+        my %d = (snapshots => \@rows);
+        $d{count} = $s->{count} if exists $s->{count};
+        return { success=>1, data=>\%d };
+    }
+    sub call_ok { my $s=shift; $s->call(@_); return { snapshot_uuid=>'new' } }
+}
+{
+    package CountLUN;
+    our @ISA = ('PVE::Storage::Custom::Synology::LUN');
+    sub new { my ($c,%o)=@_; bless { api=>CountAPI->new(%o) }, $c }
+    sub api { $_[0]->{api} }
+}
+
+# meta reports what the NAS sent, and `rows` is the RAW count — before the
+# taken_by filter, because that is the number `count` can be compared against.
+{
+    my $l = CountLUN->new(max=>256, rows=>3, count=>3);
+    my %meta;
+    my $list = $l->snapshot_list('u', meta => \%meta);
+    is(scalar @$list, 3, 'snapshot_list still returns the rows');
+    is($meta{rows},  3, 'meta.rows is what the NAS sent');
+    is($meta{count}, 3, 'meta.count is the total the NAS reported');
+}
+
+# A NAS that reports no total must keep working — this must not become a new
+# refusal on firmware that simply does not send `count`.
+{
+    my $l = CountLUN->new(max=>256, rows=>2);          # no count key at all
+    my %meta;
+    $l->snapshot_list('u', meta => \%meta);
+    ok(!defined $meta{count}, 'meta.count is undef when the NAS did not say');
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'x') } or $err = $@;
+    is($err, '', 'and the ceiling check still proceeds');
+}
+
+# THE POINT: the NAS says 300 and hands over 5. The old check counted 5, found
+# room under 256, and took the snapshot.
+{
+    my $l = CountLUN->new(max=>256, rows=>5, count=>300);
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'x') } or $err = $@;
+    like($err, qr/reported 300 snapshots .* but returned 5 of them/s,
+         'a short listing is refused, not counted');
+    like($err, qr/cannot be trusted/,
+         'and the message says the count is the problem, not the ceiling');
+    ok(!grep({ $_ eq 'take_snapshot' } @{ $l->api->{sent} }),
+       'nothing was sent — the refusal precedes the request');
+}
+
+# Agreement is the ordinary case and must stay silent.
+{
+    my $l = CountLUN->new(max=>256, rows=>7, count=>7);
+    my $err = '';
+    eval { $l->snapshot_create(src_uuid=>'u', name=>'x') } or $err = $@;
+    is($err, '', 'when the two agree the snapshot is taken');
+}
 
 done_testing();

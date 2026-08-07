@@ -280,9 +280,23 @@ sub assert_room_for_snapshot {
     # The NAS did not say. Stop guarding rather than invent a number.
     return 1 if !defined $max;
 
-    my $have = defined $opt{count}
-             ? $opt{count}
-             : scalar @{ $self->snapshot_list($src_uuid, all => 1) };
+    my $have = $opt{count};
+    if (!defined $have) {
+        my %meta;
+        $have = scalar @{ $self->snapshot_list($src_uuid, all => 1, meta => \%meta) };
+
+        # DSM reports its own total beside the array. When the two disagree the
+        # listing is SHORT, and this guard was counting the array — so it would
+        # under-count against the very ceiling it exists to enforce, and
+        # under-counting here fails in the direction of taking the snapshot.
+        # A safety check that cannot answer must not answer "there is room".
+        die "storage '" . $self->api->storeid . "': the NAS reported"
+          . " $meta{count} snapshots for this LUN but returned $meta{rows} of"
+          . " them, so the count against this model's maximum per LUN ($max)"
+          . " cannot be trusted. Refusing rather than risking a snapshot past"
+          . " the limit. Check SAN Manager for this LUN's snapshots.\n"
+            if defined $meta{count} && $meta{count} != $meta{rows};
+    }
     return 1 if $have < $max;
 
     die "storage '" . $self->api->storeid . "': this LUN already has $have"
@@ -574,6 +588,19 @@ sub snapshot_create {
 }
 
 # Only this plugin's own snapshots. Never the user's.
+#
+# `meta => \%h` fills in what the NAS said about the listing as a whole, which
+# the caller cannot recover from the returned array:
+#
+#   rows   how many entries the NAS actually sent, BEFORE any taken_by filtering
+#   count  the total the NAS reported beside them, or undef if it did not
+#
+# Measured on DSM 7.4.1 (2026-08-07, nine LUNs, read-only): `list_snapshot` is the
+# only listing on this API that reports its own total — `LUN list` and
+# `Target list` ignore `offset`/`limit` and report nothing. `count` agreed with
+# the row count on every LUN, including one holding a snapshot. It is exposed
+# rather than trusted, because a total beside a list is the SHAPE of a pageable
+# API, and the caller that needs it is a ceiling check.
 sub snapshot_list {
     my ($self, $src_uuid, %opt) = @_;
 
@@ -590,6 +617,11 @@ sub snapshot_list {
     my $snaps = $r->{data}{snapshots};
     die "storage '" . $self->api->storeid . "': the snapshot listing was not a list\n"
         if ref $snaps ne 'ARRAY';
+
+    if (ref $opt{meta} eq 'HASH') {
+        $opt{meta}{rows}  = scalar @$snaps;
+        $opt{meta}{count} = $r->{data}{count};
+    }
 
     return [ grep { ref $_ eq 'HASH' } @$snaps ] if $opt{all};
     return [ grep { ref $_ eq 'HASH' && ($_->{taken_by} // '') eq $TAKEN_BY } @$snaps ];
