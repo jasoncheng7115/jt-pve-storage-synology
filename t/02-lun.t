@@ -219,7 +219,9 @@ is_deeply($taken->deleted, [],
     package SnapAPI;
     sub new { my ($c,%o)=@_; bless { max=>$o{max}, sent=>[] }, $c }
     sub storeid { 'snap' }
-    sub limits { { luns=>undef, targets=>undef, snapshots_per_lun=>$_[0]->{max} } }
+    sub limits { { luns=>undef, targets=>undef, snapshots_per_lun=>$_[0]->{max},
+                   snapshots_per_lun_v2=>$_[0]->{max2},
+                   snapshots_per_lun_effective=>$_[0]->{max} } }
     sub call { my ($s,$a,$m,%p)=@_; push @{$s->{sent}},$m; return { success=>1, data=>{} } }
     sub call_ok { my $s=shift; $s->call(@_); return { snapshot_uuid=>'new' } }
 }
@@ -287,10 +289,15 @@ is_deeply($taken->deleted, [],
 
 {
     package CountAPI;
+    # A package variable mentioned once earns a 'used only once' warning, and a
+    # suite that prints warnings trains people to skim its output.
+    no warnings 'once';
     my $MINE = $PVE::Storage::Custom::Synology::LUN::TAKEN_BY;
     sub new { my ($c,%o)=@_; bless { %o, sent=>[] }, $c }
     sub storeid { 'cnt' }
-    sub limits { { luns=>undef, targets=>undef, snapshots_per_lun=>$_[0]->{max} } }
+    sub limits { { luns=>undef, targets=>undef, snapshots_per_lun=>$_[0]->{max},
+                   snapshots_per_lun_v2=>$_[0]->{max2},
+                   snapshots_per_lun_effective=>$_[0]->{max} } }
     sub call {
         my ($s,$a,$m,%p)=@_;
         push @{$s->{sent}}, $m;

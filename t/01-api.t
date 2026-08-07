@@ -142,4 +142,44 @@ ok(!$one->_rotate_portal, 'a single portal does not rotate, so a dead NAS fails 
            'nothing was added to the healthy set beyond what has been seen');
 }
 
+# --- R-26: two snapshot ceilings, and the lower one is what guards ------------
+#
+# DSM publishes max_snapshot_per_lun 256 AND max_snapshot_per_lun_v2 128 and does
+# not say which it enforces — measured on a DS918+/7.4.1 and a DS925+/7.3.2, the
+# identical pair on both. Which is real cannot be settled read-only. Guarding at
+# the higher one would let the NAS refuse first, which is the one thing this
+# guard exists to prevent.
+{
+    package DefAPI;
+    our @ISA = ('PVE::Storage::Custom::Synology::API');
+    sub new { my ($c,%o)=@_; bless { d=>$o{d} }, $c }
+    sub system_define { $_[0]->{d} }
+}
+
+{
+    my $l = DefAPI->new(d => { max_iscsiluns => 256, max_iscsitrgs => 128,
+                               max_snapshot_per_lun => 256,
+                               max_snapshot_per_lun_v2 => 128 })->limits;
+    is($l->{snapshots_per_lun},    256, 'the plain key is reported as the NAS gave it');
+    is($l->{snapshots_per_lun_v2}, 128, 'and so is the _v2 key');
+    is($l->{snapshots_per_lun_effective}, 128,
+       'the EFFECTIVE ceiling is the lower of the two — the guard must refuse before the NAS does');
+}
+
+# Only one reported: use it, do not invent a second.
+{
+    my $l = DefAPI->new(d => { max_snapshot_per_lun => 256 })->limits;
+    is($l->{snapshots_per_lun_effective}, 256, 'one ceiling reported, that one is used');
+    my $v = DefAPI->new(d => { max_snapshot_per_lun_v2 => 64 })->limits;
+    is($v->{snapshots_per_lun_effective}, 64, 'only the _v2 key reported, that one is used');
+}
+
+# Neither reported: undef, which means stop guarding — never "no limit" and
+# never a guessed number.
+{
+    my $l = DefAPI->new(d => {})->limits;
+    ok(!defined $l->{snapshots_per_lun_effective},
+       'the NAS said nothing, so there is no ceiling to enforce');
+}
+
 done_testing();

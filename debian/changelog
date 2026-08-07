@@ -1,3 +1,24 @@
+jt-pve-storage-synology (0.6.26-1) unstable; urgency=medium
+
+  * The snapshot ceiling now guards at the LOWER of the two numbers the NAS
+    reports (R-26). DSM publishes max_snapshot_per_lun 256 and
+    max_snapshot_per_lun_v2 128 and does not say which it enforces; a DS918+ on
+    7.4.1 and a DS925+ on 7.3.2 report the identical pair. Which is real cannot be
+    settled read-only. Guarding at the higher one would let the array refuse
+    first, which is the one thing this check exists to prevent, so the lower one
+    wins and the refusal names both numbers.
+  * Documentation site: the sections were in a different order from the sidebar,
+    and Requirements and The DSM account sat after Installing and Configuring. The
+    order is now overview, what has been measured, before you start, use it,
+    project -- and the sidebar matches exactly.
+  * The LUN ceiling is your VM-disk ceiling, now said plainly: a count and not a
+    size, per NAS and shared by the whole cluster, counting LUNs made in SAN
+    Manager for anything else, and a VM with a system and a data disk spends two.
+  * The DSM account section no longer ends on "the probing stopped rather than
+    guessing" -- R-14 is answered from DSM's Applications tab.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 22:00:00 +0800
+
 jt-pve-storage-synology (0.6.25-1) unstable; urgency=medium
 
   * qm move_disk back onto this storage and qmrestore failed on any node that had

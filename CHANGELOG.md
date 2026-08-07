@@ -6,6 +6,36 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.26] - 2026-08-07
+
+### Changed
+
+- **The snapshot ceiling now guards at the LOWER of the two numbers the NAS
+  reports (R-26).** DSM publishes `max_snapshot_per_lun` **256** and
+  `max_snapshot_per_lun_v2` **128** and does not say which it enforces — a DS918+
+  on 7.4.1 and a DS925+ on 7.3.2 report the identical pair, so it is systematic.
+  Which is real cannot be settled read-only; it would take a 129th snapshot on one
+  LUN. Guarding at the higher one would let the array refuse first, which is the
+  one thing this check exists to prevent, so the lower one wins and the refusal
+  names both numbers.
+
+### Documentation
+
+- **The page sections were in a different order from the sidebar**, and
+  Requirements and The DSM account sat *after* Installing and Configuring — the two
+  things a reader needs before starting were at the bottom. The order is now
+  overview → what has been measured → before you start → use it → project, and the
+  sidebar matches it exactly.
+- **The LUN ceiling is your VM-disk ceiling, and it is now said plainly** rather
+  than implied: it is a count and not a size, it is per NAS and shared by the whole
+  cluster, it counts LUNs you made in SAN Manager for anything else, and a VM with
+  a system and a data disk spends two of them. Also added to `docs/LIMITS.md`.
+- The snapshot two-ceiling situation is explained where an operator would meet it.
+- The DSM account section no longer ends on "the probing stopped rather than
+  guessing". R-14 is answered: the Applications tab lists twenty applications and
+  none is SAN Manager, so there is nothing finer to grant — and every one of those
+  twenty **can** be denied, which is what makes the hardening advice worth doing.
+
 ## [0.6.25] - 2026-08-07
 
 ### Fixed

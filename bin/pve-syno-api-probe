@@ -91,7 +91,7 @@ sub read_password {
     return $answer;
 }
 
-my $VERSION = '0.6.25';
+my $VERSION = '0.6.26';
 
 my $host;
 my $port;

@@ -593,10 +593,36 @@ sub limits {
     my %l;
     for my $pair ([ luns => 'max_iscsiluns' ],
                   [ targets => 'max_iscsitrgs' ],
-                  [ snapshots_per_lun => 'max_snapshot_per_lun' ]) {
+                  [ snapshots_per_lun    => 'max_snapshot_per_lun' ],
+                  [ snapshots_per_lun_v2 => 'max_snapshot_per_lun_v2' ]) {
         my $v = $d->{ $pair->[1] };
         $l{ $pair->[0] } = (defined $v && $v =~ /\A\d+\z/ && $v > 0) ? int($v) : undef;
     }
+
+    # R-26. THE NAS REPORTS TWO SNAPSHOT CEILINGS AND DOES NOT SAY WHICH IT
+    # ENFORCES: `max_snapshot_per_lun` 256 and `max_snapshot_per_lun_v2` 128,
+    # measured on 2026-08-07 on a DS918+ running DSM 7.4.1 and on a DS925+
+    # running 7.3.2 — the identical pair on both, so it is systematic and not a
+    # quirk of one model or one firmware. The share keys have the same shape,
+    # 1024 against 512.
+    #
+    # Which one DSM actually enforces cannot be settled read-only; it needs a
+    # 129th snapshot on one LUN. Jason's call on 2026-08-07 was to take the
+    # LOWER rather than measure it, and the reasoning is worth keeping: this
+    # guard exists to refuse BEFORE the array does, so guarding at twice the
+    # real limit would defeat its only purpose. Neither direction risks data —
+    # too high means the NAS returns the error, too low means the plugin does —
+    # so the tie goes to the guard doing its job.
+    #
+    # Both raw values are kept so the refusal can name them. An operator who
+    # hits 128 on a NAS that would have allowed 256 must be able to see why.
+    my @seen = grep { defined } @l{qw(snapshots_per_lun snapshots_per_lun_v2)};
+    if (@seen) {
+        $l{snapshots_per_lun_effective} = (sort { $a <=> $b } @seen)[0];
+    } else {
+        $l{snapshots_per_lun_effective} = undef;
+    }
+
     return \%l;
 }
 

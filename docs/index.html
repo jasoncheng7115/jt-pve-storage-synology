@@ -75,10 +75,19 @@
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
-            <span class="lang-en">What we know</span><span class="lang-zh">已知的事實</span>
+            <span class="lang-en">What has been measured</span><span class="lang-zh">已經量測過的</span>
         </div>
         <a href="#verified" class="sidebar__link"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></a>
         <a href="#rollback" class="sidebar__link"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Before you start</span><span class="lang-zh">開始之前</span>
+        </div>
+        <a href="#requirements" class="sidebar__link"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></a>
+        <a href="#account" class="sidebar__link"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></a>
+        <a href="#limits" class="sidebar__link"><span class="lang-en">How many LUNs</span><span class="lang-zh">最多幾個 LUN</span></a>
+        <a href="#ha" class="sidebar__link"><span class="lang-en">HA &amp; dual controllers</span><span class="lang-zh">HA 與雙控制器</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
@@ -88,10 +97,6 @@
         <a href="#configure" class="sidebar__link"><span class="lang-en">Configuring a storage</span><span class="lang-zh">設定 storage</span></a>
         <a href="#reap" class="sidebar__link"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></a>
         <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
-        <a href="#limits" class="sidebar__link"><span class="lang-en">How many LUNs</span><span class="lang-zh">最多幾個 LUN</span></a>
-        <a href="#ha" class="sidebar__link"><span class="lang-en">HA &amp; dual controllers</span><span class="lang-zh">HA 與雙控制器</span></a>
-        <a href="#account" class="sidebar__link"><span class="lang-en">DSM account</span><span class="lang-zh">DSM 帳號</span></a>
-        <a href="#requirements" class="sidebar__link"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
@@ -113,7 +118,7 @@
         <!-- The version sits on this line, immediately after the class, because
              <code>make release-check</code> reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.25 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.26 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -242,12 +247,73 @@
     </div>
 </section>
 
+<section class="doc-section" id="requirements">
+    <h2 class="section-title"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></h2>
+
+    <div class="table-wrap">
+    <table>
+        <tbody>
+        <tr>
+            <td><strong>DSM</strong></td>
+            <td><span class="lang-en"><strong>7.0 or later</strong>, and only 7.1.1 verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
+            <td><span class="lang-en"><strong>Btrfs.</strong> Snapshots exist only for a thin LUN on Btrfs, so an ext4 volume is refused when the storage is added rather than failing at the first snapshot</span><span class="lang-zh"><strong>Btrfs。</strong>快照只存在於 Btrfs 上的精簡 LUN，所以 ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
+            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> —and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>——而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
+            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused —DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕——DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
+        </tr>
+        <tr>
+            <td><strong>Proxmox VE</strong></td>
+            <td><span class="lang-en">8.x / 9.x. The storage API version is negotiated against the node, never hardcoded</span><span class="lang-zh">8.x／9.x。儲存 API 版本是對節點協商出來的，從不寫死</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+</section>
+
+<section class="doc-section" id="account">
+    <h2 class="section-title"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></h2>
+
+    <p>
+        <span class="lang-en">Do not give this plugin your <code>admin</code> account. And there is one thing DSM will not let you restrict, which you should know before deciding how to network the NAS: <strong>SAN Manager's API has no privilege you can grant for "manage LUNs"</strong>. There is no SAN operator role, and the per-user Application privileges list does not contain SAN Manager, so the account has to be an administrator.</span>
+        <span class="lang-zh">不要把 <code>admin</code> 帳號給這個 plugin。而且有一件事 DSM 不讓你限制，你應該在決定 NAS 的網路配置之前先知道：<strong>SAN Manager 的 API 沒有任何一個可以單獨授予的「管理 LUN」權限</strong>。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager，所以帳號必須是管理員。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">That is a limitation of DSM, not a shortcut taken here. What can still be taken away from the account is everything else —every shared folder, every application except DSM itself, and any address that is not one of your PVE nodes. A leaked credential then cannot be used to browse your files over SMB or Drive, which is the difference between an incident and a disaster.</span>
+        <span class="lang-zh">這是 DSM 的限制，不是這裡便宜行事。仍然可以從那個帳號拿掉的是其他一切——每一個共用資料夾、除 DSM 以外的每一個應用程式，以及任何不屬於你的 PVE 節點的位址。這樣一組洩漏的憑證就無法用來透過 SMB 或 Drive 翻你的檔案，而那是「一次事故」和「一場災難」的差別。</span>
+    </p>
+
+    <p>
+        <div class="alert alert--info">
+        <strong><span class="lang-en">Confirmed by reading DSM, not by guessing</span><span class="lang-zh">這是讀 DSM 得到的，不是猜的</span></strong>
+        <span class="lang-en">Two halves, both measured. Through the API on DSM 7.1.1: there are exactly three groups —<code>administrators</code>, <code>http</code>, <code>users</code>— and none is iSCSI-specific; an account with no groups is refused <strong>at login</strong> with <strong>402</strong>, and so is one in <code>users</code>. Then in the interface on DSM 7.4.1, the account's <strong>Applications</strong> tab was read directly: it lists twenty applications and <strong>not one is SAN Manager, Storage Manager or iSCSI</strong>. So there is nothing finer to grant —and equally, every one of those twenty <strong>can</strong> be denied, which is what makes the paragraph above worth doing.</span>
+        <span class="lang-zh">兩半都量過。透過 API，在 DSM 7.1.1 上：只有三個群組——<code>administrators</code>、<code>http</code>、<code>users</code>——沒有一個是 iSCSI 專用的；沒有群組的帳號在<strong>登入</strong>就被拒絕（<strong>402</strong>），放進 <code>users</code> 也一樣。然後在介面上，於 DSM 7.4.1 直接讀了那個帳號的<strong>應用程式</strong>分頁：它列出二十個應用程式，而<strong>沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI</strong>。所以沒有更細的權限可以給——反過來說，那二十項<strong>每一項都可以</strong>拒絕，而那正是上面那段值得照做的原因。</span>
+    </div>
+
+    <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
+    </p>
+</section>
+
 <section class="doc-section" id="limits">
     <h2 class="section-title"><span class="lang-en">How many LUNs, and what happens at the ceiling</span><span class="lang-zh">最多可以切幾個 LUN，以及開到上限會怎樣</span></h2>
     <p class="section-subtitle">
         <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit —and on some models it is very small.</span>
         <span class="lang-zh">一顆 VM 磁碟就是一個 LUN，所以這是實實在在的容量限制——而在某些機型上它非常小。</span>
     </p>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">The LUN ceiling is your VM-disk ceiling. Count it before you buy.</span><span class="lang-zh">LUN 上限就是你的 VM 磁碟數上限。買之前先算。</span></strong>
+        <span class="lang-en">This is not a size limit, it is a <strong>count</strong>. One VM disk is one LUN, so a NAS that publishes 256 LUNs holds <strong>256 VM disks in total</strong> —for the whole cluster, not per node, and shared with every LUN already on that NAS for anything else. A VM with a system disk and a data disk spends two of them, so 256 is roughly <strong>128 such VMs</strong>. On a model that publishes 4, it is <strong>two</strong>.<br><br>The plugin reads the number from your NAS and refuses before the array does, counting every LUN on it rather than only its own. So the failure is an error message at allocation time, not a surprise — but the planning is still yours.</span>
+        <span class="lang-zh">這不是容量限制，是<strong>數量</strong>限制。一顆 VM 磁碟就是一個 LUN，所以一台公布 256 個 LUN 的 NAS，總共只能放<strong>256 顆 VM 磁碟</strong>——是整個叢集共用，不是每個節點各算，而且要和那台 NAS 上為別的用途建的每一個 LUN 一起分。一台有系統碟加資料碟的 VM 就用掉兩個，所以 256 大約是 <strong>128 台這樣的 VM</strong>。在公布 4 個的機型上，是<strong>兩台</strong>。<br><br>Plugin 會從你的 NAS 讀那個數字，並且在陣列拒絕之前先拒絕，而且數的是那台 NAS 上的每一個 LUN，不只是它自己建的。所以撞到上限時看到的是配置當下的錯誤訊息，不是意外——但規劃還是你的事。</span>
+    </div>
 
     <p>
         <span class="lang-en">The figure everyone quotes —<strong>512 LUNs and 256 targets</strong> —comes from Synology's <a href="https://www.synology.com/en-global/dsm/7.1/software_spec/san_manager">SAN Manager Technical Specifications</a>, which footnotes it: &ldquo;the maximum number of LUNs, targets, and snapshots varies according to models&rdquo;. It is the ceiling for the whole product line, not for your NAS.</span>
@@ -311,6 +377,12 @@
         <span class="lang-en">The three ceilings in the order they bite: <strong>LUNs</strong>, one per VM disk; <strong>snapshots per LUN</strong>, 256 and <em>shared with the user's own SAN Manager schedule</em>; and <strong>targets</strong>, irrelevant in the default <code>shared</code> mode which uses one —and the reason <code>per-volume</code> is not the default, since 128 targets would cap the storage <em>below</em> the LUN ceiling.</span>
         <span class="lang-zh">三個上限按會先咬到你的順序：<strong>LUN</strong>，每顆 VM 磁碟一個；<strong>每顆 LUN 的快照</strong>，256 個，而且<strong>和使用者自己的 SAN Manager 排程共用額度</strong>；以及 <strong>target</strong>，在預設的 <code>shared</code> 模式下無關緊要，因為只用一個——這也正是 <code>per-volume</code> 不是預設的原因，因為 128 個 target 會把 storage 卡在<strong>低於</strong> LUN 上限的地方。</span>
     </p>
+
+    <div class="alert alert--info">
+        <strong><span class="lang-en">Snapshots: the NAS reports two ceilings and does not say which it enforces</span><span class="lang-zh">快照：NAS 回報兩個上限，而且沒說它執行哪一個</span></strong>
+        <span class="lang-en">A DS918+ and a DS925+ both publish <code>max_snapshot_per_lun</code> <strong>256</strong> and <code>max_snapshot_per_lun_v2</code> <strong>128</strong> —the identical pair, so it is not a quirk of one model. Which one DSM enforces cannot be read out of the API; it would take a 129th snapshot on one LUN to find out. The plugin therefore guards at the <strong>lower</strong> one, because a guard that lets the array refuse first has failed at its only job. If you are refused at 128 the message names both numbers. The ceiling is also <strong>shared with any snapshot schedule you set in SAN Manager</strong>, and those count.</span>
+        <span class="lang-zh">DS918+ 與 DS925+ 都公布 <code>max_snapshot_per_lun</code> <strong>256</strong> 與 <code>max_snapshot_per_lun_v2</code> <strong>128</strong>——一模一樣的一對，所以這不是某個機型的怪癖。DSM 實際執行哪一個，從 API 讀不出來；要在同一顆 LUN 上拍到第 129 張才知道。因此 plugin 守在<strong>較小</strong>的那個，因為一道讓陣列先拒絕的守門，等於沒有做到它唯一的工作。如果你在 128 被拒絕，訊息會把兩個數字都寫出來。這個上限也<strong>和你在 SAN Manager 裡設的快照排程共用</strong>，那些也算在內。</span>
+    </div>
 </section>
 
 <section class="doc-section" id="ha">
@@ -688,60 +760,6 @@
     <div class="alert alert--info">
         <span class="lang-en">This is how R-1 gets answered, and it is the single most useful thing an owner of a Synology NAS can contribute to this project.</span>
         <span class="lang-zh">R-1 就是這樣回答的，而它是一位 Synology NAS 的擁有者能為這個專案做的最有價值的一件事。</span>
-    </div>
-</section>
-
-<section class="doc-section" id="account">
-    <h2 class="section-title"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></h2>
-
-    <p>
-        <span class="lang-en">Do not give this plugin your <code>admin</code> account. And there is one thing DSM will not let you restrict, which you should know before deciding how to network the NAS: <strong>SAN Manager's API has no privilege you can grant for "manage LUNs"</strong>. There is no SAN operator role, and the per-user Application privileges list does not contain SAN Manager, so the account has to be an administrator.</span>
-        <span class="lang-zh">不要把 <code>admin</code> 帳號給這個 plugin。而且有一件事 DSM 不讓你限制，你應該在決定 NAS 的網路配置之前先知道：<strong>SAN Manager 的 API 沒有任何一個可以單獨授予的「管理 LUN」權限</strong>。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager，所以帳號必須是管理員。</span>
-    </p>
-
-    <p>
-        <span class="lang-en">That is a limitation of DSM, not a shortcut taken here. What can still be taken away from the account is everything else —every shared folder, every application except DSM itself, and any address that is not one of your PVE nodes. A leaked credential then cannot be used to browse your files over SMB or Drive, which is the difference between an incident and a disaster.</span>
-        <span class="lang-zh">這是 DSM 的限制，不是這裡便宜行事。仍然可以從那個帳號拿掉的是其他一切——每一個共用資料夾、除 DSM 以外的每一個應用程式，以及任何不屬於你的 PVE 節點的位址。這樣一組洩漏的憑證就無法用來透過 SMB 或 Drive 翻你的檔案，而那是「一次事故」和「一場災難」的差別。</span>
-    </p>
-
-    <p>
-        <div class="note">
-        <span class="lang-en"><strong>Probed on hardware, and it went further than expected.</strong> A temporary account was created on the test NAS, probed and deleted. DSM 7.1.1 offers exactly three groups —<code>administrators</code>, <code>http</code>, <code>users</code> —and <strong>none is iSCSI-specific</strong>. With no groups the account was refused at <strong>login</strong> with error <strong>402</strong>; as a member of <code>users</code>, also <strong>402</strong>. So a plain account does not get as far as being denied the storage calls. <code>SYNO.Core.User get</code> exposes no privilege fields, and the group API reports success while declining to add to <code>administrators</code> —so the minimum cannot be isolated through the API, and the probing stopped rather than guessing at an undocumented model on a production NAS. <strong>The account in use is an administrator and no smaller working configuration has been demonstrated.</strong></span>
-        <span class="lang-zh"><strong>已在硬體上探測，而結果比預期更進一步。</strong>在測試用 NAS 上建立一個臨時帳號、探測、然後刪除。DSM 7.1.1 只提供三個群組——<code>administrators</code>、<code>http</code>、<code>users</code>——而<strong>沒有任何一個是 iSCSI 專用的</strong>。完全沒有群組時，該帳號在<strong>登入</strong>就被拒絕，錯誤 <strong>402</strong>；加入 <code>users</code> 之後，也是 <strong>402</strong>。所以一個普通帳號根本走不到「被拒絕儲存呼叫」那一步。<code>SYNO.Core.User get</code> 沒有公開任何權限欄位，而群組 API 回報成功卻沒有真的加進 <code>administrators</code>——所以無法透過 API 隔離出最小集合，而探測就此停止，不去對一台正式 NAS 上未公開的模型做猜測。<strong>使用中的帳號是管理員，而沒有任何更小的可用設定被示範過。</strong></span>
-    </div>
-
-    <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
-    </p>
-</section>
-
-<section class="doc-section" id="requirements">
-    <h2 class="section-title"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></h2>
-
-    <div class="table-wrap">
-    <table>
-        <tbody>
-        <tr>
-            <td><strong>DSM</strong></td>
-            <td><span class="lang-en"><strong>7.0 or later</strong>, and only 7.1.1 verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
-        </tr>
-        <tr>
-            <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
-            <td><span class="lang-en"><strong>Btrfs.</strong> Snapshots exist only for a thin LUN on Btrfs, so an ext4 volume is refused when the storage is added rather than failing at the first snapshot</span><span class="lang-zh"><strong>Btrfs。</strong>快照只存在於 Btrfs 上的精簡 LUN，所以 ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗</span></td>
-        </tr>
-        <tr>
-            <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
-            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> —and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>——而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
-        </tr>
-        <tr>
-            <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
-            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused —DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕——DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
-        </tr>
-        <tr>
-            <td><strong>Proxmox VE</strong></td>
-            <td><span class="lang-en">8.x / 9.x. The storage API version is negotiated against the node, never hardcoded</span><span class="lang-zh">8.x／9.x。儲存 API 版本是對節點協商出來的，從不寫死</span></td>
-        </tr>
-        </tbody>
-    </table>
     </div>
 </section>
 

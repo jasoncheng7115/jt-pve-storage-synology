@@ -276,9 +276,23 @@ sub assert_room_for_lun {
 sub assert_room_for_snapshot {
     my ($self, $src_uuid, %opt) = @_;
 
-    my $max = $self->api->limits->{snapshots_per_lun};
+    # The LOWER of the two ceilings the NAS reports. R-26: DSM publishes
+    # `max_snapshot_per_lun` 256 AND `max_snapshot_per_lun_v2` 128 and does not
+    # say which it enforces, and that cannot be settled read-only. Guarding at
+    # the higher one would let the NAS refuse first, which defeats the only
+    # purpose this check has. See API::limits for the measurement.
+    my $lim = $self->api->limits;
+    my $max = $lim->{snapshots_per_lun_effective};
     # The NAS did not say. Stop guarding rather than invent a number.
     return 1 if !defined $max;
+
+    # Named in full when the two disagree, because an operator refused at 128 on
+    # a NAS whose other key says 256 needs to see why rather than assume a bug.
+    my ($a, $b) = @{$lim}{qw(snapshots_per_lun snapshots_per_lun_v2)};
+    my $which = (defined $a && defined $b && $a != $b)
+        ? " (this model reports two ceilings, $a and $b, and does not say which"
+          . " it enforces, so the lower one is used)"
+        : '';
 
     my $have = $opt{count};
     if (!defined $have) {
@@ -300,10 +314,10 @@ sub assert_room_for_snapshot {
     return 1 if $have < $max;
 
     die "storage '" . $self->api->storeid . "': this LUN already has $have"
-      . " snapshots, which is this model's maximum per LUN ($max). The limit is"
-      . " shared with any snapshot schedule set in SAN Manager, so some of those"
-      . " may not be Proxmox VE's — check SAN Manager. Delete snapshots to make"
-      . " room.\n";
+      . " snapshots, which is this model's maximum per LUN ($max)$which. The"
+      . " limit is shared with any snapshot schedule set in SAN Manager, so some"
+      . " of those may not be Proxmox VE's — check SAN Manager. Delete snapshots"
+      . " to make room.\n";
 }
 
 # Warn while there is still time to act, once per storage rather than on every
