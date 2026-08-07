@@ -1,3 +1,17 @@
+jt-pve-storage-synology (0.6.13-1) unstable; urgency=medium
+
+  * Cloning from a snapshot was refused by activate_volume, which broke a
+    capability the feature table declares. PVE's clone_vm activates the source
+    volumes WITH the snapname before cloning them, for a linked clone as much
+    as a full one -- so the die there refused the whole operation, with a
+    message telling the operator to clone it while they were cloning it. A
+    snapname is now a successful no-op, matching deactivate_volume, which had
+    always been one. path() still refuses a snapname and must.
+  * The documented command was wrong too: --full 0 is required, because PVE
+    defaults full to true for anything that is not a template.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 14:55:00 +0800
+
 jt-pve-storage-synology (0.6.12-1) unstable; urgency=medium
 
   * DSM asks the initiator to LOG OUT while it restores a snapshot -- twice,

@@ -4,6 +4,22 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.13] - 2026-08-07
+
+### 修正
+
+- **從快照複製被拒絕，而拒絕它的是一道守著「半個錯的不變量」的防護。**`volume_has_feature` 宣告 `clone => { snap => 1 }`，而 `activate_volume` 對任何 snapname 都 die——所以 `qm clone --snapname <快照> --full 0` 會以「a snapshot cannot be activated; roll back to it or clone it」失敗，而操作者當下正在複製它。
+
+  PVE 的 `clone_vm` 在複製之前會**帶著 snapname** 啟用來源磁碟——`API2/Qemu.pm` 裡的 `activate_volumes($storecfg, $vollist, $snapname)`——連結複製和完整複製都一樣。這個專案寫下來的不變量是「任何用 `snap` 宣告的能力，都必須在不用 `path()` 也不用 `activate_volume` 的情況下成立，因為兩者都拒絕 snapname」，而後半句讓前半句永遠到不了。
+
+  修正後的不變量：`snap` 宣告必須在不用 **`path()`** 的情況下成立，而 `activate_volume` 對 snapname 必須是**成功地什麼都不做**。本來就沒有東西要啟用——Synology 的 LUN 在快照上沒有裝置，而 `clone_from_snapshot` 完全在陣列端——而 `deactivate_volume` 一直都是對 snapname 回傳 1。缺的是啟用那一半。`path()` 仍然拒絕，而且必須拒絕：真正需要「快照當下那顆裝置」的呼叫者必須大聲失敗，而不是拿到目前狀態的裝置。
+
+  `t/11-features.t` 斷言的是錯的那個不變量，所以必須跟著程式一起改——這正是「把不變量寫成測試而不是寫成註解」的理由：那個信念一崩，測試當場就紅了。
+
+### 文件
+
+- 一小時前寫進文件的指令是錯的：**必須加 `--full 0`**。省略 `--full` 不等於關掉它——PVE 對任何「不是範本」的東西把它預設為「真」（`$param->{full} // !PVE::QemuConfig->is_template($conf)`），所以不寫它，要到的正好是那個被正確拒絕的完整複製。
+
 ## [0.6.12] - 2026-08-07
 
 ### 修正

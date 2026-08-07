@@ -6,6 +6,44 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.13] - 2026-08-07
+
+### Fixed
+
+- **Cloning from a snapshot was refused, by a guard defending an invariant that
+  was half wrong.** `volume_has_feature` declares `clone => { snap => 1 }`, and
+  `activate_volume` died on any snapname — so `qm clone --snapname <snap>
+  --full 0` failed with *a snapshot cannot be activated; roll back to it or clone
+  it*, while the operator was cloning it.
+
+  PVE's `clone_vm` activates the source volumes **with the snapname** before
+  cloning them — `activate_volumes($storecfg, $vollist, $snapname)` in
+  `API2/Qemu.pm` — for a linked clone as much as a full one. The invariant this
+  project had written down was *"anything claimed with `snap` must work without
+  `path()` or `activate_volume`, because both refuse a snapname"*, and the second
+  half of that made the first half unreachable.
+
+  The corrected invariant: a `snap` claim must work without **`path()`**, and
+  `activate_volume` must be a successful **no-op** for a snapname. There is
+  nothing to activate — a Synology LUN has no device at a snapshot and
+  `clone_from_snapshot` is entirely array-side — and `deactivate_volume` had
+  always returned 1 for a snapname. Activation was the missing half of that
+  symmetry. `path()` still refuses, and must: a caller that genuinely needs a
+  device *at* a snapshot has to fail loudly rather than be handed the current
+  state's device.
+
+  `t/11-features.t` asserted the wrong invariant and had to be corrected with the
+  code, which is the argument for writing an invariant as a test rather than as a
+  comment: the test failed the moment the belief did.
+
+### Documentation
+
+- The command documented an hour earlier was wrong: **`--full 0` is required.**
+  Omitting `--full` is not the same as disabling it — PVE defaults it to *true*
+  for anything that is not a template
+  (`$param->{full} // !PVE::QemuConfig->is_template($conf)`), so leaving it out
+  asks for exactly the full clone that is correctly refused.
+
 ## [0.6.12] - 2026-08-07
 
 ### Fixed

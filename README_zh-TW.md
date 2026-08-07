@@ -61,10 +61,10 @@ Full clone feature is not supported for a snapshot of 'syno-nas2:vm-146-disk-0'
 
 GUI 對任何「不是範本」的東西一律寫死用**完整複製**——`pvemanagerlib.js` 裡的 `isTemplate ? 'clone' : 'copy'`——而「完整」複製的意思是 PVE 自己用 `qemu-img convert` 去讀來源，而且是定址到**快照當下的那顆磁碟**。Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 就在動手之前拒絕。宣告支援反而更糟：PVE 會開始做、做到一半失敗，而訊息講的是路徑，不是你要求的那件事。
 
-真正可行的是**連結**複製，這個 storage 從快照支援它，而指令列會給你：
+真正可行的是**連結**複製，這個 storage 從快照支援它。指令列會給你，而且**`--full 0` 是必要的**——省略 `--full` 不等於同一件事，因為 Proxmox VE 對任何「不是範本」的東西把它預設為「真」：
 
 ```bash
-qm clone 146 149 --name from-snapshot --snapname mysnapshot   # 不要加 --full
+qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 ```
 
 在這個陣列上，「連結」這個字反而說得太保守了：DSM 的 `clone_from_snapshot` 產生的是 **reflink**,所以新的 LUN 是獨立的——之後把來源快照刪掉也不影響它——而建立當下不佔任何空間。

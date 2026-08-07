@@ -59,21 +59,25 @@ ok($declared{clone}{current},
 
 # --- the invariant behind all of it ----------------------------------------
 #
-# Anything claimed with `snap` must not depend on path() or activate_volume,
-# because both refuse a snapname outright. This is checked as an explicit list so
-# that adding a `snap` key forces someone to come back here.
+# Anything claimed with `snap` must not depend on **path()**, which refuses a
+# snapname outright. This is checked as an explicit list so that adding a `snap`
+# key forces someone to come back here.
+#
+# It used to say "path() or activate_volume", and the second half was wrong in a
+# way that cost the `clone` capability: PVE's clone_vm activates the source with
+# the snapname before cloning it, so a die in activate_volume refused the very
+# operation the table promised. This assertion encoded that mistake and had to be
+# corrected along with the code — which is the point of writing the invariant
+# down as a test rather than as a comment.
 my @snap_claimed = sort grep { $declared{$_}{snap} } keys %declared;
 is_deeply(\@snap_claimed, ['clone', 'snapshot'],
           'only clone and snapshot are claimed for a snapshot')
     or diag('claimed with snap: ' . join(', ', @snap_claimed)
-          . ' — anything new here must work without path() or activate_volume,'
-          . ' both of which die on a snapname');
+          . ' — anything new here must work without path(), which dies on a'
+          . ' snapname, and must tolerate an activate_volume that does nothing');
 
-# And the two refusals that make the invariant true.
 like($src, qr/cannot be addressed at a snapshot/,
-     'path() refuses a snapname');
-like($src, qr/a snapshot cannot be activated/,
-     'activate_volume refuses a snapname');
+     'path() refuses a snapname, and must');
 
 # --- rename and template, which are current-only ---------------------------
 ok($declared{rename}{current} && !$declared{rename}{snap},
@@ -150,5 +154,39 @@ like($src, qr/R-25, still open|R-25/,
     like($li, qr/ctime\s*=>\s*undef/,
          'ctime is undef, honestly: a LUN carries no create_time field (R-25)');
 }
+
+# --- what a `snap` claim actually requires -----------------------------------
+#
+# The invariant used to be written as "anything claimed with `snap` must work
+# without path() OR activate_volume, because both refuse a snapname". Half of
+# that was wrong, and it cost the `clone` capability: PVE's clone_vm activates
+# the source volumes WITH the snapname before cloning them —
+# `activate_volumes($storecfg, $vollist, $snapname)` in API2/Qemu.pm — for a
+# linked clone as much as a full one. A die there refused the whole operation,
+# with a message telling the operator to clone it while they were cloning it.
+#
+# The corrected invariant: a `snap` claim must work without **path()**, and
+# activate_volume must be a successful NO-OP for a snapname. deactivate_volume
+# had always been one; activation was the missing half.
+subtest 'activate_volume tolerates a snapname, path() still refuses one' => sub {
+    my ($activate) = $src =~ /\nsub activate_volume \{(.*?)\n\}/s;
+    ok(defined $activate, 'found activate_volume');
+
+    unlike($activate, qr/die[^;]*snapshot cannot be activated/,
+           'it no longer dies on a snapname — that broke clone-from-snapshot');
+    like($activate, qr/return 1 if defined \$snapname/,
+         'it returns success and does nothing, which is what there is to do');
+
+    my ($deactivate) = $src =~ /\nsub deactivate_volume \{(.*?)\n\}/s;
+    like($deactivate, qr/return 1 if defined \$snapname/,
+         'and deactivate_volume is the same, so the pair is symmetric');
+
+    # path() must keep refusing: a caller that needs a device AT a snapshot has
+    # to fail loudly rather than be handed the current state's device.
+    my ($path) = $src =~ /\nsub path \{(.*?)\n\}/s;
+    ok(defined $path, 'found path');
+    like($path, qr/\$snapname/,
+         'path() still looks at the snapname rather than ignoring it');
+};
 
 done_testing();

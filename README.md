@@ -106,10 +106,12 @@ worse: PVE then begins the operation and fails partway, with a message about a
 path rather than about what was asked.
 
 What does work is the **linked** clone, which this storage supports from a
-snapshot and which the command line will give you:
+snapshot. The command line will give it to you, and **`--full 0` is required** —
+omitting `--full` is not the same thing, because Proxmox VE defaults it to *true*
+for anything that is not a template:
 
 ```bash
-qm clone 146 149 --name from-snapshot --snapname mysnapshot   # no --full
+qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 ```
 
 On this array "linked" is a misnomer in your favour: DSM's

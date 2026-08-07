@@ -1433,8 +1433,29 @@ use constant {
 sub activate_volume {
     my ($class, $storeid, $scfg, $volname, $snapname, $cache, $hints) = @_;
 
-    die "storage '$storeid': a snapshot cannot be activated; roll back to it or"
-      . " clone it\n" if defined $snapname;
+    # A SNAPNAME IS A SUCCESSFUL NO-OP, not a refusal.
+    #
+    # This used to die, and it broke `clone` from a snapshot — a capability the
+    # feature table declares. PVE's `clone_vm` activates the source volumes with
+    # the snapname before it clones them (`activate_volumes($storecfg, $vollist,
+    # $snapname)` in API2/Qemu.pm), for a linked clone as much as a full one. So
+    # refusing here refused the whole operation, with a message telling the
+    # operator to clone it — while they were cloning it.
+    #
+    # There is nothing to activate: a Synology LUN has no device at a snapshot,
+    # and `clone_from_snapshot` is entirely array-side. `deactivate_volume` has
+    # always returned 1 for a snapname; this is the missing half of that
+    # symmetry.
+    #
+    # `path()` still refuses a snapname, and must: a caller that genuinely needs
+    # a device at a snapshot has to fail loudly rather than be handed the
+    # device for the current state. That is why `copy` does not declare `snap`
+    # — PVE would read the source itself, through `path()`.
+    #
+    # So the invariant this file records is corrected: anything claimed with
+    # `snap` must work without **`path()`**, and must tolerate an
+    # `activate_volume` that does nothing. Not "without activate_volume".
+    return 1 if defined $snapname;
 
     my $api = $class->_api($storeid, $scfg);
     my $lun = $class->_lun($api);
