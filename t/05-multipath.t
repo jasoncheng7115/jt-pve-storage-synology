@@ -121,6 +121,29 @@ SKIP: {
     is($r->{ok}, 0, 'an unreadable map size is not "big enough"');
     is($r->{size}, undef, 'and it is reported as unknown rather than as a number');
 
+    # multipathd could not be RUN. That is not the map declining to grow, and
+    # reporting it as such is what happened for a whole 60-second retry loop:
+    # three hundred failures, no output, and an error blaming the map.
+    {
+        my @tried;
+        local *PVE::Storage::Custom::Synology::Multipath::map_size_bytes = sub { 50 };
+        local *PVE::Storage::Custom::Synology::Multipath::device_size_bytes = sub { 100 };
+        local *PVE::Storage::Custom::Synology::Multipath::resize_map = sub {
+            push @tried, $_[0];
+            return 0;
+        };
+        local *PVE::Storage::Custom::Synology::Multipath::last_resize_error =
+            sub { "'multipathd' was not found in /usr/sbin, /sbin" };
+        my $f = $M->can('grow_map')->('wwid', 'mpatha', 100, ['/dev/sda'],
+                                      timeout => 30, pause => 0);
+        is($f->{ok}, 0, 'a command that could not run is not success');
+        like($f->{cmd_error}, qr/multipathd.*not found/,
+             'and the caller is told WHY, not just that the map is short');
+        is(scalar @tried, 1,
+           'it stops after the first failure — retrying a missing binary for'
+           . ' 30s is 30s spent not telling anyone');
+    }
+
     # The map catches up on a later poll, which is the real-world case: the
     # first ask is the no-op, the second lands after udev has caught up.
     my @sizes = (50, 50, 100);

@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.6.6
+VERSION = 0.6.7
 
 DESTDIR =
 PREFIX   = /usr
@@ -21,7 +21,7 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets check-zh zh-normalise critic check-doc-urls \
+        check-multipath-flush check-secrets check-tool-paths check-zh zh-normalise critic check-doc-urls \
         check-release-archive \
         release-check deb deb-clean clean
 
@@ -278,11 +278,37 @@ zh-normalise:
 	@perl tools/zh-normalise.pl $$(ls *_zh-TW.md docs/*_zh-TW.md 2>/dev/null)
 	@perl tools/check-zh-markdown.pl
 
+# Every external command must reach the tool resolver, never $ENV{PATH}.
+#
+# A PVE daemon has NO PATH at all — measured on pvestatd, pvedaemon, pveproxy
+# and pve-ha-lrm — so exec falls back to /bin:/usr/bin and every tool this
+# plugin uses lives in /usr/sbin. A command spawned any other way than through
+# run_cmd() bypasses Command::tool_path and fails only when someone drives the
+# operation from the web interface instead of a shell.
+check-tool-paths:
+	@echo "Checking that no command bypasses the tool resolver..."
+	@bad=0; \
+	for f in $(PERL_MODULES) $(BIN_SCRIPTS); do \
+		hits=$$(perl -ne 'next if /^\s*#/; print "$$.: $$_" if /\b(?:system|exec|open3|readpipe)\s*\(/ || /qx\{/' "$$f"); \
+		case "$$f" in *"/Synology/Command.pm") continue;; esac; \
+		if [ -n "$$hits" ]; then \
+			echo "  ERROR: $$f spawns a process outside the command runner:"; \
+			echo "$$hits" | sed 's/^/      /'; \
+			bad=1; \
+		fi; \
+	done; \
+	if [ "$$bad" = "1" ]; then \
+		echo "         Route it through Command::run_cmd, which resolves an"; \
+		echo "         absolute path. A PVE daemon has no PATH."; \
+		exit 1; \
+	fi; \
+	echo "  OK: every external command goes through the resolver."
+
 check-zh:
 	@echo "Checking the Traditional Chinese documents..."
 	@perl tools/check-zh-markdown.pl
 
-release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nopve critic \
+release-check: check-multipath-flush check-secrets check-tool-paths check-zh syntax unit unit-nopve critic \
                check-doc-urls \
                check-release-archive
 	@echo "Checking version consistency..."

@@ -29,6 +29,7 @@ our @EXPORT_OK = qw(
     is_block_device
     sysfs_read_with_timeout
     sysfs_write_with_timeout
+    tool_path
 );
 
 # ---------------------------------------------------------------------------
@@ -246,6 +247,55 @@ sub _reap_timed_out_child {
        . " (likely uninterruptible sleep in the kernel); leaving it to init\n";
 }
 
+# ---------------------------------------------------------------------------
+# EVERY COMMAND IS RESOLVED TO AN ABSOLUTE PATH, BECAUSE A PVE DAEMON HAS NO PATH
+# ---------------------------------------------------------------------------
+#
+# Measured on host-108, 2026-08-07: `/proc/<pid>/environ` for **pvestatd,
+# pvedaemon, pveproxy and pve-ha-lrm** contains no `PATH` variable at all, and
+# nothing in the whole PVE tree sets one at runtime. `exec` then falls back to
+# the C library's default, which is `/bin:/usr/bin` — and every tool this plugin
+# runs lives in `/usr/sbin`.
+#
+# So the SAME operation succeeded or failed according to who started it. A
+# resize from `qm resize` on a login shell worked, because a login shell has
+# /usr/sbin on its PATH. The identical resize from the web interface ran in a
+# pvedaemon worker, where `multipathd` could not be executed at all — open3 died
+# with "exec of multipathd resize map ... failed: No such file or directory",
+# the caller's eval swallowed it, and the operation reported a map that had not
+# grown rather than a command that had never run.
+#
+# PVE's own plugins have always written absolute paths and this is why:
+# ISCSIPlugin has `/usr/bin/iscsiadm`, LVMPlugin has `/sbin/vgs`. The two places
+# in this plugin that already resolved a path by hand — `_fuser` and `scsi_id`
+# in Multipath — were the shape of the answer, applied to two commands out of
+# five. Doing it here means nothing can be added later that forgets.
+#
+# /usr/sbin first: on a merged-/usr Debian the /sbin entries are symlinks into
+# it, and naming the real directory keeps the resolved path stable.
+our @TOOL_DIRS = qw(/usr/sbin /sbin /usr/bin /bin /usr/local/sbin /usr/local/bin);
+
+# Only successes are cached. A negative answer must not be remembered, or a node
+# where the operator installs the missing package goes on failing until every
+# daemon is restarted.
+my %TOOL_PATH;
+
+sub tool_path {
+    my ($name) = @_;
+    return undef if !defined $name || !length $name;
+    return $name if $name =~ m{/};      # already a path; the caller chose it
+    return $TOOL_PATH{$name} if defined $TOOL_PATH{$name} && -x $TOOL_PATH{$name};
+
+    for my $dir (@TOOL_DIRS) {
+        my $p = "$dir/$name";
+        # An ordinary file test on a path under /usr or /bin, never under /dev,
+        # so rule 10's uninterruptible-stat hazard does not apply here.
+        next if !-f $p || !-x $p;
+        return $TOOL_PATH{$name} = $p;
+    }
+    return undef;
+}
+
 sub _run_cmd {
     _not_a_method($_[0]);
     my ($cmd, %opts) = @_;
@@ -254,6 +304,19 @@ sub _run_cmd {
     my ($stdout, $stderr) = ('', '');
     my $err = gensym;
     my $pid;
+
+    my @argv = @{ $cmd // [] };
+    croak "Command failed: no command given" if !@argv;
+    my $prog = tool_path($argv[0]);
+    # Loud, and named. "not installed" and "not on the PATH of whoever started
+    # this daemon" are the same symptom to the caller, and both are worth the
+    # same sentence: the tool is not runnable from here.
+    croak "Command failed: '$argv[0]' was not found in "
+        . join(', ', @TOOL_DIRS)
+        . ". Install the package that provides it (open-iscsi and"
+        . " multipath-tools between them provide all of them)."
+        if !defined $prog;
+    $argv[0] = $prog;
 
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
@@ -267,7 +330,12 @@ sub _run_cmd {
         local $ENV{LC_ALL} = 'C';
         local $ENV{LANG}   = 'C';
 
-        $pid = open3(my $in, my $out, $err, @$cmd);
+        # Belt and braces for anything the child itself execs. The absolute path
+        # above is what makes THIS command run; this is so a helper it spawns
+        # does not hit the same wall.
+        local $ENV{PATH} = join(':', @TOOL_DIRS);
+
+        $pid = open3(my $in, my $out, $err, @argv);
         close($in);
 
         # Read both streams: a full stderr pipe would otherwise deadlock the

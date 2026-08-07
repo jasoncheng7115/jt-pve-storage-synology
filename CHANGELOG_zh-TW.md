@@ -4,6 +4,18 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.7] - 2026-08-07
+
+### 修正
+
+- **每一個外部指令現在都會解析成絕對路徑，理由是 Proxmox VE 的 daemon 根本沒有 `PATH`**。在這台節點上量測：**pvestatd、pvedaemon、pveproxy 與 pve-ha-lrm** 的 `/proc/<pid>/environ` 裡都沒有 `PATH` 這個變數，而整個 PVE 樹裡也沒有任何地方在執行期設定它。`exec` 於是退回 C 函式庫的預設值 `/bin:/usr/bin`——而 `multipathd`、`multipath`、`iscsiadm`、`dmsetup` 與 `blockdev` 全都在 `/usr/sbin`。所以**同一個操作**會因為是誰啟動的而成功或失敗：從 shell 上用 `qm resize` 做的擴充會成功，從網頁介面做的一模一樣的擴充則連 `multipathd` 都執行不了。這個 plugin 有五個指令是用裸名稱呼叫的。PVE 自己的 plugin 一直都寫絕對路徑，正是為了這個原因——`ISCSIPlugin` 寫 `/usr/bin/iscsiadm`，`LVMPlugin` 寫 `/sbin/vgs`——而這個 plugin 裡本來就自己解析路徑的兩個地方，`_fuser` 與 `scsi_id`，就是正確答案的形式，只是七個指令裡只套用到兩個。
+- **一個從來沒有執行的指令，不再看起來像執行了然後拒絕。**`resize_map` 兩種情況都回傳一個裸 0，所以一個根本無法執行的 `multipathd`，和一個看過之後發現沒事可做的 `multipathd`，是分不出來的。上面那個問題就是這樣撐過整整 60 秒的重試迴圈：三百次失敗、沒有任何輸出，最後給出一個怪罪 map 沒有跟上路徑的錯誤。`grow_map` 現在會在第一次這種失敗就停下來，並說出到底是哪一種。
+
+### 新增
+
+- `make check-tool-paths` 會在任何繞過指令執行器的行程產生點上讓建置失敗，這樣之後新增的指令就不會是漏掉的那一個。它第一次跑就找到另外三個，而且已經在刻意製造的回歸上示範過會失敗。
+- 探索工具不再用 `stty` 來關閉回顯。`POSIX::Termios` 是 Perl 核心模組，做的是同一個 `termios(3)` 呼叫，不需要尋找也不需要 exec 任何東西。
+
 ## [0.6.6] - 2026-08-07
 
 ### 修正

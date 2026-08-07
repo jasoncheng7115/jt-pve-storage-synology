@@ -31,6 +31,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use JSON;
 use LWP::UserAgent;
 use HTTP::Request::Common qw(POST);
+use POSIX ();
 
 # Term::ReadKey is not installed on a stock Proxmox VE node and this tool has
 # to run there, so echo is turned off with stty. The restore is registered as
@@ -38,21 +39,50 @@ use HTTP::Request::Common qw(POST);
 # Ctrl-C between the two would otherwise leave the operator's terminal silent
 # with no clue why.
 my $echo_off = 0;
-END { system('stty', 'echo') if $echo_off }
+
+# NO SUBPROCESS. This used to shell out to `stty`, which is a command run by
+# bare name — the thing that cost this project a whole incident when a PVE
+# daemon turned out to have no PATH at all. This tool only ever runs from a
+# shell, so its own PATH would have been fine; the point is that the rule has no
+# exceptions worth arguing about when the alternative is in core Perl.
+#
+# POSIX::Termios is that alternative: it turns echo off through the same
+# termios(3) call stty would have made, with nothing to find and nothing to
+# exec. If the terminal cannot be configured, the password is echoed rather than
+# the tool refusing to run.
+my $termios;
+my $saved_lflag;
+
+sub _echo_off {
+    return 0 if !-t STDIN;
+    $termios = POSIX::Termios->new;
+    return 0 if !defined eval { $termios->getattr(fileno(STDIN)); 1 };
+    $saved_lflag = $termios->getlflag;
+    return 0 if !defined $saved_lflag;
+    $termios->setlflag($saved_lflag & ~POSIX::ECHO());
+    $termios->setattr(fileno(STDIN), POSIX::TCSANOW());
+    return 1;
+}
+
+sub _echo_on {
+    return if !defined $termios || !defined $saved_lflag;
+    $termios->setlflag($saved_lflag);
+    $termios->setattr(fileno(STDIN), POSIX::TCSANOW());
+}
+
+END { _echo_on() if $echo_off }
 
 sub read_password {
     my ($prompt) = @_;
     print STDERR $prompt;
-    if (-t STDIN) {
-        $echo_off = 1 if system('stty', '-echo') == 0;
-    }
+    $echo_off = _echo_off();
     ## no critic (InputOutput::ProhibitExplicitStdin)
     # <> would read @ARGV as filenames — for a PASSWORD prompt that is not a
     # style question: it would silently take the password from a file named on
     # the command line, or from a pipe, with echo suppression already applied.
     my $answer = <STDIN>;
     if ($echo_off) {
-        system('stty', 'echo');
+        _echo_on();
         $echo_off = 0;
         print STDERR "\n";
     }
@@ -61,7 +91,7 @@ sub read_password {
     return $answer;
 }
 
-my $VERSION = '0.6.6';
+my $VERSION = '0.6.7';
 
 my $host;
 my $port;

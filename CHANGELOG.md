@@ -6,6 +6,42 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.7] - 2026-08-07
+
+### Fixed
+
+- **Every external command is now resolved to an absolute path, and the reason
+  is that a Proxmox VE daemon has no `PATH` at all.** Measured on this node:
+  `/proc/<pid>/environ` for **pvestatd, pvedaemon, pveproxy and pve-ha-lrm**
+  contains no `PATH` variable, and nothing in the PVE tree sets one at runtime.
+  `exec` then falls back to the C library's default of `/bin:/usr/bin` — and
+  `multipathd`, `multipath`, `iscsiadm`, `dmsetup` and `blockdev` all live in
+  `/usr/sbin`. So the *same operation* succeeded or failed according to who
+  started it: a resize from `qm resize` on a shell worked, and the identical
+  resize from the web interface could not execute `multipathd` at all. The
+  plugin ran five commands by bare name. PVE's own plugins have always written
+  absolute paths for exactly this reason — `ISCSIPlugin` has
+  `/usr/bin/iscsiadm`, `LVMPlugin` has `/sbin/vgs` — and the two places this
+  plugin already resolved a path by hand, `_fuser` and `scsi_id`, were the
+  shape of the answer applied to two commands out of seven.
+- **A command that never ran no longer looks like one that ran and declined.**
+  `resize_map` returned a bare 0 for both, so a `multipathd` that could not be
+  executed was indistinguishable from one that had looked and found nothing to
+  do. That is how the fault above survived a 60-second retry loop: three
+  hundred failures, no output, and a final error blaming the map for not
+  following the paths. `grow_map` now stops at the first such failure and says
+  which of the two happened.
+
+### Added
+
+- `make check-tool-paths` fails the build on any process spawned outside the
+  command runner, so a command added later cannot be the one that forgets. It
+  found three more on its first run, and has been shown to fail on a
+  deliberate regression.
+- The discovery tool no longer shells out to `stty` to turn off echo.
+  `POSIX::Termios` is core Perl, makes the same `termios(3)` call, and has
+  nothing to find and nothing to exec.
+
 ## [0.6.6] - 2026-08-07
 
 ### Fixed

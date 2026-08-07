@@ -127,4 +127,66 @@ subtest 'is_block_device on a path that does not exist' => sub {
          'a method call is refused outright rather than answered wrongly');
 };
 
+# --- every command is resolved to an absolute path ---------------------------
+#
+# A PVE daemon has NO PATH — measured on pvestatd, pvedaemon, pveproxy and
+# pve-ha-lrm — so exec falls back to /bin:/usr/bin while every tool this plugin
+# runs lives in /usr/sbin. The same resize succeeded from `qm resize` on a shell
+# and failed from the web interface, and the failure was swallowed.
+subtest 'tool_path resolves commands without consulting $ENV{PATH}' => sub {
+    my $tp = \&PVE::Storage::Custom::Synology::Command::tool_path;
+
+    is($tp->(undef), undef, 'no name, no path');
+    is($tp->(''), undef, 'an empty name resolves to nothing');
+    is($tp->('/usr/sbin/multipathd'), '/usr/sbin/multipathd',
+       'a caller that supplied a path keeps it');
+    is($tp->('there-is-no-such-tool-anywhere'), undef,
+       'a tool that is not installed resolves to undef, never to its bare name');
+
+    # A real one, resolved with PATH removed entirely — which is the condition
+    # the daemons actually run in.
+    SKIP: {
+        my ($real) = grep { -x $_ } ('/bin/sh', '/usr/bin/sh');
+        skip 'no sh to resolve', 2 if !defined $real;
+        local %ENV = (%ENV);
+        delete $ENV{PATH};
+        my $got = $tp->('sh');
+        ok(defined $got, 'sh resolves with no PATH in the environment at all');
+        ok(-x $got, "and what came back is executable ($got)");
+    }
+};
+
+subtest 'a command that cannot be found fails loudly, and names itself' => sub {
+    my $err = '';
+    eval {
+        PVE::Storage::Custom::Synology::Command::run_cmd(
+            [ 'there-is-no-such-tool-anywhere', '--help' ], timeout => 5);
+        1;
+    } or $err = $@;
+
+    like($err, qr/there-is-no-such-tool-anywhere/,
+         'the message names the command that could not be run');
+    like($err, qr{/usr/sbin}, 'and where it looked');
+
+    # The important half: this must NOT be reported the same way as a command
+    # that ran and returned non-zero. `allow_nonzero` covers a tool declining;
+    # it must not cover a tool that was never there.
+    my $err2 = '';
+    eval {
+        PVE::Storage::Custom::Synology::Command::run_cmd(
+            [ 'there-is-no-such-tool-anywhere' ], allow_nonzero => 1, timeout => 5);
+        1;
+    } or $err2 = $@;
+    ok(length $err2, 'allow_nonzero does not silence a command that does not exist');
+};
+
+subtest 'run_cmd still runs a real command, resolved' => sub {
+    local %ENV = (%ENV);
+    delete $ENV{PATH};
+    my ($out, $err, $rc) = PVE::Storage::Custom::Synology::Command::run_cmd(
+        [ 'sh', '-c', 'echo hello' ], timeout => 10);
+    is($rc, 0, 'it ran with no PATH in the environment');
+    like($out, qr/hello/, 'and produced its output');
+};
+
 done_testing();

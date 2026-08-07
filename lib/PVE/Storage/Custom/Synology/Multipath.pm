@@ -44,7 +44,7 @@ use warnings;
 use File::Basename qw(basename dirname);
 
 use PVE::Storage::Custom::Synology::Command qw(
-    run_cmd is_block_device sysfs_read_with_timeout
+    run_cmd is_block_device sysfs_read_with_timeout tool_path
 );
 
 # Everything here is a function, not a method. This module and Naming have both
@@ -273,7 +273,7 @@ sub grow_map {
     my $pause   = defined $opt{pause}   ? $opt{pause}   : 0.2;
     my $deadline = time + $timeout;
 
-    my ($seen, $paths_ready);
+    my ($seen, $paths_ready, $cmd_error);
     while (1) {
         $seen = map_size_bytes($wwid);
         last if defined $seen && $seen >= $want;
@@ -285,7 +285,15 @@ sub grow_map {
             my $sz = device_size_bytes($sd);
             if (!defined $sz || $sz < $want) { $paths_ready = 0; last }
         }
-        resize_map($map) if $paths_ready;
+        if ($paths_ready && !resize_map($map)) {
+            # STOP. multipathd could not be RUN — a missing binary, a daemon
+            # that is not there. Retrying that for a minute is a minute spent
+            # not telling anyone, which is what the first version of this loop
+            # did: three hundred failures, no output, and an error at the end
+            # blaming the map for not following.
+            $cmd_error = last_resize_error();
+            last;
+        }
 
         $seen = map_size_bytes($wwid);
         last if defined $seen && $seen >= $want;
@@ -297,6 +305,7 @@ sub grow_map {
         size        => $seen,
         ok          => (defined $seen && $seen >= $want) ? 1 : 0,
         paths_ready => $paths_ready ? 1 : 0,
+        cmd_error   => $cmd_error,
     };
 }
 
@@ -463,15 +472,41 @@ sub claim_path {
     return $@ ? 0 : 1;
 }
 
+# The reason the last resize_map call did not run, or undef. File-scoped rather
+# than returned, because the 1/0 contract has other callers and a second return
+# value in scalar context is exactly the kind of quiet wrong answer this module
+# exists to avoid. One process resizes one map at a time.
+my $last_resize_error;
+
+sub last_resize_error { return $last_resize_error }
+
 sub resize_map {
     _not_a_method($_[0]);
     my ($name) = @_;
-    return 0 if !defined $name || !length $name;
+    $last_resize_error = undef;
+    if (!defined $name || !length $name) {
+        $last_resize_error = 'no map name given';
+        return 0;
+    }
     # Refreshes an existing map's size. NOT a host scan: a scan discovers new
     # devices, it does not refresh the ones already there.
-    eval { run_cmd([ 'multipathd', 'resize', 'map', $name ],
-                   timeout => 30, allow_nonzero => 1) };
-    return $@ ? 0 : 1;
+    #
+    # `allow_nonzero` covers multipathd DECLINING. It does not cover multipathd
+    # never being reached, and the difference is not academic: for as long as
+    # this returned a bare 0 for both, a `multipathd` that could not even be
+    # executed looked identical to one that had looked and found nothing to do.
+    # That is how the PATH incident stayed invisible for a whole 60-second retry
+    # loop. The reason is kept so a caller can say which of the two happened.
+    my $ok = eval {
+        run_cmd([ 'multipathd', 'resize', 'map', $name ],
+                timeout => 30, allow_nonzero => 1);
+        1;
+    };
+    return 1 if $ok;
+
+    $last_resize_error = $@ // 'unknown error';
+    $last_resize_error =~ s/\s+\z//;
+    return 0;
 }
 
 # Remove ONE map, named. Never every unused map on the node.
@@ -546,11 +581,13 @@ sub invalidate_device_cache {
 # fuser lives in different places on different distributions, and a hardcoded
 # path that does not exist makes the check return undef forever — which is safe,
 # but means every delete refuses and nothing works.
+#
+# This used to carry its own directory list. It was one of the two places in the
+# plugin that resolved a path by hand while five other commands were run by bare
+# name, and the PATH incident is what that asymmetry cost. One resolver now, in
+# the command runner, so a command added later cannot be the one that forgets.
 sub _fuser {
-    for my $p ('/bin/fuser', '/usr/bin/fuser', '/sbin/fuser') {
-        return $p if -x $p;
-    }
-    return 'fuser';
+    return tool_path('fuser') // 'fuser';
 }
 
 # ---------------------------------------------------------------------------

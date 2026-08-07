@@ -1,3 +1,21 @@
+jt-pve-storage-synology (0.6.7-1) unstable; urgency=medium
+
+  * Resolve every external command to an absolute path. A PVE daemon has NO
+    PATH at all -- measured on pvestatd, pvedaemon, pveproxy and pve-ha-lrm --
+    so exec fell back to /bin:/usr/bin while multipathd, multipath, iscsiadm,
+    dmsetup and blockdev all live in /usr/sbin. The same operation therefore
+    succeeded from a shell and failed from the web interface. This is why
+    PVE's own plugins hardcode /usr/bin/iscsiadm and /sbin/vgs.
+  * multipathd resize map no longer reports "the map did not follow" when
+    multipathd could not be run at all, and grow_map stops retrying instead of
+    spending the whole timeout on a command that will never work.
+  * make check-tool-paths fails the build on any process spawned outside the
+    command runner. It found three more on its first run.
+  * The probe tool no longer shells out to stty; POSIX::Termios is core Perl
+    and needs no PATH.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 12:05:00 +0800
+
 jt-pve-storage-synology (0.6.6-1) unstable; urgency=medium
 
   * Fix a disk resize that reached the NAS but not the node. multipathd

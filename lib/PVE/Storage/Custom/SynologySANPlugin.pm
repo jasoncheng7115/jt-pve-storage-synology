@@ -1682,9 +1682,13 @@ sub _grow_node_device {
 
     my $have = defined $r->{size} ? "$r->{size} bytes"
                                   : 'a size that could not be read';
-    my $why = $r->{paths_ready}
-        ? "The paths carry the new size but the map did not follow."
-        : "This node's paths to the LUN are still reporting the old size.";
+    my $why =
+        $r->{cmd_error}   ? "multipathd could not be run on this node:"
+                            . " $r->{cmd_error}"
+      : $r->{paths_ready} ? "The paths carry the new size but the map did not"
+                            . " follow."
+      :                     "This node's paths to the LUN are still reporting"
+                            . " the old size.";
     my $msg = "storage '$storeid': the LUN is $want bytes on the NAS, but this"
       . " node's multipath map '$map' is presenting $have after "
       . PVE::Storage::Custom::Synology::Multipath::RESIZE_SETTLE_TIMEOUT
