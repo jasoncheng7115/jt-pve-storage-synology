@@ -73,20 +73,45 @@ sub status {
     my $location = $opt{location};
     my $storeid  = $api->storeid;
 
-    my $vol = eval {
-        $api->call_ok('SYNO.Core.Storage.Volume', 'get',
-            volume_path => PVE::Storage::Custom::Synology::API::json_string($location),
-            _what       => "reading the DSM volume $location");
+    # `call`, not `call_ok`, because the error CODE is the answer here. A wrong
+    # `syno-location` is a likely operator mistake and it must not be reported
+    # as an unreachable NAS: "not there" and "could not ask" are different
+    # answers, and only one of them is worth checking the network over.
+    my $r = eval {
+        $api->call('SYNO.Core.Storage.Volume', 'get',
+            volume_path => PVE::Storage::Custom::Synology::API::json_string($location));
     };
-    if (!$vol || $@) {
-        my $why = $@ || 'no answer';
-        chomp $why;
+    my $threw = $@;
+
+    if ($threw || !$r) {
+        chomp $threw if $threw;
         _warn_once("$storeid:unreachable",
-            "storage '$storeid': the NAS did not answer — $why\n");
+            "storage '$storeid': the NAS did not answer — "
+          . ($threw || 'no response') . "\n");
         return (0, 0, 0, 0);
     }
 
-    my $v = $vol->{volume};
+    if (!$r->{success}) {
+        # A transport-level problem really is "did not answer". An error CODE is
+        # the NAS answering.
+        if (defined $r->{transport}) {
+            _warn_once("$storeid:unreachable",
+                "storage '$storeid': the NAS did not answer — $r->{transport}\n");
+        } elsif (PVE::Storage::Custom::Synology::API::is_no_such_volume($r->{error})) {
+            _warn_once("$storeid:novolume",
+                "storage '$storeid': there is no DSM volume at '$location'."
+              . " Check syno-location — SAN Manager shows the path, and it is"
+              . " usually /volume1.\n");
+        } else {
+            _warn_once("$storeid:refused",
+                "storage '$storeid': the NAS refused to describe '$location' — "
+              . PVE::Storage::Custom::Synology::API::error_text($r->{error})
+              . "\n");
+        }
+        return (0, 0, 0, 0);
+    }
+
+    my $v = $r->{data}{volume};
     if (ref $v ne 'HASH' || !defined $v->{size_total_byte}) {
         _warn_once("$storeid:novolume",
             "storage '$storeid': the NAS answered but described no volume at"
@@ -106,8 +131,22 @@ sub status {
         return ($total, 0, $used, 0);
     }
 
+    # WHAT COUNTS AS HEALTHY IS MORE THAN ONE WORD, and the second NAS is what
+    # showed it. A DS925+ on DSM 7.3.2 reports `has_acceptable_disk` for a
+    # perfectly good Btrfs volume — it means the disks are not on Synology's
+    # validated list, which is what any NAS with third-party drives says. The
+    # check compared against `normal` alone and warned on every healthy volume of
+    # that kind. A guard with a false positive is a guard people learn to ignore,
+    # and this project has now met that in check-zh, in t/07-imports.t, in
+    # perlcritic and here.
+    #
+    # `has_acceptable_disk` is the only addition, because it is the only one that
+    # has been seen. Anything else still warns: a volume that is `crashed`,
+    # `degrade` or resyncing is worth saying out loud, and inventing a wider
+    # allowlist from guesswork would be the opposite mistake.
+    my %HEALTHY = map { $_ => 1 } qw(normal has_acceptable_disk);
     my $st = $v->{status} // '';
-    if ($st ne 'normal') {
+    if (!$HEALTHY{$st}) {
         _warn_once("$storeid:volstatus",
             "storage '$storeid': the DSM volume '$location' reports status"
           . " '$st' rather than normal.\n");
@@ -188,10 +227,21 @@ sub assert_usable {
           . " model, not of the DSM version.\n";
     }
 
-    my $vol = $api->call_ok('SYNO.Core.Storage.Volume', 'get',
-        volume_path => PVE::Storage::Custom::Synology::API::json_string($location),
-        _what       => "reading the DSM volume $location");
-    my $v = $vol->{volume};
+    # Same reason as in status(): 117 means the volume is not there, and saying
+    # so is far more use at `pvesm add` time than "failed — 117 (undocumented)".
+    my $vr = $api->call('SYNO.Core.Storage.Volume', 'get',
+        volume_path => PVE::Storage::Custom::Synology::API::json_string($location));
+
+    die "storage '$storeid': there is no DSM volume at '$location'. Use a path"
+      . " such as /volume1, as SAN Manager shows it.\n"
+        if $vr && !$vr->{success} && !defined $vr->{transport}
+           && PVE::Storage::Custom::Synology::API::is_no_such_volume($vr->{error});
+
+    die "storage '$storeid': reading the DSM volume $location failed — "
+      . ($vr->{transport} // PVE::Storage::Custom::Synology::API::error_text($vr->{error}))
+      . "\n" if !$vr || !$vr->{success};
+
+    my $v = $vr->{data}{volume};
     die "storage '$storeid': there is no DSM volume at '$location'. Use a path"
       . " such as /volume1, as SAN Manager shows it.\n" if ref $v ne 'HASH';
 

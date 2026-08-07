@@ -1,3 +1,20 @@
+jt-pve-storage-synology (0.6.15-1) unstable; urgency=medium
+
+  * A SECOND MODEL AND A SECOND DSM VERSION have answered, read-only: a DS925+
+    on DSM 7.3.2-86009 Update 4. Every API the plugin uses is present at the
+    same version and the same CGI path -- including SYNO.API.Auth on entry.cgi
+    rather than the auth.cgi both reference clients hardcode. The per-model
+    ceilings read the same and the pvesm add gates pass.
+  * Two defects the second NAS found:
+    - Error 117 means "no such volume", measured on BOTH DSM versions. A wrong
+      syno-location was reported as "the NAS did not answer" while the NAS had
+      answered clearly. Keyed on the code, never the text.
+    - has_acceptable_disk is a HEALTHY volume status -- it means the disks are
+      not on Synology's validated list. The check compared against 'normal'
+      alone and warned on every healthy volume with third-party drives.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 16:20:00 +0800
+
 jt-pve-storage-synology (0.6.14-1) unstable; urgency=medium
 
   * Documentation. The claim that migration leaves a multipath map on the source

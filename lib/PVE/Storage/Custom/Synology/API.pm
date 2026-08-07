@@ -63,6 +63,17 @@ our %COMMON_ERR = (
     106 => 'session timeout',
     107 => 'session interrupted by a duplicate login',
     119 => 'SID not found',
+    # 117: measured on BOTH DSM 7.1.1 and 7.3.2, asking
+    # `SYNO.Core.Storage.Volume get` for a well-formed volume path that does not
+    # exist (`/volume2` on a NAS that has only `/volume1`). Not in either
+    # reference client and not in Synology's published list.
+    #
+    # A path that is not volume-shaped at all — `/nonsense` — answers SUCCESS
+    # with no volume instead, which is the other branch Health already had. So
+    # the same operator mistake arrives two different ways, and before this the
+    # 117 way was reported as "the NAS did not answer" while the NAS had
+    # answered perfectly clearly.
+    117 => 'no such volume',
     400 => 'invalid credentials',
     402 => 'account disabled, or two-factor authentication required',
     403 => 'one-time password required',
@@ -207,6 +218,9 @@ sub error_text {
 
 sub is_session_expired { return defined $_[0] && $SESSION_EXPIRED{ $_[0] } }
 sub is_credential_error { return defined $_[0] && $CREDENTIAL_ERR{ $_[0] } }
+
+# Keyed on the code, never on the words the NAS chose — rule 25.
+sub is_no_such_volume { return defined $_[0] && $_[0] == 117 }
 
 # ---------------------------------------------------------------------------
 # Transport

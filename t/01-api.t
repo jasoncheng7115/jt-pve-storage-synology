@@ -92,4 +92,54 @@ is($rot->{sid}, undef, 'rotating drops the session, which belonged to the old ad
 my $one = $C->new(portals => ['only'], username => 'u', password => 'p');
 ok(!$one->_rotate_portal, 'a single portal does not rotate, so a dead NAS fails fast');
 
+# --- error 117, and why the code has to be the answer --------------------------
+#
+# Measured on BOTH DSM 7.1.1 and 7.3.2: asking `SYNO.Core.Storage.Volume get`
+# for a well-formed volume path that does not exist (`/volume2` on a NAS with
+# only `/volume1`) answers **117**. Neither reference client lists it and nor
+# does Synology.
+#
+# A path that is not volume-shaped at all — `/nonsense` — answers SUCCESS with
+# no volume instead. So the same operator mistake, a wrong `syno-location`,
+# arrives two different ways, and the 117 way used to be reported as "the NAS
+# did not answer" while the NAS had answered perfectly clearly. "Not there" and
+# "could not ask" are different answers.
+{
+    my $A = 'PVE::Storage::Custom::Synology::API';
+    like($A->can('error_text')->(117), qr/117/, 'the code is named in the text');
+    like($A->can('error_text')->(117), qr/no such volume/,
+         'and 117 is no longer "undocumented"');
+
+    my $p = $A->can('is_no_such_volume');
+    ok($p->(117), '117 is recognised');
+    ok(!$p->(400), 'a credential error is not');
+    ok(!$p->(105), 'nor is a permission error');
+    ok(!$p->(undef), 'and undef is not a volume that is missing');
+}
+
+# --- what counts as a healthy volume is more than one word --------------------
+#
+# A DS925+ on DSM 7.3.2 reports `has_acceptable_disk` for a perfectly good Btrfs
+# volume: it means the disks are not on Synology's validated list, which is what
+# any NAS with third-party drives says. Comparing against `normal` alone warned
+# on every healthy volume of that kind, and a guard with a false positive is a
+# guard people learn to ignore.
+{
+    open(my $fh, '<', 'lib/PVE/Storage/Custom/Synology/Health.pm')
+        or BAIL_OUT('cannot read Health.pm');
+    my $src = do { local $/; <$fh> };
+    close($fh);
+    (my $code = $src) =~ s/^\s*#.*$//mg;
+
+    like($code, qr/has_acceptable_disk/,
+         'has_acceptable_disk is accepted as healthy');
+    unlike($code, qr/\$st\s+ne\s+.normal./,
+           'and the check is no longer a comparison against one word');
+    # The allowlist must stay narrow: a crashed or degraded volume is worth
+    # saying out loud, and a wider set invented from guesswork is the opposite
+    # mistake to the one being fixed.
+    unlike($code, qr/qw\(normal has_acceptable_disk \w/,
+           'nothing was added to the healthy set beyond what has been seen');
+}
+
 done_testing();

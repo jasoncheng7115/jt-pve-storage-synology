@@ -19,13 +19,21 @@ locally.
 > **0 of 60 reads** during a path failure, and a DSM management outage left the
 > guest with **zero I/O errors**.
 >
-> What is still honest to say: **one** model, **one** DSM version, no Synology HA
-> or dual-controller chassis has ever been near it, and the DSM account needs
-> administrator rights because DSM 7.1.1 offers no narrower one — a non-administrator
-> cannot even log in. Around twenty-five defects were found by running it that no
-> amount of reading had shown, so assume there are more.
+> A **second model and a second DSM version** have now answered, read-only: a
+> **DS925+ on DSM 7.3.2-86009 Update 4**. Every API this plugin uses is present
+> at the same version and the same CGI path, the per-model ceilings read the
+> same, and the Btrfs and support checks that gate `pvesm add` pass. The data
+> path was not exercised there — that NAS refuses port 3260 — so this is the API
+> half of the answer, not the whole of it.
 >
-> `1.0.0` waits on a second model, a second DSM version, and the minimum DSM
+> What is still honest to say: the **data path** has been driven against **one**
+> model only, no Synology HA or dual-controller chassis has ever been near it,
+> and the DSM account needs administrator rights because DSM 7.1.1 offers no
+> narrower one — a non-administrator cannot even log in. Around thirty defects
+> were found by running it that no amount of reading had shown, so assume there
+> are more.
+>
+> `1.0.0` waits on a second model **for the data path**, and the minimum DSM
 > privileges settled. [docs/TESTING.md](docs/TESTING.md) is the register of what is
 > verified and what is not, and it is worth reading before trusting this.
 

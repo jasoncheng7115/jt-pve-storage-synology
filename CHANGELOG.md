@@ -6,6 +6,41 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.15] - 2026-08-07
+
+### Added
+
+- **A second model and a second DSM version have answered**, read-only: a
+  **DS925+ on DSM 7.3.2-86009 Update 4**, reached over a VPN. Every API this
+  plugin uses is present at the same version and the same CGI path — including
+  **`SYNO.API.Auth` on `entry.cgi`**, not the `auth.cgi` both public reference
+  clients hardcode. That is precisely what asking `SYNO.API.Info` instead of
+  using a constant was meant to protect against, and it had never been checked
+  on a second DSM version. `max_iscsiluns`, `max_iscsitrgs`,
+  `max_snapshot_per_lun` and `iscsi_target_type` all read the same as on the
+  DS918+; `type=define` carries 346 keys there against 316. The Btrfs, model-
+  support and volume checks that gate `pvesm add` all pass.
+
+  **The data path was not exercised there** — that NAS refuses port 3260 — so
+  this is the API half of the answer and is recorded as such.
+
+### Fixed
+
+- **Error 117 means "no such volume", and a wrong `syno-location` was reported
+  as an unreachable NAS.** Measured on **both** DSM 7.1.1 and 7.3.2: asking for a
+  well-formed volume path that does not exist answers 117, while a path that is
+  not volume-shaped at all answers *success with no volume*. So the same operator
+  mistake arrives two ways, and the 117 way said *the NAS did not answer* while
+  the NAS had answered perfectly clearly. `Health` now uses `call` rather than
+  `call_ok` where the error code is the answer — as that function's own comment
+  had always said — and keys on the code, never on the words.
+- **`has_acceptable_disk` is a healthy volume status.** It means the disks are not
+  on Synology's validated list, which is what any NAS with third-party drives
+  reports. The check compared against `normal` alone, so it warned on every
+  healthy volume of that kind — and a guard with a false positive is a guard
+  people learn to ignore. It is the only status added, because it is the only one
+  that has been seen; `crashed` and `degrade` still warn.
+
 ## [0.6.14] - 2026-08-07
 
 ### Documentation

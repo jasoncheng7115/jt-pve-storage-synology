@@ -32,6 +32,27 @@ Synology's **SAN Manager Technical Specifications** page states:
 So **512 and 256 are the ceiling for the whole product line.** They are not your
 NAS's numbers unless your NAS's own datasheet says so.
 
+### A second model and a second DSM version report the same way
+
+`SYNO.Core.System info type=define` was read from a **DS925+ on DSM 7.3.2-86009
+Update 4** on 2026-08-07 — a different model and a different DSM major version
+from the DS918+/7.1.1 the rest of this project was measured on:
+
+| | DS918+ · DSM 7.1.1 | DS925+ · DSM 7.3.2 |
+|---|---|---|
+| `max_iscsiluns` | 256 | **256** |
+| `max_iscsitrgs` | 128 | **128** |
+| `max_snapshot_per_lun` | 256 | **256** |
+| `iscsi_target_type` | lio4x | **lio4x** |
+| keys in `type=define` | 316 | **346** |
+| `SYNO.API.Auth` | v1-7 on `entry.cgi` | **v1-7 on `entry.cgi`** |
+
+Every API this plugin uses is present on 7.3.2 at the same version and the same
+CGI path, **including `SYNO.API.Auth` on `entry.cgi`** rather than the `auth.cgi`
+both public reference clients hardcode. That is the one thing asking
+`SYNO.API.Info` instead of using a constant was meant to protect against, and it
+had never been checked on a second DSM version until now.
+
 ### There is no discrepancy between the datasheet and the API
 
 This project previously documented one, and was wrong. The test NAS is a DS918+:
@@ -68,6 +89,7 @@ under `https://global.download.synology.com/download/Document/Hardware/`.
 | | RS3621xs+ | 256 | 128 |
 | | RS3618xs | 128 | 64 |
 | **Plus** | DS1821+ | 256 | 128 |
+| | **DS925+** (read from the NAS) | **256** | **128** |
 | | DS923+ | 256 | 128 |
 | | DS920+ | 256 | 128 |
 | | **DS918+** (the test NAS) | **256** | **128** |
