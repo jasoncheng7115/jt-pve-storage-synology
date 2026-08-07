@@ -1311,6 +1311,51 @@ undisturbed, and that no other vendor's multipath maps were touched.
 
 ---
 
+## Before every release — the operational checklist
+
+**Drive it from the web interface.** That is not a preference: `pvedaemon`,
+`pveproxy`, `vzdump` and `pct` run as `#!/usr/bin/perl -T` **with no `PATH` at
+all**, while `qm`, `pvesm`, `pvesh` and `qmrestore` do not. Five defects have
+lived in code that worked perfectly from `qm` and failed from the interface an
+operator actually uses, and two rounds of hardware verification passed while the
+web interface went on failing. **A run from a shell is a regression check, not a
+verification.**
+
+| | Operation | What it exercises |
+|---|---|---|
+| **A1–A4** | Add · edit · set CHAP · remove a storage | `on_add_hook`, `on_update_hook_full`, `on_delete_hook`, the credential store in `/etc/pve/priv`. **Not reachable from the GUI** — PVE hardcodes its storage-type list, so this stage is `pvesm` plus a `perl -T` run on the node |
+| **B1** | Add a disk | `alloc_image`, and the first one creates the target |
+| **B2** | Resize | `LUN::resize`, then `grow_map` — the map must reach the new size, not just the NAS |
+| **B3** | Move to another storage and back | `volume_export` / `volume_import` |
+| **B4** | Detach and remove | `free_image`: unmap, delete the LUN, flush the map, untrack |
+| **C1 · C2** | Snapshot, running and stopped | `volume_snapshot`, the host cache flush, the DSM description |
+| **C3** | **Roll back** | `restore_snapshot`, the cache flush *and* invalidation, and the session rescan — DSM asks the initiator to log out while it restores |
+| **C4** | Delete a snapshot | the ownership gate |
+| **C5** | Read the name in SAN Manager | that the PVE snapshot name reached the description |
+| **D1** | Stop and start | `activate_volume`: iSCSI login, session rescan, WWID confirmation, map creation, tracking |
+| **D2** | Migrate away and back, offline and online | that the source node is left clean |
+| **D3 · D4** | Full clone · clone from a snapshot | `clone_image`; D4 needs `--full 0` and the command line |
+| **D5** | Template, then linked and full clone from it | `create_base` and both clone paths |
+| **E1 · E2 · E3** | Backup in all three `vzdump` modes | the read path under `-T` |
+| **E4 · E5** | Restore to a new VM ID · overwrite the original | `alloc_image` and `free_image` back to back |
+
+**Then audit both sides.** This is the part that catches what an operation
+reported as successful:
+
+```bash
+# On the node — every map and every tracking entry must match a live volume
+multipath -ll | grep -cE '^[0-9a-f]{20,}'
+grep -v '^#' /var/lib/jt-pve-storage-synology/*.wwids
+pve-syno-reap --all                 # dry run; must report nothing left behind
+
+# On the NAS — every LUN and every target mapping must match a VM configuration
+bin/pve-syno-api-probe --host <nas> --user <account>
+```
+
+A LUN on the NAS that no configuration references, or a target mapping pointing
+at a uuid that no longer exists, is a leak that succeeded silently. That check is
+how `flush_map` was found to have never removed a map.
+
 ## Reporting
 
 If you run any of this on your own NAS, the results are worth more than
@@ -1457,3 +1502,46 @@ On this array "linked" understates it: DSM's `clone_from_snapshot` makes a
 afterwards does not affect it — while costing no space when it is made. Measured:
 a template's LUN was deleted while a linked clone of it was **running**, and the
 clone kept running.
+
+---
+
+## What the protocol turned out to be
+
+Synology publishes no specification for the SAN Manager Web API, so every line
+below is something this project had to establish and then keep. They are here
+rather than on the documentation site because none of them is needed to install
+or run the plugin — but each one changed a design decision, and a reader who
+wonders *why* the code does something odd should be able to find the answer.
+
+### Findings that changed the design
+
+| Finding | Consequence |
+|---|---|
+| A session must be carried as a Cookie: id=<sid> header, and DSM never sets that cookie itself | The client must construct it from the login's answer. A form parameter alone fails with 119 |
+| Anti-CSRF protection makes a missing token answer 105, insufficient permission | A code that reads exactly like a privilege problem and is not one |
+| Auto Block: 3 attempts in 5 minutes blocks that IP for a day | A wrong password would lock a node out for 24 hours in about 30 seconds of normal polling. So a rejected credential stops on the first failure |
+| can_snapshot and emulate_tpu are both 0 by default | A LUN created without asking for them cannot be snapshotted and never gives freed space back |
+| vpd_unit_sn is the LUN's uuid, and the WWID derives from it deterministically | A node can identify its device by the kernel's own view instead of the path it was found on. Both reference clients use only by-path |
+| A create that reports failure can create the LUN anyway (a 255-character name, error 18990068) | So a failed create is never believed: the name is looked up afterwards and what is found is adopted or deleted. Otherwise every such failure leaks a LUN PVE has no record of |
+| mapping_index is reused —a freed index goes to the next LUN mapped | A stale device path would resolve to a different disk. Both public clients identify devices by path alone; on this array that is not safe, which is what makes the WWID derivation load-bearing |
+| The CSI driver's twelve-type LUN filter hid a LUN —a Virtual Machine Manager virtual disk | Its capacity still comes out of the same volume. So this project lists unfiltered and matches locally: a filter verified to be incomplete is worse than no filter |
+| max_sessions defaults to 1 | A target left at the default admits exactly one node, so no cluster can share it and no map can be multipathed |
+
+### A rule the kernel source would get wrong
+
+A Synology LUN's WWID is built from its uuid:
+
+```
+WWID = "3" + "6001405" + (uuid with "-" replaced by "d", first 25 characters)
+```
+
+`6001405` is Linux-IO's IEEE company identifier, so the target is LIO-based —
+**which is exactly the trap.** Upstream LIO converts the serial with
+`hex_to_bin()`, which *skips* every non-hexadecimal character; a reader following
+the kernel source would therefore expect the hyphens to be dropped. On DSM they
+are **replaced with `d`**, not dropped, and that was established by comparing two
+LUNs against the kernel's own `scsi_id` output rather than by reading the source.
+
+The last 11 characters of the uuid are discarded, so the WWID cannot be inverted
+back to a uuid. The computed value is for cross-checking; the final decision
+always rests on what the kernel itself reports for the device.

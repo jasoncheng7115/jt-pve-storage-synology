@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.18 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.19 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -134,8 +134,12 @@
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">It works on a cluster, and it has been run hard.</span><span class="lang-zh">它在叢集上可以用，而且被操得很兇。</span></strong>
-        <span class="lang-en">Everything below has been driven against a DS918+ on DSM 7.1.1: a guest <strong>booting from the NAS</strong>, backed up in all three <code>vzdump</code> modes and restored byte-identical, <strong>live-migrated across three nodes</strong> (5&nbsp;ms and 87&nbsp;ms downtime), and a crashed node's LUN <strong>taken over by a surviving node in 3.6&nbsp;s</strong> while the dead node's session was still registered. Two-portal multipath lost <strong>0 of 60 reads</strong> during a path failure. What is still honest to say: <strong>one</strong> model, <strong>one</strong> DSM version, no Synology HA chassis has ever been near it, and the DSM account still needs administrator rights. Around twenty-five defects surfaced from running it that no amount of reading had shown —including two releases that could not add a storage at all —so assume there are more.</span>
-        <span class="lang-zh">以下每一項都已對一台 DS918+（DSM 7.1.1）實際跑過：一台 guest <strong>從 NAS 開機</strong>、以三種 <code>vzdump</code> 模式備份並還原成完全相同的位元組、<strong>跨三個節點即時遷移</strong>（中斷 5 毫秒與 87 毫秒），以及一個當掉節點的 LUN <strong>由存活節點在 3.6 秒內接手</strong>，而當時死掉節點的工作階段仍然登記在 NAS 上。兩個 portal 的 multipath 在路徑故障期間<strong>60 次讀取失敗 0 次</strong>。仍然該誠實說的是：<strong>一個</strong>機型、<strong>一個</strong> DSM 版本、從來沒有任何 Synology HA 機箱接近過它，而且那個 DSM 帳號目前仍需要管理員權限。從實際運行中冒出大約二十五個讀程式碼讀不出來的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。</span>
+        <span class="lang-en"><strong>Driven on hardware:</strong> a guest booting from the NAS; backups in all three <code>vzdump</code> modes, restored byte-identical; live migration across five nodes; a crashed node's LUN taken over by a surviving node in <strong>3.6&nbsp;s</strong>, while the dead node's session was still registered on the NAS; two-portal multipath through a path failure —<strong>60 reads, 0 failures</strong>; and a whole-NAS outage that left the node itself untouched —no process in uninterruptible sleep, every other storage still active.</span>
+        <span class="lang-zh"><strong>已在實機上跑過：</strong>一台 guest 從 NAS 開機；三種 <code>vzdump</code> 模式的備份，還原成完全相同的位元組；跨五個節點的即時遷移；一個當掉節點的 LUN 由存活節點在 <strong>3.6&nbsp;秒</strong>內接手，而當時死掉節點的工作階段仍然登記在 NAS 上；兩個 portal 的 multipath 撐過一次路徑故障——<strong>60 次讀取，0 次失敗</strong>；以及一次整台 NAS 中斷，而節點本身毫髮無傷——沒有任何行程進入不可中斷睡眠，其他每一個 storage 都還是 active。</span>
+        <span class="lang-en"><strong>Two models and three DSM versions:</strong> a DS918+ on 7.1.1, carried across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> driven end to end.</span>
+        <span class="lang-zh"><strong>兩個機型、三個 DSM 版本：</strong>一台 DS918+（7.1.1），並帶著全部 LUN uuid 完好地跨過升級到 <strong>7.4.1</strong>；以及一台 DS925+（<strong>7.3.2</strong>）完整跑過一輪。</span>
+        <span class="lang-en"><strong>What is still honest to say:</strong> no Synology HA or dual-controller chassis has ever been near it, and the DSM account needs administrator rights because DSM offers no narrower one. Around <strong>thirty</strong> defects were found by running it that no amount of reading had shown —two releases could not add a storage at all —so assume there are more.</span>
+        <span class="lang-zh"><strong>仍然該誠實說的是：</strong>從來沒有任何 Synology HA 或雙控制器機箱接近過它，而那個 DSM 帳號需要管理員權限，因為 DSM 沒有更窄的選擇。從實際運行中找出大約<strong>三十個</strong>「讀程式碼永遠讀不出來」的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。</span>
     </div>
 
     <p>
@@ -176,76 +180,41 @@
 <section class="doc-section" id="verified">
     <h2 class="section-title"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">Against a DS918+ on DSM 7.1.1 —read-only discovery first, then writes, then a guest, then a three-node cluster with node failures. Full detail in the register.</span>
-        <span class="lang-zh">在一台 DS918+（DSM 7.1.1）上以唯讀方式取得。完整內容見登記簿。</span>
+        <span class="lang-en">Against a <strong>DS918+</strong> —read-only discovery first, then writes, then a guest, then a five-node cluster with node failures, and finally that NAS carried across a <strong>DSM 7.1.1 &rarr; 7.4.1 upgrade with every LUN uuid intact</strong>. Then a second model and a second DSM version: a <strong>DS925+ on DSM 7.3.2</strong>, driven end to end over a VPN —storage added, LUN and target created, guest booted, snapshot, rollback, and the storage removed leaving nothing behind on either side. Full detail in the register.</span>
+        <span class="lang-zh">對一台 <strong>DS918+</strong>——先唯讀探索，然後寫入，然後一台 guest，然後一個五節點叢集加上節點故障，最後那台 NAS 還帶著<strong>全部 LUN uuid 完好地跨過 DSM 7.1.1 → 7.4.1 升級</strong>。接著是第二個機型與第二個 DSM 版本：一台 <strong>DS925+，DSM 7.3.2</strong>，透過 VPN 完整跑過一輪——加入 storage、建立 LUN 與 target、guest 開機、快照、倒回，以及移除 storage 之後兩邊都沒有留下東西。完整細節在登記簿裡。</span>
     </p>
 
-    <h3 class="subsection-title"><span class="lang-en">Findings that changed the design</span><span class="lang-zh">改變了設計的發現</span></h3>
+    <p class="muted">
+        <span class="lang-en">Nine protocol findings changed a design decision each —how a session must be carried, why a failed create is never believed, why device identity comes from the kernel and never from a path —and one rule the kernel's own source would lead you to get wrong: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#what-the-protocol-turned-out-to-be">What the protocol turned out to be</a>.</span>
+        <span class="lang-zh">有九個協定發現各自改變了一個設計決定——工作階段必須怎麼攜帶、為什麼失敗的建立絕不被相信、為什麼裝置身分來自核心而非路徑——以及一條照著核心自己的原始碼讀就會讀錯的規則：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#協定實際上長什麼樣">協定實際上長什麼樣</a>。</span>
+    </p>
 
-    <div class="table-wrap">
+
+    <h3 class="subsection-title"><span class="lang-en">The operational checklist, driven from the web interface</span><span class="lang-zh">操作清單，從網頁介面驅動</span></h3>
+
+    <p>
+        <span class="lang-en">Every row below was run on a production five-node cluster on 2026-08-07. The interface matters: <code>pvedaemon</code>, <code>pveproxy</code>, <code>vzdump</code> and <code>pct</code> run under <code>-T</code> with no <code>PATH</code>, and <code>qm</code>, <code>pvesm</code>, <code>pvesh</code> and <code>qmrestore</code> do not —so an operation verified from a shell is not verified. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
+        <span class="lang-zh">下面每一列都在 2026-08-07 於一個五節點的正式叢集上跑過。介面很重要：<code>pvedaemon</code>、<code>pveproxy</code>、<code>vzdump</code> 與 <code>pct</code> 在 <code>-T</code> 底下執行而且沒有 <code>PATH</code>，`qm`、`pvesm`、`pvesh`、`qmrestore` 不是——所以「在 shell 上驗證過」不等於驗證過。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
+    </p>
+
     <table>
         <thead><tr>
-            <th><span class="lang-en">Finding</span><span class="lang-zh">發現</span></th>
-            <th><span class="lang-en">Consequence</span><span class="lang-zh">後果</span></th>
+            <th></th>
+            <th><span class="lang-en">Operation</span><span class="lang-zh">操作</span></th>
+            <th><span class="lang-en">Result</span><span class="lang-zh">結果</span></th>
         </tr></thead>
         <tbody>
-        <tr>
-            <td><span class="lang-en">A session must be carried as a <code>Cookie: id=&lt;sid&gt;</code> header, and DSM never sets that cookie itself</span><span class="lang-zh">工作階段必須以 <code>Cookie: id=&lt;sid&gt;</code> 標頭攜帶，而 DSM 自己從不設定這個 cookie</span></td>
-            <td><span class="lang-en">The client must construct it from the login's answer. A form parameter alone fails with 119</span><span class="lang-zh">用戶端必須自己從登入回應組出來。只用表單參數會得到 119</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en">Anti-CSRF protection makes a missing token answer <strong>105, insufficient permission</strong></span><span class="lang-zh">開啟防 CSRF 後，少了 token 會回 <strong>105 權限不足</strong></span></td>
-            <td><span class="lang-en">A code that reads exactly like a privilege problem and is not one</span><span class="lang-zh">一個看起來完全像權限問題、但根本不是的錯誤碼</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en">Auto Block: 3 attempts in 5 minutes blocks that IP for a day</span><span class="lang-zh">自動封鎖：5 分鐘 3 次失敗，該 IP 被封鎖一天</span></td>
-            <td><span class="lang-en">A wrong password would lock a node out for 24 hours in about 30 seconds of normal polling. So a rejected credential stops on the first failure</span><span class="lang-zh">密碼設錯時，正常輪詢約 30 秒就會讓一個節點被鎖 24 小時。所以憑證被拒絕時第一次就停</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en"><code>can_snapshot</code> and <code>emulate_tpu</code> are both <strong>0</strong> by default</span><span class="lang-zh"><code>can_snapshot</code> 與 <code>emulate_tpu</code> 預設都是 <strong>0</strong></span></td>
-            <td><span class="lang-en">A LUN created without asking for them cannot be snapshotted and never gives freed space back</span><span class="lang-zh">沒有明確要求就建立的 LUN 拍不出快照，也永遠不會把釋放的空間還回去</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en"><code>vpd_unit_sn</code> is the LUN's uuid, and the WWID derives from it deterministically</span><span class="lang-zh"><code>vpd_unit_sn</code> 就是 LUN 的 uuid，而 WWID 由它確定性地衍生</span></td>
-            <td><span class="lang-en">A node can identify its device by the kernel's own view instead of the path it was found on. Both reference clients use only by-path</span><span class="lang-zh">節點可以靠核心自己的認定辨識裝置，而不是靠它從哪個路徑被發現。兩份參考實作都只用 by-path</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en">A create that reports <strong>failure</strong> can create the LUN anyway (a 255-character name, error 18990068)</span><span class="lang-zh">回報<strong>失敗</strong>的建立仍可能把 LUN 建出來（255 字元名稱，錯誤 18990068）</span></td>
-            <td><span class="lang-en">So a failed create is never believed: the name is looked up afterwards and what is found is adopted or deleted. Otherwise every such failure leaks a LUN PVE has no record of</span><span class="lang-zh">所以失敗的建立絕不被相信：事後按名稱查一次，找到的就接管或刪掉。否則每次這種失敗都漏掉一顆 PVE 沒有紀錄的 LUN</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en"><code>mapping_index</code> is <strong>reused</strong> —a freed index goes to the next LUN mapped</span><span class="lang-zh"><code>mapping_index</code> 會<strong>重用</strong>——被釋放的編號會給下一顆被對應的 LUN</span></td>
-            <td><span class="lang-en">A stale device path would resolve to a different disk. Both public clients identify devices by path alone; on this array that is not safe, which is what makes the WWID derivation load-bearing</span><span class="lang-zh">殘留的裝置路徑會指向另一顆磁碟。兩份公開用戶端都只用路徑認裝置；在這個陣列上那不安全，這也讓 WWID 推導成為承重結構</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en">The CSI driver's twelve-type LUN filter <strong>hid a LUN</strong> —a Virtual Machine Manager virtual disk</span><span class="lang-zh">CSI driver 的十二種型態 LUN 過濾條件<strong>藏了一顆 LUN</strong>——一個 Virtual Machine Manager 的虛擬磁碟</span></td>
-            <td><span class="lang-en">Its capacity still comes out of the same volume. So this project lists unfiltered and matches locally: a filter verified to be incomplete is worse than no filter</span><span class="lang-zh">它的容量還是吃同一個儲存空間。所以本專案不帶過濾地列出、在本地比對：一個已被驗證為不完整的過濾條件，比不過濾更糟</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en"><code>max_sessions</code> defaults to <strong>1</strong></span><span class="lang-zh"><code>max_sessions</code> 預設是 <strong>1</strong></span></td>
-            <td><span class="lang-en">A target left at the default admits exactly one node, so no cluster can share it and no map can be multipathed</span><span class="lang-zh">停在預設值的 target 只容許一個節點，所以叢集無法共用，也做不出 multipath</span></td>
-        </tr>
+        <tr><td><strong>B1–B4</strong></td><td><span class="lang-en">Add a disk · resize · move to another storage and back · detach and remove</span><span class="lang-zh">新增磁碟 · 擴充 · 移動到別的 storage 再移回 · 卸離並移除</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>C1–C5</strong></td><td><span class="lang-en">Snapshot running and stopped · <strong>roll back</strong> · delete · the name visible in SAN Manager</span><span class="lang-zh">執行中與關機拍快照 · <strong>倒回</strong> · 刪除 · 名稱在 SAN Manager 看得到</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>D1–D5</strong></td><td><span class="lang-en">Stop and start · migrate away and back, offline and online · full clone · clone from a snapshot · template, then linked and full clone from it</span><span class="lang-zh">關機與啟動 · 遷移離開再遷回（離線與線上）· 完整複製 · 從快照複製 · 轉範本再做連結與完整複製</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>E1–E5</strong></td><td><span class="lang-en">Backup in all three <code>vzdump</code> modes · restore to a new VM ID · restore overwriting the original</span><span class="lang-zh"><code>vzdump</code> 三種模式的備份 · 還原到新的 VM ID · 覆蓋原本的 VM</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>A1–A4</strong></td><td><span class="lang-en">Add · edit · CHAP · remove a storage — <em>not reachable from the GUI</em>, so <code>pvesm</code> plus a <code>perl -T</code> run on the node</span><span class="lang-zh">新增 · 編輯 · CHAP · 移除 storage ——<strong>GUI 到不了</strong>，所以是 <code>pvesm</code> 加上在節點上跑一次 <code>perl -T</code></span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         </tbody>
     </table>
-    </div>
 
-    <h3 class="subsection-title"><span class="lang-en">A rule the kernel source would get wrong</span><span class="lang-zh">一條讀核心原始碼會讀錯的規則</span></h3>
-
-    <p>
-        <span class="lang-en">A Synology LUN's WWID is built from its uuid:</span>
-        <span class="lang-zh">Synology LUN 的 WWID 是由它的 uuid 組成的：</span>
-    </p>
-
-    <div class="config-block"><pre><code>WWID = "3" + "6001405" + (uuid with "-" replaced by "d", first 25 characters)</code></pre></div>
-
-    <p>
-        <span class="lang-en"><code>6001405</code> is Linux-IO's IEEE company identifier, so the target is LIO-based —which is exactly the trap. Upstream LIO converts the serial with <code>hex_to_bin()</code> and <strong>skips</strong> every non-hex character, which would drop the hyphens and produce a different WWID entirely. Synology maps them to <code>d</code>. Reading the upstream source would have given a confidently wrong answer; only hardware gave the right one.</span>
-        <span class="lang-zh"><code>6001405</code> 是 Linux-IO 的 IEEE 公司識別碼，所以 target 是 LIO 系的——而這正是陷阱。上游 LIO 用 <code>hex_to_bin()</code> 轉換序號，會<strong>跳過</strong>每一個非十六進位字元，那樣會把連字號丟掉，算出完全不同的 WWID。Synology 是把它們映射成 <code>d</code>。讀上游原始碼會得到一個很有自信的錯誤答案，只有實機給了對的。</span>
-    </p>
-
-    <div class="alert alert--info">
-        <span class="lang-en">The last 11 characters of the uuid are discarded, so the WWID cannot be inverted back to a uuid. The computed value is a <strong>cross-check</strong>; the kernel's own identification is what decides.</span>
-        <span class="lang-zh">uuid 的最後 11 個字元被丟掉了，所以 WWID 無法反推回 uuid。算出來的值是<strong>交叉核對</strong>用的，最終認定由核心自己的識別決定。</span>
+    <div class="alert alert--success">
+        <span class="lang-en"><strong>And then the audit, which is the part that catches what an operation reported as successful.</strong> After all of the above: the NAS held exactly the LUNs and target mappings its VM configurations referenced, and the node exactly the maps and tracking entries — no orphan, no stale mapping, <code>pve-syno-reap</code> reporting nothing left behind on every node. <strong>Five defects were found by this run</strong>, all in code that worked from a shell, and all fixed.</span>
+        <span class="lang-zh"><strong>然後是盤點，那才是抓「操作回報成功但其實沒做到」的部分。</strong>以上全部做完之後：NAS 上剩下的 LUN 與 target 對應，正好就是 VM 設定所引用的那些；節點上的 map 與追蹤紀錄也正好對得上——沒有孤兒、沒有失效對應，每個節點的 <code>pve-syno-reap</code> 都回報沒有殘留。<strong>這一輪找出五個缺陷</strong>，全部都在「從 shell 跑正常」的程式碼裡，而且全部修好了。</span>
     </div>
 </section>
 
@@ -298,16 +267,6 @@
         <li><span class="lang-en"><strong>Snapshots newer than the restored one survive.</strong> Restoring to the oldest of three left all three in place, and <code>restored_time</code> records the epoch second so the result is observable afterwards.</span><span class="lang-zh"><strong>比還原點更新的快照會存活。</strong>還原到三個之中最舊的那一個，三個都還在，而 <code>restored_time</code> 會記錄還原當下的 epoch 秒，所以事後看得出來。</span></li>
     </ul>
 
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Schedule the first install.</span><span class="lang-zh">第一次安裝請排維護時段。</span></strong>
-        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> —a <strong>node-wide</strong> command. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing.<br><br><strong>Measured: it does not disturb another vendor's storage.</strong> On multipath-tools 0.11.1, with continuous direct reads running against an existing unrelated map, a <code>multipathd reconfigure</code> gave <strong>1776 reads and 0 failures</strong>, the map's device-mapper <strong>event counter did not move at all</strong> —so it was never reloaded —and its path stayed <code>active ready running</code>. Reconfigure re-reads the configuration but only reloads a map whose resulting configuration actually changed, and this drop-in matches <code>vendor "SYNOLOGY"</code> alone. The maintenance window is advice for a first install on a production node, not a known outage.<br><br>The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
-        <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——這是一個<strong>節點層級</strong>的命令。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。<br><br><strong>實測：它不會動到別的廠商的儲存。</strong>在 multipath-tools 0.11.1 上，一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 <code>multipathd reconfigure</code>：<strong>1776 次讀取、0 次失敗</strong>，那個 map 的 device-mapper <strong>事件計數器完全沒有動</strong>——代表它從未被重新載入——而它的路徑維持 <code>active ready running</code>。reconfigure 會重讀設定，但只會重新載入「設定結果真的有變」的 map，而這個 drop-in 只匹配 <code>vendor "SYNOLOGY"</code>。排維護時段是給正式節點第一次安裝的建議，不是已知的中斷。<br><br>這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
-    </div>
-
-    <p class="muted">
-        <span class="lang-en">Why each of those is true, the mixed-version symptom that is hard to read, and what to do if an older version of this page told you to use <code>dpkg -i</code> —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
-        <span class="lang-zh">以上每一項為什麼成立、版本混雜時那個很難判讀的症狀，以及本頁舊版本叫你用 <code>dpkg -i</code> 時怎麼補救——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
-    </p>
     <div class="alert alert--success">
         <span class="lang-en">The second row is why the related projects <strong>refuse</strong> a rollback past newer snapshots: on those arrays the newer ones are destroyed, so letting PVE do it silently would delete snapshots the user could still see. Here nothing is destroyed, so that restriction is not needed and a disk can be rolled back repeatedly.</span>
         <span class="lang-zh">第二列正是相關專案<strong>拒絕</strong>越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
@@ -343,7 +302,7 @@
         <tr><td>SA</td><td>SA3200D</td><td>128</td><td>64</td></tr>
         <tr><td>XS+</td><td>DS3622xs+, RS4021xs+, RS3621xs+</td><td>256</td><td>128</td></tr>
         <tr><td>XS</td><td>RS3618xs</td><td>128</td><td>64</td></tr>
-        <tr><td>Plus</td><td>DS1821+, DS923+, DS920+, <strong>DS918+</strong>, DS723+</td><td>256</td><td>128</td></tr>
+        <tr><td>Plus</td><td>DS1821+, <strong>DS925+</strong>, DS923+, DS920+, <strong>DS918+</strong>, DS723+</td><td>256</td><td>128</td></tr>
         <tr><td>Plus</td><td>DS1825+, RS2825RP+, RS1221+</td><td>128</td><td>64</td></tr>
         <tr><td>Plus</td><td>DS425+</td><td><strong>4</strong></td><td><strong>2</strong></td></tr>
         <tr><td>Value</td><td>DS423, DS223</td><td><strong>4</strong></td><td><strong>2</strong></td></tr>
@@ -484,6 +443,17 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   <span class="c"># chec
     <p class="muted">
         <span class="lang-en">The reasoning behind each line of that block —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
         <span class="lang-zh">那一段每一行背後的理由——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
+    </p>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Schedule the first install</span><span class="lang-zh">第一次安裝請排維護時段</span></strong>
+        <span class="lang-en">The first activation writes a multipath drop-in and runs <code>multipathd reconfigure</code>, which is <strong>node-wide</strong>. Measured not to disturb another vendor's maps —1776 reads, 0 failures, event counter unmoved —but it is a node-wide command on a production node, so give it a window. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why the drop-in is mandatory</a>.</span>
+        <span class="lang-zh">第一次啟用會寫一個 multipath drop-in，並執行 <code>multipathd reconfigure</code>，那是一個<strong>節點層級</strong>的命令。實測不會動到別的廠商的 map——1776 次讀取、0 次失敗、事件計數器沒有動——但它畢竟是在正式節點上執行節點層級的命令，所以請排個時段。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">drop-in 為什麼是必要的</a>。</span>
+    </div>
+
+    <p class="muted">
+        <span class="lang-en">Why each of those is true, the mixed-version symptom that is hard to read, why the line is <code>apt install ./…</code> and not <code>dpkg -i</code>, and what to do if an older version of this page already led you into that —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">以上每一項為什麼成立、版本混雜時那個很難判讀的症狀、為什麼那一行是 <code>apt install ./…</code> 而不是 <code>dpkg -i</code>，以及本頁舊版本已經把你帶進那個坑時怎麼補救——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
     </p>
 
     <h3 class="subsection-title" id="upgrade"><span class="lang-en">Upgrading</span><span class="lang-zh">更新</span></h3>

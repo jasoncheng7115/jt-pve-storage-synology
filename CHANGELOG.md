@@ -6,6 +6,36 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.19] - 2026-08-07
+
+### Added
+
+- **The pre-release operational checklist is written down at last.** It existed
+  only in a conversation: the A–E list, what each row exercises, and the audit of
+  both sides afterwards — with the rule that made it worth having, which is that
+  it **must be driven from the web interface**. `pvedaemon`, `pveproxy`, `vzdump`
+  and `pct` run under `-T` with no `PATH`; `qm`, `pvesm`, `pvesh` and `qmrestore`
+  do not. Five defects lived in code that worked perfectly from a shell. *A run
+  from a shell is a regression check, not a verification.*
+- The **results** of that checklist are on the documentation site, with the audit
+  stated separately, because "the operation reported success" is not the same as
+  "nothing was left behind" — and that audit is how `flush_map` was found never to
+  have removed a map.
+
+### Documentation
+
+- **The Status box was one run-on paragraph, and three facts in it were stale**:
+  one model, one DSM version, three nodes, twenty-five defects. It is now four
+  labelled sentences — what has been driven, which models and DSM versions, what
+  is still honest to say — with current numbers. `60 reads 0 failures` was also
+  written in a way that could be read as *60 failures*.
+- The nine protocol findings and the WWID derivation moved to the register as
+  **What the protocol turned out to be**. None of it is needed to install or run
+  the plugin, and it was the first thing on the page after the status box.
+- **DS925+ is in the per-model table and the verified section.** Measuring a
+  second model and not saying so on the page it belongs on was the omission that
+  made the measurement worth less than it should have been.
+
 ## [0.6.18] - 2026-08-07
 
 ### Documentation

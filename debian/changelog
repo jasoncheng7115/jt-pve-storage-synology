@@ -1,3 +1,19 @@
+jt-pve-storage-synology (0.6.19-1) unstable; urgency=medium
+
+  * The pre-release operational checklist is written down. It existed only in a
+    conversation until now: A1-A4 storage lifecycle, B disks, C snapshots,
+    D guest lifecycle, E backup and restore, what each row exercises, and the
+    audit of both sides afterwards -- plus the rule that it must be driven from
+    the web interface, because pvedaemon, pveproxy, vzdump and pct are perl -T
+    with no PATH and qm, pvesm, pvesh and qmrestore are not.
+  * The site's Status box was one run-on paragraph and three facts in it were
+    stale. Rewritten as four labelled sentences with current numbers.
+  * The nine protocol findings and the WWID derivation moved to the register.
+    DS925+ added to the per-model table and to the verified section, which had
+    been the point of measuring it.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 18:20:00 +0800
+
 jt-pve-storage-synology (0.6.18-1) unstable; urgency=medium
 
   * Documentation. The Installing and Upgrading sections had grown into a wall
