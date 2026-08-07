@@ -51,12 +51,20 @@ jobs:
       # developer machine here — left the log as the only evidence, and the
       # logs of a public repository need a token to download. Two releases were
       # held up working that out.
+      # The failing lines are emitted as ::error:: annotations, not just printed.
+      # A public repository's Actions LOGS need a token to download, but its
+      # annotations do not — so this is what makes a red run diagnosable by
+      # anyone who can see the repository, including from a machine that cannot
+      # reproduce the failure. Two releases were held up because the only
+      # evidence was behind an authenticated download.
       - name: Unit tests
         run: |
           make unit && exit 0
-          echo "::group::verbose rerun"
-          prove -Ilib -v t/*.t || true
-          echo "::endgroup::"
+          prove -Ilib -v t/*.t > /tmp/verbose.log 2>&1 || true
+          grep -aE "^not ok|^# +Failed|^# +got|^# +expected|Can't locate|Dubious|^Bailout|syntax error|Undefined subroutine" \
+            /tmp/verbose.log | head -25 | while IFS= read -r line; do
+              printf '::error::%s\n' "$(printf '%s' "$line" | sed 's/%/%25/g')"
+            done
           exit 1
 
       # Documents come in pairs. A change that updates one language and not
