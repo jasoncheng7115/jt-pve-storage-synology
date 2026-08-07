@@ -1716,11 +1716,12 @@ sub volume_snapshot {
     # interface skipped this and said nothing, because `blockdev` cannot be
     # executed from a PVE daemon by bare name.
     my $wwid = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($obj->{uuid});
+    my $flushed = PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
     warn "storage '$storeid': could not flush this node's cache for the device"
        . " before snapshotting '$snap'. The snapshot is still crash-consistent,"
        . " but it may not contain the guest's most recent writes. Check that"
        . " blockdev is installed and runnable on this node.\n"
-        if !PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+        if defined $flushed && !$flushed;
 
     # THE SNAPSHOT NAME GOES IN THE DESCRIPTION, and that is not redundancy.
     #
@@ -1814,11 +1815,15 @@ sub volume_snapshot_rollback {
     # thing that says whether `blockdev` ran at all — which, from a PVE daemon
     # with no PATH, it did not. A rollback that skips this silently is the one
     # operation here where "it probably worked" is not good enough.
-    die "storage '$storeid': refusing to roll back — the host cache for this"
-      . " device could not be flushed, so dirty pages could be written back on"
-      . " top of the restored snapshot. Check that blockdev is installed and"
-      . " runnable on this node.\n"
-        if !PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+    # `defined` FIRST. undef means there is no device on this node — which is
+    # what a stopped VM leaves behind, and PVE requires a stop before a disk
+    # rollback. No device, no dirty pages, nothing to refuse over.
+    my $flushed = PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+    die "storage '$storeid': refusing to roll back — this node has the device"
+      . " for this disk but its host cache could not be flushed, so dirty pages"
+      . " could be written back on top of the restored snapshot. Check that"
+      . " blockdev is installed and runnable on this node.\n"
+        if defined $flushed && !$flushed;
 
     # LUN::snapshot_rollback verifies afterwards that the uuid did not change —
     # if it ever does, the device identity moved underneath every node.
@@ -1832,11 +1837,12 @@ sub volume_snapshot_rollback {
     # refusing would report a failure for work that is done. But it must be said
     # out loud, because the symptom is a disk that looks as though it was never
     # rolled back at all.
+    my $dropped = PVE::Storage::Custom::Synology::Multipath::invalidate_device_cache($wwid);
     warn "storage '$storeid': the rollback succeeded on the NAS, but this node's"
        . " cache for the device could not be invalidated. Reads may return"
        . " pre-rollback data until the guest is started fresh. Check that"
        . " blockdev is installed and runnable on this node.\n"
-        if !PVE::Storage::Custom::Synology::Multipath::invalidate_device_cache($wwid);
+        if defined $dropped && !$dropped;
 
     eval { $api->logout };
     return 1;

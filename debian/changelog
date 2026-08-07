@@ -1,3 +1,14 @@
+jt-pve-storage-synology (0.6.11-1) unstable; urgency=medium
+
+  * Rollback was refused on every cleanly stopped VM. flush_device_cache
+    returned a bare 0 both when the flush failed and when there is no device
+    on this node -- and PVE requires a stop before a disk rollback, which
+    deactivates the volume, so the second case is the normal one. Both cache
+    helpers are now three-valued (1 / 0 / undef) and the call sites read
+    `defined` first.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 13:50:00 +0800
+
 jt-pve-storage-synology (0.6.10-1) unstable; urgency=medium
 
   * The other half of taint mode: file operations. A storeid reaches a

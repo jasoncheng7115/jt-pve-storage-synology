@@ -6,6 +6,25 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.11] - 2026-08-07
+
+### Fixed
+
+- **Rollback was refused on every cleanly stopped VM**, by the guard 0.6.8 added
+  three releases earlier. `flush_device_cache` returned a bare `0` both when the
+  flush failed and when **there is no device on this node** — and PVE requires a
+  VM to be stopped before a disk rollback, which deactivates the volume, so the
+  second case is the ordinary one. No device means no dirty pages, which is the
+  safest state there is; it was being reported as a failure and the rollback
+  stopped. Both cache helpers are now three-valued — `1` flushed, `0` a device is
+  here and the flush failed, `undef` nothing here to flush — and all three call
+  sites read `defined` first.
+
+  This is rule 12's shape appearing inside the fix written for the previous
+  instance of rule 12, which is the second time that has happened in this
+  project. `t/05-multipath.t` now asserts the contract and greps the plugin's
+  source for a bare negation of either helper.
+
 ## [0.6.10] - 2026-08-07
 
 ### Fixed

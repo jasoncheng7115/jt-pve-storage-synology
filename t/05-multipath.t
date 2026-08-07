@@ -155,4 +155,33 @@ SKIP: {
     is($r->{size}, 100, 'and reports the size it ended up at');
 }
 
+# --- the cache helpers are THREE-valued, and the middle case broke rollback ---
+#
+# PVE requires a VM to be STOPPED before a disk rollback, and a stopped VM has
+# been deactivated — so the device is gone from this node and there is nothing
+# to flush. That is the safest state there is. Returning a bare 0 for it made it
+# indistinguishable from "the flush failed", and every rollback from a clean
+# stop was refused by the guard added one release earlier.
+{
+    my $M = 'PVE::Storage::Custom::Synology::Multipath';
+    is($M->can('flush_device_cache')->('3600140500000000000000000000000000'), undef,
+       'no device on this node: undef, not 0 — there is nothing to flush');
+    is($M->can('invalidate_device_cache')->('3600140500000000000000000000000000'), undef,
+       'and the same for the invalidation after a rollback');
+    is($M->can('flush_device_cache')->('not-a-wwid'), undef,
+       'an unusable WWID resolves to no device rather than to a failure');
+}
+
+# The plugin must read them with `defined` first. Checked in the source, because
+# the bug was a bare negation and a bare negation compiles perfectly.
+{
+    open(my $fh, '<', 'lib/PVE/Storage/Custom/SynologySANPlugin.pm')
+        or BAIL_OUT('cannot read the plugin');
+    my $src = do { local $/; <$fh> };
+    close($fh);
+    (my $code = $src) =~ s/^\s*#.*$//mg;   # strip comments: they discuss this
+    unlike($code, qr/!\s*PVE::Storage::Custom::Synology::Multipath::(?:flush|invalidate)_device_cache/,
+           'no call site bare-negates a three-valued cache helper');
+}
+
 done_testing();

@@ -551,31 +551,49 @@ sub flush_map {
 # project directly — reading the device straight after a successful rollback
 # returned the OLD bytes until the cache was invalidated, so a caller that
 # checked its own work would have concluded the rollback had failed.
+# THREE-VALUED, and the middle case is the one that matters:
+#
+#   1     flushed
+#   0     a device IS here and the flush failed
+#   undef no device on this node, so there was nothing to flush
+#
+# The last two used to be the same `0`, and a caller cannot tell them apart —
+# which broke rollback the day the refusal was added. PVE requires a VM to be
+# STOPPED before a disk rollback, and a stopped VM has been deactivated, so the
+# device is gone from this node and `device_path_for_wwid` answers undef. That
+# is the safest state there is: no device, therefore no dirty pages, therefore
+# nothing that could land on top of the restored snapshot. It was being reported
+# as "the flush failed" and every rollback from a clean stop was refused.
+#
+# Rule 12's shape, in the fix written for the previous instance of rule 12.
 sub flush_device_cache {
     _not_a_method($_[0]);
     my ($wwid) = @_;
-    my $path = device_path_for_wwid($wwid) or return 0;
-    eval { run_cmd([ 'blockdev', '--flushbufs', $path ],
-                   timeout => 30, allow_nonzero => 1) };
-    return $@ ? 0 : 1;
+    my $path = device_path_for_wwid($wwid);
+    return undef if !defined $path;
+    my $ok = eval { run_cmd([ 'blockdev', '--flushbufs', $path ],
+                            timeout => 30, allow_nonzero => 1); 1 };
+    return $ok ? 1 : 0;
 }
 
 # Drop what the host has cached for ONE device. Not `/proc/sys/vm/drop_caches`,
 # which throws away every cache on the node including other storages'.
+# Same three-valued contract as flush_device_cache above, for the same reason.
 sub invalidate_device_cache {
     _not_a_method($_[0]);
     my ($wwid) = @_;
-    my $path = device_path_for_wwid($wwid) or return 0;
+    my $path = device_path_for_wwid($wwid);
+    return undef if !defined $path;
 
     # BLKFLSBUF via blockdev discards the buffer cache for this device only.
-    eval { run_cmd([ 'blockdev', '--flushbufs', $path ],
-                   timeout => 30, allow_nonzero => 1) };
+    my $ok = eval { run_cmd([ 'blockdev', '--flushbufs', $path ],
+                            timeout => 30, allow_nonzero => 1); 1 };
 
     # And re-read the partition table, which is what makes the kernel drop its
     # cached view of the contents. Harmless on a device with no partitions.
-    eval { run_cmd([ 'blockdev', '--rereadpt', $path ],
-                   timeout => 30, allow_nonzero => 1) };
-    return 1;
+    $ok &&= eval { run_cmd([ 'blockdev', '--rereadpt', $path ],
+                           timeout => 30, allow_nonzero => 1); 1 };
+    return $ok ? 1 : 0;
 }
 
 # fuser lives in different places on different distributions, and a hardcoded
