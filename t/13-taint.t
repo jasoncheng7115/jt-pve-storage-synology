@@ -38,7 +38,13 @@ for my $line (@lines) {
     chomp $line;
     my ($verdict, $rest) = $line =~ /\A(not ok|ok) (.*)\z/ or next;
     my ($name, $why) = split(/\t/, $rest, 2);
-    ok($verdict eq 'ok', $name) or diag($why // '(no detail)');
+    # The reason goes in the NAME, not only in a diag. GitHub Actions turns a
+    # failing test into an annotation and annotations are readable without a
+    # token, where the log is not — but only the name comes through. A detail
+    # that lands solely in `diag` is a detail nobody outside the browser sees.
+    $name .= ' -- ' . $why if $verdict ne 'ok' && defined $why && length $why;
+    $name =~ s/\s+/ /g;
+    ok($verdict eq 'ok', $name);
 }
 
 done_testing();

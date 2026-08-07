@@ -44,6 +44,17 @@ my $tainted = do {
 };
 result(Scalar::Util::tainted($tainted) ? 1 : 0, 'the fixture is genuinely tainted');
 
+# What the resolver found, reported whether or not it worked: when every command
+# case fails at once the question is always "was the program found at all", and
+# the answer belongs in the output rather than in the next debugging cycle.
+{
+    my $echo = $C->can('tool_path')->('echo');
+    my @dirs = grep { -d $_ } @PVE::Storage::Custom::Synology::Command::TOOL_DIRS;
+    result(defined $echo, "tool_path('echo') resolves",
+           'got ' . (defined $echo ? $echo : 'undef')
+           . '; directories present: ' . (join(' ', @dirs) || 'none'));
+}
+
 # The regression: before the fix this died inside IPC::Open3, sixty seconds into
 # a retry loop, having reached multipathd exactly zero times.
 {
