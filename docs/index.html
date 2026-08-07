@@ -4,17 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>jt-pve-storage-synology -- Synology NAS storage plugin for Proxmox VE</title>
-<meta name="description" content="A Proxmox VE storage plugin for Synology NAS over iSCSI: one VM disk is one thin LUN. Currently at the discovery stage, with a read-only DSM API probe and an honest register of what is verified against hardware. MIT License.">
+<meta name="description" content="A Proxmox VE storage plugin for Synology NAS over iSCSI: one VM disk is one Btrfs thin LUN, so DSM's own snapshots, rollback and clones act on the unit an operator thinks about. Driven end to end on a production cluster, with an honest register of what is verified and what is not. MIT License.">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="jt-pve-storage-synology">
-<meta property="og:description" content="Synology NAS storage plugin for Proxmox VE over iSCSI. One VM disk = one thin LUN. Discovery stage: read-only DSM API probe plus a verified/not-verified register. Open source, MIT.">
+<meta property="og:description" content="Synology NAS storage plugin for Proxmox VE over iSCSI. One VM disk = one Btrfs thin LUN: DSM snapshots, rollback, reflink clones, multipath, live migration. Driven end to end on a production cluster. Open source, MIT.">
 <meta property="og:url" content="https://jasoncheng7115.github.io/jt-pve-storage-synology/">
 <meta property="og:site_name" content="jt-pve-storage-synology">
+<meta property="og:image" content="https://jasoncheng7115.github.io/jt-pve-storage-synology/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="jt-pve-storage-synology — Synology SAN Manager iSCSI plugin for Proxmox VE">
 
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://jasoncheng7115.github.io/jt-pve-storage-synology/og-image.png">
 <meta name="twitter:title" content="jt-pve-storage-synology">
-<meta name="twitter:description" content="Synology NAS storage plugin for Proxmox VE. Discovery stage. Open source, MIT License.">
+<meta name="twitter:description" content="Synology NAS storage plugin for Proxmox VE over iSCSI. One VM disk = one Btrfs thin LUN. Snapshots, rollback, reflink clones, multipath. Open source, MIT License.">
 
 <link rel="stylesheet" href="style.css">
 
@@ -108,7 +114,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.19 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.20 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>

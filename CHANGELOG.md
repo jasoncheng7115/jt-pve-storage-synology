@@ -6,6 +6,31 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.20] - 2026-08-07
+
+### Added
+
+- **`docs/og-image.png`** — the card a shared link shows. The `netapp` and
+  `purestorage` projects have one and this project did not, which mattered more
+  than a missing decoration: `twitter:card` was already declared as
+  `summary_large_image`, and that card **needs** an image. Without one it silently
+  degrades to a text-only summary, so every link ever shared showed the plain
+  fallback. The accent is **`#0086E5`**, DSM's own `mask-icon` colour read off a
+  real NAS rather than picked, and the layout follows the sibling cards so the
+  four read as one family.
+- **`make og-image`**, and **`check-og-image`** in `release-check`. The badge
+  carries the version, so the file goes stale on every release; the check fails
+  when it is older than `debian/changelog` rather than trusting anyone to
+  remember. Shown to fail on a deliberately stale file.
+
+### Fixed
+
+- **All three social descriptions still said "discovery stage"** — what the
+  project was before it had any hardware. It has since been driven end to end on
+  two models and three DSM versions across a five-node production cluster. Those
+  strings are exactly what someone sees when they share the link, so they were
+  the most-read stale text in the project.
+
 ## [0.6.19] - 2026-08-07
 
 ### Added

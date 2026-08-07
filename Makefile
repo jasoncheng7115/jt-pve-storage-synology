@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.6.19
+VERSION = 0.6.20
 
 DESTDIR =
 PREFIX   = /usr
@@ -22,6 +22,7 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
         check-multipath-flush check-secrets check-tool-paths check-zh zh-normalise critic check-doc-urls \
+        og-image check-og-image \
         check-release-archive \
         release-check deb deb-clean clean
 
@@ -304,13 +305,30 @@ check-tool-paths:
 	fi; \
 	echo "  OK: every external command goes through the resolver."
 
+# The card a link to the documentation site shows. The VERSION is baked into its
+# badge, so it goes stale on every release — check-og-image below fails when it
+# is older than debian/changelog rather than trusting anyone to remember. The
+# accent is DSM's own mask-icon colour, read off a real NAS.
+og-image:
+	@python3 tools/og-image.py $(VERSION)
+
+check-og-image:
+	@echo "Checking the social card is not older than the changelog..."
+	@if [ ! -f docs/og-image.png ]; then \
+		echo "  ERROR: docs/og-image.png is missing. Run 'make og-image'."; exit 1; fi
+	@if [ debian/changelog -nt docs/og-image.png ]; then \
+		echo "  ERROR: docs/og-image.png is older than debian/changelog."; \
+		echo "         Its badge carries the version, so it now shows the wrong one."; \
+		echo "         Run 'make og-image'."; exit 1; fi
+	@echo "  OK: the social card is current."
+
 check-zh:
 	@echo "Checking the Traditional Chinese documents..."
 	@perl tools/check-zh-markdown.pl
 	@perl tools/check-zh-markdown.pl >/dev/null 2>&1 || { \
 		echo "  (run 'make zh-normalise' — it fixes what it can)"; exit 1; }
 
-release-check: check-multipath-flush check-secrets check-tool-paths check-zh syntax unit unit-nopve critic \
+release-check: check-multipath-flush check-secrets check-tool-paths check-zh check-og-image syntax unit unit-nopve critic \
                check-doc-urls \
                check-release-archive
 	@echo "Checking version consistency..."

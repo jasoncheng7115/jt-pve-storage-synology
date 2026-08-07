@@ -1,3 +1,19 @@
+jt-pve-storage-synology (0.6.20-1) unstable; urgency=medium
+
+  * docs/og-image.png, the card a shared link shows. The netapp and purestorage
+    projects had one and this did not -- and twitter:card was already declared
+    as summary_large_image, which needs an image and silently degrades to a
+    text-only card without one. The accent is #0086E5, DSM's own mask-icon
+    colour read off a real NAS.
+  * All three social descriptions still said "discovery stage", which is what
+    the project was before it had hardware. Those are the strings someone sees
+    when they share the link.
+  * make og-image regenerates it, and check-og-image fails release-check when
+    the file is older than debian/changelog -- the badge carries the version, so
+    it goes stale on every release.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 18:50:00 +0800
+
 jt-pve-storage-synology (0.6.19-1) unstable; urgency=medium
 
   * The pre-release operational checklist is written down. It existed only in a
