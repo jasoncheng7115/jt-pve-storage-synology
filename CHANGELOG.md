@@ -26,6 +26,16 @@ deciding whether to trust a given release.
   shape: `_fuser`/`scsi_id` against five bare command names, `slaves_of_map`
   against every other tainted argument, and now this.
 
+- **`$ENV{PATH}` must contain nothing taint mode would reject, and 0.6.10's own
+  "belt and braces" line was the next failure.** Perl refuses to `exec` when
+  **any** directory in `$ENV{PATH}` is writable by group or other —
+  *Insecure directory in `$ENV{PATH}` while running with -T switch* — and the
+  PATH set for the child was the whole search list, `/usr/local/bin` included.
+  On a machine where that directory is group-writable, every command the plugin
+  runs from `pvedaemon` or `vzdump` dies. It is now filtered to the directories
+  taint mode accepts, checked per call because a directory's mode is exactly the
+  node-local fact this project has been caught assuming.
+
 ### Documentation
 
 - The capacity-units comparison is now **shown**: Proxmox VE reporting

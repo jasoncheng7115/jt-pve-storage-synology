@@ -192,4 +192,37 @@ subtest 'run_cmd still runs a real command, resolved' => sub {
     like($out, qr/hello/, 'and produced its output');
 };
 
+# --- $ENV{PATH} must contain nothing taint mode would reject -----------------
+#
+# Perl refuses to exec when ANY directory in $ENV{PATH} is writable by group or
+# other: "Insecure directory in $ENV{PATH} while running with -T switch". The
+# plugin sets PATH for the child as a courtesy to anything the child itself
+# execs — and setting it to the whole search list was the next failure, because
+# a GitHub runner's /usr/local/bin is group-writable. Every command in the suite
+# died on a line that existed only to be careful.
+subtest 'safe_path drops a directory that would make exec refuse' => sub {
+    my $ok_dir  = "/tmp/syno-safe-$$";
+    my $bad_dir = "/tmp/syno-unsafe-$$";
+    mkdir $ok_dir; chmod 0755, $ok_dir;
+    mkdir $bad_dir; chmod 0777, $bad_dir;
+
+    SKIP: {
+        skip 'cannot create the fixtures', 3 if !-d $ok_dir || !-d $bad_dir;
+        my @st = stat($bad_dir);
+        skip 'the filesystem would not take mode 0777', 3 if !($st[2] & 0o022);
+
+        no warnings 'once';
+        local @PVE::Storage::Custom::Synology::Command::TOOL_DIRS =
+            ($ok_dir, $bad_dir, '/tmp/syno-does-not-exist');
+        my $path = PVE::Storage::Custom::Synology::Command::safe_path();
+
+        like($path, qr/\Q$ok_dir\E/, 'a 0755 directory is kept');
+        unlike($path, qr/\Q$bad_dir\E/,
+               'a world-writable one is dropped, because exec would refuse the whole PATH');
+        unlike($path, qr/does-not-exist/, 'and one that is not there is not named');
+    }
+
+    rmdir $bad_dir; rmdir $ok_dir;
+};
+
 done_testing();

@@ -30,6 +30,7 @@ our @EXPORT_OK = qw(
     sysfs_read_with_timeout
     sysfs_write_with_timeout
     tool_path
+    safe_path
 );
 
 # ---------------------------------------------------------------------------
@@ -344,6 +345,21 @@ sub _untaint_arg {
         . " come from anywhere trustworthy.";
 }
 
+# The subset of @TOOL_DIRS that taint mode will accept in $ENV{PATH}: present,
+# and not writable by group or other. Recomputed each call rather than cached —
+# it is six stats, and a directory's mode is exactly the kind of node-local fact
+# this project has been caught assuming twice today.
+sub safe_path {
+    my @ok;
+    for my $dir (@TOOL_DIRS) {
+        my @st = stat($dir) or next;
+        next if !-d _;
+        next if $st[2] & 0o022;      # group- or world-writable
+        push @ok, $dir;
+    }
+    return join(':', @ok);
+}
+
 sub _run_cmd {
     _not_a_method($_[0]);
     my ($cmd, %opts) = @_;
@@ -379,15 +395,24 @@ sub _run_cmd {
         local $ENV{LC_ALL} = 'C';
         local $ENV{LANG}   = 'C';
 
-        # Belt and braces for anything the child itself execs. The absolute path
-        # above is what makes THIS command run; this is so a helper it spawns
-        # does not hit the same wall.
+        # For anything the child itself execs. The absolute path above is what
+        # makes THIS command run; this is so a helper it spawns does not hit the
+        # same wall. Under -T it is also mandatory rather than defensive: Perl
+        # refuses to exec with a tainted or relative $ENV{PATH}, and insists the
+        # four variables below are unset.
         #
-        # Under -T this is also mandatory rather than defensive: Perl refuses to
-        # exec at all with a tainted or relative $ENV{PATH}, and it insists the
-        # four variables below are unset. These are built from literals here, so
-        # they are untainted by construction.
-        local $ENV{PATH} = join(':', @TOOL_DIRS);
+        # SAFE directories only, and that word is taint mode's, not an opinion.
+        # Perl refuses to exec when ANY directory in $ENV{PATH} is writable by
+        # group or other:
+        #
+        #   Insecure directory in $ENV{PATH} while running with -T switch
+        #
+        # Setting PATH to the full search list was added as belt and braces and
+        # was itself the next failure: on a GitHub runner /usr/local/bin is
+        # group-writable, and every command in the suite died on a line that
+        # existed only to be careful. A node with a relaxed /usr/local would
+        # have done the same to a real operation from pvedaemon or vzdump.
+        local $ENV{PATH} = safe_path();
         local @ENV{qw(IFS CDPATH ENV BASH_ENV)};
         delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
 

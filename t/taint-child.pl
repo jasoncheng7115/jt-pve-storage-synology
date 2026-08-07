@@ -93,6 +93,25 @@ for my $good ('360014057244bc85d823fd4838da56fdc', 'mpatha',
            'a command resolves and runs with no PATH in the environment', $@);
 }
 
+# The same thing where it actually bites: an exec under -T, with a
+# world-writable directory in the search list. Before safe_path() this failed
+# with "Insecure directory in $ENV{PATH}" and took every command with it.
+{
+    my $bad = "/tmp/syno-ww-$$";
+    mkdir $bad;
+    chmod 0777, $bad;
+    my @st = stat($bad);
+    if (-d $bad && ($st[2] & 0o022)) {
+        no warnings 'once';
+        local @PVE::Storage::Custom::Synology::Command::TOOL_DIRS =
+            (@PVE::Storage::Custom::Synology::Command::TOOL_DIRS, $bad);
+        my ($out) = eval { $C->can('run_cmd')->([ 'echo', 'ok' ], timeout => 10) };
+        result(((($out // '') eq "ok\n") ? 1 : 0),
+               'a world-writable directory in the search list does not break exec', $@);
+    }
+    rmdir $bad;
+}
+
 # --- the other half of taint mode: FILE operations ---------------------------
 #
 # run_cmd untaints what reaches a command. `open` for writing, `unlink`, `mkdir`
