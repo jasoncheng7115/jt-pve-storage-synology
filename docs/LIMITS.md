@@ -23,6 +23,7 @@ URL. Nothing is interpolated: where Synology publishes no figure, it says so.
 
 ---
 
+
 ## The number everyone quotes is the product line's, not your model's
 
 Synology's **SAN Manager Technical Specifications** page states:
@@ -190,6 +191,22 @@ Two things about that number:
   read those numbers as LUN limits.
 
 ---
+
+### A snapshot with RAM takes a LUN of its own
+
+Tick *Include RAM* and Proxmox VE writes the memory to a separate volume,
+`vm-<vmid>-state-<snapname>` — which on this storage is another LUN, against the
+same ceiling. Two things make it larger than people expect:
+
+- It is sized at **twice the VM's RAM plus 500 MB**, because PVE reserves room to
+  finish the save without stopping the guest for long. An 8 GiB VM asks for a
+  **16.5 GB** LUN.
+- **It lands here by default.** `find_vmstate_storage` prefers a *shared* storage
+  the VM already has a disk on, and this storage is always shared. Set
+  `vmstatestorage` on the VM to send it somewhere else.
+
+It is freed when the snapshot is deleted or rolled back. Driven on hardware: the
+plugin recognises the name and treats the state volume as an ordinary LUN.
 
 ## LUN type changes what works, not how many
 

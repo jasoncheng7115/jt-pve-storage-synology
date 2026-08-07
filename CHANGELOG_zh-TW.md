@@ -702,7 +702,7 @@ add → alloc → activate → snapshot → rollback → clone → resize → fr
 ### 新增
 
 - **支援倒回。**`restore_snapshot(src_lun_uuid, snapshot_uuid)` 不會改變 LUN 的 uuid——所以 WWID 存活——而且比快照時間點更新的快照會保留。因此 `volume_rollback_is_possible` **不需要**相關專案那道拒絕，一顆磁碟也可以反覆倒回。
-- **兩種高可用性架構都支援**：Synology HA（一個浮動叢集 IP，像 Pure 的 `vir0`）與 UC／SA 雙控制器（每個控制器一個位址，透過 `relay_node` 探索）。兩種都沒有在實機上跑過；plugin 偵測到 `DSM UC` 時發出警告而不是拒絕，而文件在有人回報之前一律寫「未驗證」。
+- **兩種高可用性架構都支援**：Synology HA（一個叢集虛擬 IP，像 Pure 的 `vir0`）與 UC／SA 雙控制器（每個控制器一個位址，透過 `relay_node` 探索）。兩種都沒有在實機上跑過；plugin 偵測到 `DSM UC` 時發出警告而不是拒絕，而文件在有人回報之前一律寫「未驗證」。
 - 從快照複製出來的是**精簡的**（`allocated_size: 0`），所以連結複本與範本是真的便宜。
 
 ### 修正／學到的事

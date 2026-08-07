@@ -749,7 +749,7 @@ Synology 兩種高可用性架構都已實作。兩種都沒有實際跑過。pl
 | # | 問題 |
 |---|---|
 | R-15 | **Synology HA（SHA）**：HA 叢集 IP 在故障切換後是否仍表現為單一管理位址；以及本 plugin 拿來當 storage 身分的 `SYNO.Core.ISCSI.Node` uuid，切換後會不會變。如果會變，把 storage 釘在它上面就不是保護而是破壞 |
-| R-16 | **UC／SA 雙控制器機型**（`firmware_ver` 含 `DSM UC`）：兩個控制器各有自己的管理位址，沒有浮動位址。`SYNO.Core.Network.Interface` 接受 `relay_node=node0`／`node1` 列舉對側——在單控制器的測試機上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的。**依 Synology 自己 CSI 的邏輯實作，但未驗證**。未解的問題正是只有機箱能回答的：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同——這兩件合起來決定故障切換後節點還找不找得到自己的磁碟 |
+| R-16 | **UC／SA 雙控制器機型**（`firmware_ver` 含 `DSM UC`）：兩個控制器各有自己的管理位址，沒有虛擬 IP。`SYNO.Core.Network.Interface` 接受 `relay_node=node0`／`node1` 列舉對側——在單控制器的測試機上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的。**依 Synology 自己 CSI 的邏輯實作，但未驗證**。未解的問題正是只有機箱能回答的：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同——這兩件合起來決定故障切換後節點還找不找得到自己的磁碟 |
 
 ---
 
