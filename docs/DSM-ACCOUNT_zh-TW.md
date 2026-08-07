@@ -129,41 +129,6 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 
 它們對 Proxmox VE 宣告為 `sensitive-properties`，正是這一點讓 PVE 在寫入設定之前把它們拿掉，改為交給 plugin。PVE 自己的 CIFS、PBS 和 ESXi plugin 用的是同一套機制。
 
-### 如果你安裝過 0.5.3~beta1 之前的版本，請做一次這件事
-
-那些版本把密碼寫進**`/etc/pve/storage.cfg`**。那個檔案是 `root:www-data 0640`，而且一個 Proxmox VE 不知道是機密的屬性，會透過 `GET /storage/<id>` 回傳給**任何持有 `Datastore.Audit` 的使用者**——所以一個唯讀的稽核者就能讀到一組具備 SAN Manager 權限的 DSM 憑證。
-
-plugin 仍然會從那裡讀取密碼，所以升級不會壞掉，而且每個 storage 會警告一次。要搬移它：
-
-```bash
-pvesm set <storage> --syno-password '<密碼>'
-```
-
-這會把它寫進私有檔案，並且**從 `storage.cfg` 移除**。如果你有用 CHAP，對 `--syno-chap-password` 做同樣的事。然後確認：
-
-```bash
-grep -c syno-password /etc/pve/storage.cfg      # 應該是 0
-ls -l /etc/pve/priv/storage/                     # 應該有 <storage>.syno，0600
-```
-
-因為舊的值任何以 `www-data` 身分執行的東西都讀得到，**請視為已經洩漏**：不要只是搬移，而要更換那個 DSM 帳號的密碼。如果原本有使用 2FA，裝置權杖也一併暴露了——請在 DSM 該帳號的信任裝置中撤銷它，再用新的 `--syno-otp` 讓 plugin 取得一個新的。
-
-## 兩步驟驗證
-
-這個 plugin 可以搭配開了 2FA 的帳號，而 Synology 自己的 CSI driver 不行——這是「晚做」少數佔到便宜的地方。
-
-流程是：第一次登入把一次性密碼和 `enable_device_token=yes` 一起送出，DSM 回傳一個 **device token**；之後每次登入送這個 token，不必再輸入代碼。
-
-```bash
-pvesm set <storage> --syno-otp 123456     # 只需一次
-# plugin 會保存 device token 並清掉 otp 選項
-```
-
-**device token 是憑證**。它是那個帳號的常設 2FA 旁路：任何拿到它的人都能不用代碼登入。它和密碼一起存放在 `/etc/pve/priv/storage/<storage>.syno`——見上一節——而且絕對不可以進到程式庫、技術支援單或截圖裡。0.5.3~beta1 之前的版本把它放在 `storage.cfg`；如果你在那些版本上用過 2FA，請在 DSM 撤銷該權杖。
-
-如果你不希望 NAS 上存在一個常設旁路，那就讓這個「專用、沒有資料夾權限、沒有應用程式權限、被防火牆綁住」的帳號不要開 2FA——那是站得住腳的選擇，而且可以說是更乾淨的選擇。
-
----
 
 ## 網路
 

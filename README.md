@@ -9,39 +9,27 @@ locally.
 
 ---
 
-> ### Status: **the plugin works.** Still a prerelease.
+> ### Status: **it works on a cluster, and it has been run hard.**
 >
-> `pvesm add synologysan` works, and every lifecycle operation — allocate,
-> activate, snapshot, roll back, clone, resize, free, remove — has been driven
-> end to end against a DS918+ on DSM 7.1.1, twice over, leaving nothing behind on
-> the node or the NAS.
+> Everything below was driven against a DS918+ on DSM 7.1.1: the full volume
+> lifecycle, a guest **booting from the NAS**, backups in all three `vzdump` modes
+> restored byte-identical, **live migration across three nodes** at 5 ms and 87 ms
+> downtime, and a crashed node's LUN **taken over by a surviving node in 3.6 s**
+> while the dead node's session was still registered. Two-portal multipath lost
+> **0 of 60 reads** during a path failure, and a DSM management outage left the
+> guest with **zero I/O errors**.
 >
-> Since then: **two nodes** on different kernels with the same LUN attached, live
-> migration at about 3 ms downtime, a real booted VM holding the disk, and
-> **two-portal multipath** with a path blocked under load — 0 of 60 reads failed
-> and the path came back by itself.
+> What is still honest to say: **one** model, **one** DSM version, no Synology HA
+> or dual-controller chassis has ever been near it, and the DSM account needs
+> administrator rights because DSM 7.1.1 offers no narrower one — a non-administrator
+> cannot even log in. Around twenty-five defects were found by running it that no
+> amount of reading had shown, so assume there are more.
 >
-> It is still a prerelease, and the honest reasons are: **one** model, **one** DSM
-> version, and no HA or dual-controller chassis has ever been near it. Seven bugs
-> were found in the first hour of running it that no amount of reading had shown,
-> and an audit afterwards found four more — including a credential in the wrong
-> file — so assume there are others.
->
-> It is public at this stage because the discovery tool is useful on its own,
-> and because the honest register of what is and is not known about Synology's
-> SAN API is worth reading before anyone trusts a plugin built on it.
->
-> **Do not put production data on this yet.**
+> `1.0.0` waits on a second model, a second DSM version, and the minimum DSM
+> privileges settled. [docs/TESTING.md](docs/TESTING.md) is the register of what is
+> verified and what is not, and it is worth reading before trusting this.
 
 ---
-
-> **Upgrading from a version before 0.5.3~beta1?** Those versions stored the DSM
-> password in `/etc/pve/storage.cfg`, where it was readable by `www-data` and
-> returned by the API to any user with `Datastore.Audit`. Run
-> `pvesm set <storage> --syno-password '<password>'` once per storage to move it
-> into `/etc/pve/priv`, and **treat the old value as disclosed** — change the DSM
-> account's password. Details and the 2FA token case:
-> [docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md).
 
 ## Why this exists, and what makes it awkward
 
