@@ -303,23 +303,18 @@
 
 
     <p>
-        <span class="lang-en">Never use the built-in <code>admin</code> account for this. And there is one thing DSM will not let you restrict, which you should know before deciding how to network the NAS: <strong>SAN Manager's API has no privilege you can grant for "manage LUNs"</strong>. There is no SAN operator role, and the per-user Application privileges list does not contain SAN Manager, so the account has to be an administrator.</span>
-        <span class="lang-zh">絕對不要拿內建的 <code>admin</code> 帳號來做這件事。而且有一件事 DSM 不讓你限制，你應該在決定 NAS 的網路配置之前先知道：<strong>SAN Manager 的 API 沒有任何一個可以單獨授予的「管理 LUN」權限</strong>。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager，所以帳號必須是管理員。</span>
+        <span class="lang-en">Never the built-in <code>admin</code>. And one thing DSM will not let you narrow, worth knowing before you plan the NAS's network: <strong>there is no "manage LUNs" privilege</strong> —no SAN operator role, and SAN Manager is not in the per-user Applications list— so the account must be an administrator. Everything else can still be taken away, and should be: every shared folder, every application but DSM, every address that is not a PVE node. A leaked credential then cannot read your files over SMB.</span>
+        <span class="lang-zh">絕對不要用內建的 <code>admin</code>。而且有一件事 DSM 不讓你收窄，值得在規劃 NAS 的網路之前先知道：<strong>沒有「管理 LUN」這種權限</strong>——沒有 SAN 操作員角色，應用程式權限清單裡也沒有 SAN Manager——所以帳號必須是管理員。其他一切仍然拿得掉，也應該拿掉：每一個共用資料夾、除 DSM 以外的每一個應用程式、每一個不屬於 PVE 節點的位址。這樣一組洩漏的憑證就翻不了你的檔案。</span>
     </p>
 
-    <p>
-        <span class="lang-en">That is a limitation of DSM, not a shortcut taken here. What can still be taken away from the account is everything else —every shared folder, every application except DSM itself, and any address that is not one of your PVE nodes. A leaked credential then cannot be used to browse your files over SMB or Drive, which is the difference between an incident and a disaster.</span>
-        <span class="lang-zh">這是 DSM 的限制，不是這裡便宜行事。仍然可以從那個帳號拿掉的是其他一切——每一個共用資料夾、除 DSM 以外的每一個應用程式，以及任何不屬於你的 PVE 節點的位址。這樣一組洩漏的憑證就無法用來透過 SMB 或 Drive 翻你的檔案，而那是「一次事故」和「一場災難」的差別。</span>
-    </p>
-
-    <p>
-        <div class="alert alert--info">
-        <strong><span class="lang-en">Confirmed by reading DSM, not by guessing</span><span class="lang-zh">這是讀 DSM 得到的，不是猜的</span></strong>
-        <span class="lang-en">Two halves, both measured. Through the API on DSM 7.1.1: there are exactly three groups —<code>administrators</code>, <code>http</code>, <code>users</code>— and none is iSCSI-specific; an account with no groups is refused <strong>at login</strong> with <strong>402</strong>, and so is one in <code>users</code>. Then in the interface on DSM 7.4.1, the account's <strong>Applications</strong> tab was read directly: it lists twenty applications and <strong>not one is SAN Manager, Storage Manager or iSCSI</strong>. So there is nothing finer to grant —and equally, every one of those twenty <strong>can</strong> be denied, which is what makes the paragraph above worth doing.</span>
-        <span class="lang-zh">兩個部分都實際驗證過。透過 API，在 DSM 7.1.1 上：只有三個群組——<code>administrators</code>、<code>http</code>、<code>users</code>——沒有一個是 iSCSI 專用的；沒有群組的帳號在<strong>登入</strong>就被拒絕（<strong>402</strong>），放進 <code>users</code> 也一樣。然後在介面上，於 DSM 7.4.1 直接讀了那個帳號的<strong>應用程式</strong>分頁：它列出二十個應用程式，而<strong>沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI</strong>。所以沒有更細的權限可以給——反過來說，那二十項<strong>每一項都可以</strong>拒絕，而那正是上面那段值得照做的原因。</span>
+    <div class="alert alert--info">
+        <strong><span class="lang-en">Read from DSM, not assumed</span><span class="lang-zh">這是讀 DSM 得到的，不是猜的</span></strong>
+        <span class="lang-en">On 7.1.1 there are three groups and none is iSCSI-specific; an account outside <code>administrators</code> is refused <strong>at login</strong> with <strong>402</strong>. On 7.4.1 the account's <strong>Applications</strong> tab lists twenty applications and <strong>not one is SAN Manager</strong>.</span>
+        <span class="lang-zh">7.1.1 上只有三個群組，沒有一個是 iSCSI 專用的；不在 <code>administrators</code> 裡的帳號在<strong>登入</strong>就被 <strong>402</strong> 拒絕。7.4.1 上那個帳號的<strong>應用程式</strong>分頁列出二十個應用程式，<strong>沒有一項是 SAN Manager</strong>。</span>
     </div>
 
-    <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
+    <p>
+        <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
     </p>
 </section>
 
