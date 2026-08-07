@@ -87,6 +87,39 @@ Proxmox VE and comparing timestamps. Descriptions are written when the snapshot
 is taken and DSM never rewrites them, so snapshots taken by an older build keep
 the old text.
 
+### Cloning from a snapshot: use the command line, not the button
+
+`qm clone` from a snapshot works, and the web interface will not let you do it.
+That is Proxmox VE's shape rather than this plugin's, but the error is confusing
+enough to be worth stating plainly:
+
+```
+Full clone feature is not supported for a snapshot of 'syno-nas2:vm-146-disk-0'
+```
+
+The GUI hardcodes **full clone** for anything that is not a template —
+`isTemplate ? 'clone' : 'copy'` in `pvemanagerlib.js` — and a *full* clone means
+PVE reads the source itself with `qemu-img convert`, addressing the disk **at the
+snapshot**. A Synology LUN has no device at a snapshot, so the plugin declares
+that unsupported and PVE refuses before it starts. Declaring it supported is
+worse: PVE then begins the operation and fails partway, with a message about a
+path rather than about what was asked.
+
+What does work is the **linked** clone, which this storage supports from a
+snapshot and which the command line will give you:
+
+```bash
+qm clone 146 149 --name from-snapshot --snapname mysnapshot   # no --full
+```
+
+On this array "linked" is a misnomer in your favour: DSM's
+`clone_from_snapshot` produces a **reflink**, so the new LUN is independent —
+deleting the source snapshot afterwards does not affect it — while costing no
+space at the moment it is made.
+
+To get the button back, convert the source to a template first: the GUI offers
+linked clone for templates.
+
 ### Rollback, and why it took a while to get here
 
 Neither reference implementation has a snapshot rollback: Kubernetes and Cinder
