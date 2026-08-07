@@ -31,17 +31,25 @@ use warnings;
 
 use Getopt::Long;
 
-my $VERSION = '0.6.22';
+my $VERSION = '0.6.23';
 
-my ($remove, $storage, $all, $help, $quiet);
+my ($remove, $storage, $all, $help, $quiet, $show_version);
 GetOptions(
     'remove'    => \$remove,
     'storage=s' => \$storage,
     'all'       => \$all,
     'quiet'     => \$quiet,
     'help'      => \$help,
+    'version'   => \$show_version,
 ) or usage(1);
 usage(0) if $help;
+
+# `--version` is what an operator types. This script had only ever carried its
+# version in the --help banner, and that banner sat at 0.6.5 while 0.6.20
+# shipped — so the drift was real, but it was NOT on `--version`, because there
+# was no such option: it answered "Unknown option: version" and then printed
+# help, which during an incident reads as a broken tool rather than an old one.
+if ($show_version) { print "pve-syno-reap $VERSION\n"; exit 0 }
 
 sub usage {
     my ($rc) = @_;

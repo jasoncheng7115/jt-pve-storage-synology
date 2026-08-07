@@ -1,3 +1,19 @@
+jt-pve-storage-synology (0.6.23-1) unstable; urgency=medium
+
+  * --version on both bin scripts. Neither had it: they carried their version
+    only in the --help banner, so pve-syno-reap --version answered "Unknown
+    option: version" and printed help, which during an incident reads as a broken
+    tool rather than an old one. release-check now also asserts the option exists
+    on any script carrying a $VERSION, since a version nobody can read is not a
+    version. Shown to fail with the option removed.
+  * A correction in 0.6.21 was itself wrong. That entry said pve-syno-reap
+    --version had been reporting 0.6.5; it had not, because the option did not
+    exist -- the stale string was in the --help banner. The drift was real and the
+    fix was right, but the output was misnamed. Found by running the tool on five
+    nodes after installing the release that claimed to have fixed it.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 19:15:00 +0800
+
 jt-pve-storage-synology (0.6.22-1) unstable; urgency=medium
 
   * The snapshot ceiling counted the array DSM handed over rather than the total

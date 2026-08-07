@@ -6,6 +6,28 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.23] - 2026-08-07
+
+### Added
+
+- **`--version` on both bin scripts.** Neither had it. They carried their version
+  only in the `--help` banner, so `pve-syno-reap --version` answered
+  `Unknown option: version` and then printed help — which during an incident reads
+  as a broken tool rather than an old one, and the reaper is the documented step
+  after a node crash. `release-check` now also asserts the option **exists** on any
+  script carrying a `$VERSION`, because a version nobody can read is not a version.
+  Shown to fail with the option removed.
+
+### Fixed
+
+- **A correction in 0.6.21 was itself wrong.** That entry said
+  `pve-syno-reap --version` had been reporting `0.6.5`; it had not, because the
+  option did not exist. What was stale was the `--help` banner. The drift was real
+  and the fix was right, but the output was misnamed — found by running the tool on
+  five nodes after installing the release that claimed to have fixed it. Both
+  changelogs now say `--help`. **Asserting the output of a command without running
+  it is how a correction became a second false claim.**
+
 ## [0.6.22] - 2026-08-07
 
 ### Fixed
@@ -34,11 +56,12 @@ deciding whether to trust a given release.
 
 ### Fixed
 
-- **`bin/pve-syno-reap --version` had reported `0.6.5` for fifteen releases.**
+- **`bin/pve-syno-reap` had reported `0.6.5` in its `--help` banner for fifteen
+  releases.**
   The version-consistency check named `bin/pve-syno-api-probe` on its own, while
   this project's own documentation claimed it compared *both* version-bearing bin
   scripts. So the guard read as satisfied and the drift was invisible — on the one
-  script whose `--version` an operator reads during an incident, because the
+  script whose banner an operator reads during an incident, because the
   reaper is the documented step after a node crash. The check now enumerates every
   bin script carrying a `$VERSION` instead of naming them, so the next script is
   covered without anyone remembering. Shown to fail on the stale file before it

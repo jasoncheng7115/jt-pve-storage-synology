@@ -91,7 +91,7 @@ sub read_password {
     return $answer;
 }
 
-my $VERSION = '0.6.22';
+my $VERSION = '0.6.23';
 
 my $host;
 my $port;
@@ -106,6 +106,7 @@ my $probe_methods = 0;
 my $show_luns     = 1;
 my $json_out      = 0;
 my $help          = 0;
+my $show_version  = 0;
 
 GetOptions(
     'host|H=s'      => \$host,
@@ -121,9 +122,11 @@ GetOptions(
     'luns!'         => \$show_luns,
     'json'          => \$json_out,
     'help|h'        => \$help,
+    'version'       => \$show_version,
 ) or usage(1);
 
 usage(0) if $help;
+if ($show_version) { print "pve-syno-api-probe $VERSION\n"; exit 0 }
 usage(1) if !$host || !$user;
 
 $port //= $https ? 5001 : 5000;

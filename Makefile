@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.6.22
+VERSION = 0.6.23
 
 DESTDIR =
 PREFIX   = /usr
@@ -359,6 +359,12 @@ release-check: check-multipath-flush check-secrets check-tool-paths check-zh che
 		echo "  $$f:  $$v"; \
 		if [ "$(VERSION)" != "$$v" ]; then \
 			echo "  ERROR: Makefile and $$f disagree"; fail=1; \
+		fi; \
+		if ! grep -q "'version'" $$f; then \
+			echo "  ERROR: $$f carries a \$$VERSION but has no --version option,"; \
+			echo "         so the value above is one nobody can read. It answers"; \
+			echo "         'Unknown option' and prints help, which reads as broken."; \
+			fail=1; \
 		fi; \
 	done; \
 	for f in CHANGELOG.md CHANGELOG_zh-TW.md; do \
