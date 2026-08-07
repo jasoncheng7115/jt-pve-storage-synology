@@ -234,6 +234,12 @@ check-doc-urls:
 		echo "  ERROR: /releases/latest/download 404s while every release is a prerelease"; \
 		bad=1; \
 	fi; \
+	if grep -rn 'dpkg -i jt-pve-storage-synology' docs/ README*.md 2>/dev/null; then \
+		echo "  ERROR: dpkg -i does not resolve dependencies. On a node without"; \
+		echo "         multipath-tools it unpacks and then leaves the package"; \
+		echo "         unconfigured. Document 'apt install ./<file>.deb'."; \
+		bad=1; \
+	fi; \
 	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
 		code=$$(curl -sL -o /dev/null -w '%{http_code}' --max-time 20 "$$u"); \
 		if [ "$$code" != "200" ]; then echo "  ERROR: $$code for $$u"; bad=1; \

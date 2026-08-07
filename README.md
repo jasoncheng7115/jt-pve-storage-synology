@@ -240,10 +240,23 @@ storage and starts breaking it.
 On every node of the cluster.
 
 ```bash
+# on each node — the two packages PVE does not install for you
+apt install -y open-iscsi multipath-tools
+
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
-dpkg -i jt-pve-storage-synology_0.6.3.beta1-1_all.deb
+apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
+
+`open-iscsi` and `multipath-tools` are the two a Proxmox VE node can genuinely be
+missing — nothing in PVE pulls them in, and installing `multipath-tools` is what the
+maintenance window is really about. The four Perl modules the package also needs are
+dependencies of 86 to 151 PVE packages each, so they are already there.
+
+Then `apt install ./…`, not `dpkg -i`: `dpkg` does not resolve dependencies —
+on a node without `multipath-tools` it unpacks and then fails with *dependency
+problems — leaving unconfigured*. The leading `./` is required, or apt treats the
+argument as a package name.
 
 The version is in the URL on purpose: `/releases/latest/download/…` answers **404**
 here, because every 0.x is tagged as a prerelease and GitHub's `latest` skips those.

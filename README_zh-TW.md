@@ -149,10 +149,17 @@ SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經�
 叢集的每一個節點都要裝。
 
 ```bash
+# 每個節點都要 —— PVE 不會替你裝的兩個套件
+apt install -y open-iscsi multipath-tools
+
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
-dpkg -i jt-pve-storage-synology_0.6.3.beta1-1_all.deb
+apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
+
+`open-iscsi` 和 `multipath-tools` 是 Proxmox VE 節點真的可能沒有的兩個——PVE 不會拉進它們，而安裝 `multipath-tools` 正是那個維護時段真正在做的事。這個套件另外需要的四個 Perl 模組，各自是 86 到 151 個 PVE 套件的相依，所以一定已經在了。
+
+然後用 `apt install ./…`，不是 `dpkg -i`：`dpkg` 不會處理相依性——在沒有 `multipath-tools` 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。前面的 `./` 是必要的，否則 apt 會把它當成套件名稱。
 
 網址裡帶版本號是刻意的：這裡的 `/releases/latest/download/…` 會回 **404**，因為每一個 0.x 都標記為預發行版，而 GitHub 的 `latest` 會跳過它們。更新的版本在[發行頁面](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases)。從 clone 安裝則是 `make install`。
 

@@ -471,10 +471,17 @@
         <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西，所以在正式環境做之前請先讀下面的警告。</span>
     </p>
 
-    <pre><code><span class="c"># on each node</span>
+    <pre><code><span class="c"># on each node — the two packages PVE does not install for you</span>
+apt install -y open-iscsi multipath-tools
+
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
-dpkg -i jt-pve-storage-synology_0.6.3.beta1-1_all.deb
+apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd</code></pre>
+
+    <div class="note">
+        <span class="lang-en"><strong><code>open-iscsi</code> and <code>multipath-tools</code> are the two a Proxmox VE node can genuinely be missing</strong> — nothing in PVE pulls them in, and installing <code>multipath-tools</code> is the step the maintenance window is really about. The four Perl modules the package also needs are dependencies of 86 to 151 PVE packages each, so they are already there.<br><br>Then <strong><code>apt install ./…</code>, not <code>dpkg -i</code></strong>: <code>dpkg</code> does not resolve dependencies, so on a node without <code>multipath-tools</code> it unpacks and fails with <em>dependency problems&nbsp;— leaving unconfigured</em>. The leading <code>./</code> is required, or apt treats the argument as a package name.</span>
+        <span class="lang-zh"><strong>用 <code>apt install ./…</code>，不是 <code>dpkg -i</code>。</strong>這個套件相依於 <code>open-iscsi</code>、<code>multipath-tools</code> 和四個 Perl 模組，而 <code>dpkg</code> 不會處理相依性——在沒有 <code>multipath-tools</code> 的節點上，它會解開套件然後以「dependency problems — leaving unconfigured」失敗。<code>apt</code> 會把它們一起裝上。前面的 <code>./</code> 是必要的，否則 apt 會把它當成套件名稱。</span>
+    </div>
 
     <div class="note">
         <span class="lang-en">The version is in the URL on purpose. <strong><code>/releases/latest/download/…</code> answers 404 here</strong>, because every 0.x is tagged as a prerelease and GitHub's <code>latest</code> skips those — it will work from 1.0.0. Newer builds are on the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
