@@ -267,7 +267,7 @@ pvesm set mysyno --delete nodes        # 重新開放給整個叢集
 pvesm status --storage mysyno          # 確認
 ```
 
-有兩個理由要用它。**沒有裝 plugin 的節點**否則會在每一次 `pvestatd` 輪詢時記錄「unknown storage type」——限制節點是分批上線最乾淨的做法。而**連不到 NAS 資料 portal 的節點**本來就不該去嘗試；它會在啟用磁碟時失敗，而不是禮貌地略過。
+有兩個理由要用它。第一，**沒有裝 plugin 的節點**每一次 `pvestatd` 輪詢都會留下一筆「unknown storage type」的記錄，所以分批上線時先把它們排除掉最乾淨。第二，**連不到 NAS 資料 portal 的節點**本來就不該去嘗試：它會在啟用磁碟時失敗，而不是安靜地略過。
 
 `shared` 是強制開啟、不能關掉的——這個 plugin 會把自己註冊進 `SHARED_STORAGE`，因為 NAS 上的 LUN 依其本質就是每個節點都連得到的。所以 `nodes` 限制的是**哪些節點可以使用它**，絕不會讓這個 storage 變成節點本機的。在清單允許的任何兩個節點之間，即時遷移都可以運作。
 

@@ -661,7 +661,7 @@
 
     <p>
         <span class="lang-en">Two reasons to use it. <strong>A node without the plugin installed</strong> will otherwise log <em>unknown storage type</em> on every <code>pvestatd</code> poll —restricting the storage is the clean way to stage a rollout. And <strong>a node with no route to the NAS's data portals</strong> has no business trying: it will fail to activate volumes rather than fail politely.</span>
-        <span class="lang-zh">有兩個理由要用它。<strong>沒有裝 plugin 的節點</strong>否則會在每一次 <code>pvestatd</code> 輪詢時記錄「unknown storage type」——限制節點是分批上線最乾淨的做法。而<strong>連不到 NAS 資料 portal 的節點</strong>本來就不該去嘗試：它會在啟用磁碟時失敗，而不是禮貌地略過。</span>
+        <span class="lang-zh">有兩個理由要用它。第一，<strong>沒有裝 plugin 的節點</strong>每一次 <code>pvestatd</code> 輪詢都會留下一筆「unknown storage type」的記錄，所以分批上線時先把它們排除掉最乾淨。第二，<strong>連不到 NAS 資料 portal 的節點</strong>本來就不該去嘗試：它會在啟用磁碟時失敗，而不是安靜地略過。</span>
     </p>
 
     <div class="note">
