@@ -247,8 +247,18 @@ apt install -y open-iscsi multipath-tools
 cd /tmp
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
 apt install ./jt-pve-storage-synology_all.deb
-systemctl restart pvedaemon pveproxy pvestatd
 ```
+
+No service restart is needed, and that was measured rather than assumed. The package
+installs into `/usr/share/perl5/PVE`, which `pve-manager` watches with an
+`interest-noawait` trigger — the *Processing triggers for pve-manager* line in the
+output — and its postinst runs `reload-or-try-restart` on `pvedaemon`, `pvestatd`,
+`pveproxy`, `spiceproxy` and `pvescheduler`. A reload is enough: with the package
+removed `pvedaemon` does not list `synologysan` among the storage types it accepts,
+and installing it makes the daemon validate `synologysan` options immediately — with
+its PID unchanged throughout. If something blocks `deb-systemd-invoke`,
+`systemctl restart pvedaemon pveproxy pvestatd` is the fallback.
+
 
 > **Every node, or the storage is invisible in the web interface.** `pvesm add`
 > writes to the cluster configuration, so one node is enough to create the storage —

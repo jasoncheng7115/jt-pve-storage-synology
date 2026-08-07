@@ -156,8 +156,10 @@ apt install -y open-iscsi multipath-tools
 cd /tmp
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
 apt install ./jt-pve-storage-synology_all.deb
-systemctl restart pvedaemon pveproxy pvestatd
 ```
+
+不需要重啟服務，而這是實測出來的，不是假設的。這個套件會安裝到 `/usr/share/perl5/PVE` 底下，而 `pve-manager` 用一個 `interest-noawait` trigger 監看那個路徑——就是輸出裡「Processing triggers for pve-manager」那一行——它的 postinst 會對 `pvedaemon`、`pvestatd`、`pveproxy`、`spiceproxy`、`pvescheduler` 執行 `reload-or-try-restart`。reload 就夠了：把套件移除後，`pvedaemon` 的可用 storage 類型清單裡沒有 `synologysan`；裝回去之後 daemon 立刻就會驗證 `synologysan` 的選項——而全程它的 PID 都沒有變。如果有什麼東西擋住 `deb-systemd-invoke`，備援做法是 `systemctl restart pvedaemon pveproxy pvestatd`。
+
 
 > **每個節點都要裝，否則這個 storage 在網頁介面上看不到**。`pvesm add` 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 `pveproxy` 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 `synologysan` 這個類型，於是**會把這個 storage 從清單裡靜靜略過**。在有裝的節點上它是存在而且可用的，只是沒有被顯示出來——而這個症狀看起來就像 `pvesm add` 失敗了，但它並沒有。每個節點都要裝，而且每一台都要重啟服務，包含你正在瀏覽的那一台。若要先限制在已就緒的節點上：`pvesm set <storage> --nodes nodeA,nodeB`。
 

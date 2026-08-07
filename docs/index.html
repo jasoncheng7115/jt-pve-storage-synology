@@ -115,7 +115,7 @@
             <span class="lang-zh">透過 iSCSI 連接 Synology NAS 的 Proxmox VE 儲存 plugin。</span>
         </p>
         <p class="hero__project-desc">
-            <span class="lang-en">One VM disk is one thin LUN on the NAS, so DSM's own snapshots, clones and capacity act on the unit an operator actually thinks about — no LVM layer, and no shared LUN carved up locally.</span>
+            <span class="lang-en">One VM disk is one thin LUN on the NAS, so DSM's own snapshots, clones and capacity act on the unit an operator actually thinks about —no LVM layer, and no shared LUN carved up locally.</span>
             <span class="lang-zh">一顆 VM 磁碟就是 NAS 上一個精簡配置 LUN，所以 DSM 自己的快照、複本與容量都作用在操作者心裡想的那個單位上——沒有 LVM 夾層，也不把一個共用 LUN 在本機切開。</span>
         </p>
         <div class="hero__actions">
@@ -134,12 +134,12 @@
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">The plugin works on a cluster, and it is still a prerelease.</span><span class="lang-zh">plugin 在叢集上可以用了，而且它仍然是預發行版。</span></strong>
-        <span class="lang-en">Everything below has been driven against a DS918+ on DSM 7.1.1: a guest <strong>booting from the NAS</strong>, backed up in all three <code>vzdump</code> modes and restored byte-identical, <strong>live-migrated across three nodes</strong> (5&nbsp;ms and 87&nbsp;ms downtime), and a crashed node's LUN <strong>taken over by a surviving node in 3.6&nbsp;s</strong> while the dead node's session was still registered. Two-portal multipath lost <strong>0 of 60 reads</strong> during a path failure. The honest reasons it is still a prerelease: <strong>one</strong> model, <strong>one</strong> DSM version, no Synology HA chassis has ever been near it, and the DSM account still needs administrator rights. Around twenty-five defects surfaced from running it that no amount of reading had shown — including two releases that could not add a storage at all — so assume there are more.</span>
+        <span class="lang-en">Everything below has been driven against a DS918+ on DSM 7.1.1: a guest <strong>booting from the NAS</strong>, backed up in all three <code>vzdump</code> modes and restored byte-identical, <strong>live-migrated across three nodes</strong> (5&nbsp;ms and 87&nbsp;ms downtime), and a crashed node's LUN <strong>taken over by a surviving node in 3.6&nbsp;s</strong> while the dead node's session was still registered. Two-portal multipath lost <strong>0 of 60 reads</strong> during a path failure. The honest reasons it is still a prerelease: <strong>one</strong> model, <strong>one</strong> DSM version, no Synology HA chassis has ever been near it, and the DSM account still needs administrator rights. Around twenty-five defects surfaced from running it that no amount of reading had shown —including two releases that could not add a storage at all —so assume there are more.</span>
         <span class="lang-zh">以下每一項都已對一台 DS918+（DSM 7.1.1）實際跑過：一台 guest <strong>從 NAS 開機</strong>、以三種 <code>vzdump</code> 模式備份並還原成完全相同的位元組、<strong>跨三個節點即時遷移</strong>（中斷 5 毫秒與 87 毫秒），以及一個當掉節點的 LUN <strong>由存活節點在 3.6 秒內接手</strong>，而當時死掉節點的工作階段仍然登記在 NAS 上。兩個 portal 的 multipath 在路徑故障期間<strong>60 次讀取失敗 0 次</strong>。它仍然是預發行版的誠實理由是：<strong>一個</strong>機型、<strong>一個</strong> DSM 版本、從來沒有任何 Synology HA 機箱接近過它，而且那個 DSM 帳號目前仍需要管理員權限。從實際運行中冒出大約二十五個讀程式碼讀不出來的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。</span>
     </div>
 
     <p>
-        <span class="lang-en">It is public at this stage for two reasons. The discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers. And the register of what is and is not known about that API is worth reading <em>before</em> anyone trusts a plugin built on top of it — including this one.</span>
+        <span class="lang-en">It is public at this stage for two reasons. The discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers. And the register of what is and is not known about that API is worth reading <em>before</em> anyone trusts a plugin built on top of it —including this one.</span>
         <span class="lang-zh">在這個階段就公開有兩個理由。探索工具本身對任何想知道自己的 DSM 的 SAN API 提供什麼的人都有用；而那份「哪些知道、哪些不知道」的登記簿，值得在任何人信任一個建立在它上面的 plugin <strong>之前</strong>先讀——包括信任這一個之前。</span>
     </p>
 </section>
@@ -148,7 +148,7 @@
     <h2 class="section-title"><span class="lang-en">Why this is awkward</span><span class="lang-zh">麻煩在哪裡</span></h2>
 
     <p>
-        <span class="lang-en">Synology publishes no specification for the SAN Manager Web API. The only official document, the DSM Login Web API Guide, covers logging in and discovering APIs — and documents no LUN, target, mapping or snapshot call at all.</span>
+        <span class="lang-en">Synology publishes no specification for the SAN Manager Web API. The only official document, the DSM Login Web API Guide, covers logging in and discovering APIs —and documents no LUN, target, mapping or snapshot call at all.</span>
         <span class="lang-zh">Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件 DSM Login Web API Guide 只涵蓋登入與 API 探索，完全沒有記載任何 LUN、target、對應或快照的呼叫。</span>
     </p>
 
@@ -158,7 +158,7 @@
     </p>
 
     <p>
-        <span class="lang-en">That last step is not a formality. The two disagree, and where they disagree at least one of them is wrong on any given DSM. On the DSM 7.1.1 used for testing, <strong>Cinder's way of carrying a session fails every call</strong>, and on a NAS with anti-CSRF protection enabled — a default-available setting — <strong>neither client works at all</strong>, because neither sends the token DSM then requires.</span>
+        <span class="lang-en">That last step is not a formality. The two disagree, and where they disagree at least one of them is wrong on any given DSM. On the DSM 7.1.1 used for testing, <strong>Cinder's way of carrying a session fails every call</strong>, and on a NAS with anti-CSRF protection enabled —a default-available setting —<strong>neither client works at all</strong>, because neither sends the token DSM then requires.</span>
         <span class="lang-zh">最後那一步不是形式。兩份的做法有出入，而只要有出入，在任一台特定的 DSM 上至少有一份是錯的。在用來測試的 DSM 7.1.1 上，<strong>Cinder 帶工作階段的方式讓每一個呼叫都失敗</strong>；而在開啟防 CSRF 保護的 NAS 上（那是一個隨手可開的設定），<strong>兩份都完全不能用</strong>，因為兩份都沒有送 DSM 要求的那個 token。</span>
     </p>
 
@@ -168,7 +168,7 @@
     </div>
 
     <p>
-        <span class="lang-en">Only protocol facts are taken from those projects — API names, method names, parameters, error codes. No code is derived from either; this is Perl and its structure is its own.</span>
+        <span class="lang-en">Only protocol facts are taken from those projects —API names, method names, parameters, error codes. No code is derived from either; this is Perl and its structure is its own.</span>
         <span class="lang-zh">從那兩個專案取用的只有協定事實——API 名稱、方法名稱、參數、錯誤碼。沒有任何程式碼衍生自它們；本專案是 Perl，結構是自己的。</span>
     </p>
 </section>
@@ -176,7 +176,7 @@
 <section class="doc-section" id="verified">
     <h2 class="section-title"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">Against a DS918+ on DSM 7.1.1 — read-only discovery first, then writes, then a guest, then a three-node cluster with node failures. Full detail in the register.</span>
+        <span class="lang-en">Against a DS918+ on DSM 7.1.1 —read-only discovery first, then writes, then a guest, then a three-node cluster with node failures. Full detail in the register.</span>
         <span class="lang-zh">在一台 DS918+（DSM 7.1.1）上以唯讀方式取得。完整內容見登記簿。</span>
     </p>
 
@@ -214,11 +214,11 @@
             <td><span class="lang-en">So a failed create is never believed: the name is looked up afterwards and what is found is adopted or deleted. Otherwise every such failure leaks a LUN PVE has no record of</span><span class="lang-zh">所以失敗的建立絕不被相信：事後按名稱查一次，找到的就接管或刪掉。否則每次這種失敗都漏掉一顆 PVE 沒有紀錄的 LUN</span></td>
         </tr>
         <tr>
-            <td><span class="lang-en"><code>mapping_index</code> is <strong>reused</strong> — a freed index goes to the next LUN mapped</span><span class="lang-zh"><code>mapping_index</code> 會<strong>重用</strong>——被釋放的編號會給下一顆被對應的 LUN</span></td>
+            <td><span class="lang-en"><code>mapping_index</code> is <strong>reused</strong> —a freed index goes to the next LUN mapped</span><span class="lang-zh"><code>mapping_index</code> 會<strong>重用</strong>——被釋放的編號會給下一顆被對應的 LUN</span></td>
             <td><span class="lang-en">A stale device path would resolve to a different disk. Both public clients identify devices by path alone; on this array that is not safe, which is what makes the WWID derivation load-bearing</span><span class="lang-zh">殘留的裝置路徑會指向另一顆磁碟。兩份公開用戶端都只用路徑認裝置；在這個陣列上那不安全，這也讓 WWID 推導成為承重結構</span></td>
         </tr>
         <tr>
-            <td><span class="lang-en">The CSI driver's twelve-type LUN filter <strong>hid a LUN</strong> — a Virtual Machine Manager virtual disk</span><span class="lang-zh">CSI driver 的十二種型態 LUN 過濾條件<strong>藏了一顆 LUN</strong>——一個 Virtual Machine Manager 的虛擬磁碟</span></td>
+            <td><span class="lang-en">The CSI driver's twelve-type LUN filter <strong>hid a LUN</strong> —a Virtual Machine Manager virtual disk</span><span class="lang-zh">CSI driver 的十二種型態 LUN 過濾條件<strong>藏了一顆 LUN</strong>——一個 Virtual Machine Manager 的虛擬磁碟</span></td>
             <td><span class="lang-en">Its capacity still comes out of the same volume. So this project lists unfiltered and matches locally: a filter verified to be incomplete is worse than no filter</span><span class="lang-zh">它的容量還是吃同一個儲存空間。所以本專案不帶過濾地列出、在本地比對：一個已被驗證為不完整的過濾條件，比不過濾更糟</span></td>
         </tr>
         <tr>
@@ -239,7 +239,7 @@
     <div class="config-block"><pre><code>WWID = "3" + "6001405" + (uuid with "-" replaced by "d", first 25 characters)</code></pre></div>
 
     <p>
-        <span class="lang-en"><code>6001405</code> is Linux-IO's IEEE company identifier, so the target is LIO-based — which is exactly the trap. Upstream LIO converts the serial with <code>hex_to_bin()</code> and <strong>skips</strong> every non-hex character, which would drop the hyphens and produce a different WWID entirely. Synology maps them to <code>d</code>. Reading the upstream source would have given a confidently wrong answer; only hardware gave the right one.</span>
+        <span class="lang-en"><code>6001405</code> is Linux-IO's IEEE company identifier, so the target is LIO-based —which is exactly the trap. Upstream LIO converts the serial with <code>hex_to_bin()</code> and <strong>skips</strong> every non-hex character, which would drop the hyphens and produce a different WWID entirely. Synology maps them to <code>d</code>. Reading the upstream source would have given a confidently wrong answer; only hardware gave the right one.</span>
         <span class="lang-zh"><code>6001405</code> 是 Linux-IO 的 IEEE 公司識別碼，所以 target 是 LIO 系的——而這正是陷阱。上游 LIO 用 <code>hex_to_bin()</code> 轉換序號，會<strong>跳過</strong>每一個非十六進位字元，那樣會把連字號丟掉，算出完全不同的 WWID。Synology 是把它們映射成 <code>d</code>。讀上游原始碼會得到一個很有自信的錯誤答案，只有實機給了對的。</span>
     </p>
 
@@ -259,19 +259,19 @@
     <div class="module-list">
         <div class="module-item">
             <div class="module-item__name">R-9 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分已答</span></span></div>
-            <div class="module-item__desc"><span class="lang-en"><code>offset</code> and <code>limit</code> are ignored and no total is reported, so the listing returns everything it has — and nothing in the answer proves that. Only a second read can catch a short one, and the code that reads this list decides what may be deleted</span><span class="lang-zh"><code>offset</code> 和 <code>limit</code> 被忽略，也不回報總數，所以清單回傳的是它有的全部——而答案裡沒有任何東西可以證明這件事。只有第二次讀取才能抓到短少，而讀這份清單的正是決定什麼可以刪的程式碼</span></div>
+            <div class="module-item__desc"><span class="lang-en"><code>offset</code> and <code>limit</code> are ignored and no total is reported, so the listing returns everything it has —and nothing in the answer proves that. Only a second read can catch a short one, and the code that reads this list decides what may be deleted</span><span class="lang-zh"><code>offset</code> 和 <code>limit</code> 被忽略，也不回報總數，所以清單回傳的是它有的全部——而答案裡沒有任何東西可以證明這件事。只有第二次讀取才能抓到短少，而讀這份清單的正是決定什麼可以刪的程式碼</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">R-11 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分已答</span></span></div>
-            <div class="module-item__desc"><span class="lang-en"><code>mapping_index</code> <strong>is</strong> reused — measured — which is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured: it needs hundreds of LUNs on one target</span><span class="lang-zh"><code>mapping_index</code> <strong>確實</strong>會重用——已量測——這正是裝置身分來自核心 WWID 而非路徑的原因。上限本身仍未量測：那需要在一個 target 上放上百顆 LUN</span></div>
+            <div class="module-item__desc"><span class="lang-en"><code>mapping_index</code> <strong>is</strong> reused —measured —which is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured: it needs hundreds of LUNs on one target</span><span class="lang-zh"><code>mapping_index</code> <strong>確實</strong>會重用——已量測——這正是裝置身分來自核心 WWID 而非路徑的原因。上限本身仍未量測：那需要在一個 target 上放上百顆 LUN</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">R-14 <span class="status-badge status-badge--partial"><span class="lang-en">narrowed</span><span class="lang-zh">已縮小</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">The minimum DSM privileges. Probed on hardware: DSM 7.1.1 has three groups and none is iSCSI-specific, and a non-administrator is refused at <strong>login</strong> with <strong>402</strong> — so it never reaches the storage calls. What remains is a Control Panel check that only the DSM interface can answer</span><span class="lang-zh">最小的 DSM 權限。已在硬體上探測：DSM 7.1.1 只有三個群組，沒有一個是 iSCSI 專用的，而非管理員在「登入」就被拒絕，錯誤 <strong>402</strong>——所以它根本走不到儲存呼叫。剩下的是一個只有 DSM 介面能回答的控制台檢查</span></div>
+            <div class="module-item__desc"><span class="lang-en">The minimum DSM privileges. Probed on hardware: DSM 7.1.1 has three groups and none is iSCSI-specific, and a non-administrator is refused at <strong>login</strong> with <strong>402</strong> —so it never reaches the storage calls. What remains is a Control Panel check that only the DSM interface can answer</span><span class="lang-zh">最小的 DSM 權限。已在硬體上探測：DSM 7.1.1 只有三個群組，沒有一個是 iSCSI 專用的，而非管理員在「登入」就被拒絕，錯誤 <strong>402</strong>——所以它根本走不到儲存呼叫。剩下的是一個只有 DSM 介面能回答的控制台檢查</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">R-15 / R-16</div>
-            <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> — no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a failover decides whether pinning a storage to it protects or breaks it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換後是否存活，決定了把 storage 釘在它上面是保護還是破壞</span></div>
+            <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> —no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a failover decides whether pinning a storage to it protects or breaks it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換後是否存活，決定了把 storage 釘在它上面是保護還是破壞</span></div>
         </div>
         </div>
 
@@ -289,7 +289,7 @@
     <h2 class="section-title"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></h2>
 
     <p>
-        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one. The method was found by asking a DSM about nine candidate names, one of which answered — <strong><code>restore_snapshot</code></strong>, taking <code>src_lun_uuid</code> and <code>snapshot_uuid</code>.</span>
+        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one. The method was found by asking a DSM about nine candidate names, one of which answered —<strong><code>restore_snapshot</code></strong>, taking <code>src_lun_uuid</code> and <code>snapshot_uuid</code>.</span>
         <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<strong>新的</strong> volume」來還原，所以兩者都不需要。這個方法是靠對一台 DSM 詢問九個候選名稱找到的，其中一個回答了——<strong><code>restore_snapshot</code></strong>，收 <code>src_lun_uuid</code> 與 <code>snapshot_uuid</code>。</span>
     </p>
 
@@ -326,12 +326,12 @@
 <section class="doc-section" id="limits">
     <h2 class="section-title"><span class="lang-en">How many LUNs, and what happens at the ceiling</span><span class="lang-zh">最多可以切幾個 LUN，以及開到上限會怎樣</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit — and on some models it is very small.</span>
+        <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit —and on some models it is very small.</span>
         <span class="lang-zh">一顆 VM 磁碟就是一個 LUN，所以這是實實在在的容量限制——而在某些機型上它非常小。</span>
     </p>
 
     <p>
-        <span class="lang-en">The figure everyone quotes — <strong>512 LUNs and 256 targets</strong> — comes from Synology's <a href="https://www.synology.com/en-global/dsm/7.1/software_spec/san_manager">SAN Manager Technical Specifications</a>, which footnotes it: &ldquo;the maximum number of LUNs, targets, and snapshots varies according to models&rdquo;. It is the ceiling for the whole product line, not for your NAS.</span>
+        <span class="lang-en">The figure everyone quotes —<strong>512 LUNs and 256 targets</strong> —comes from Synology's <a href="https://www.synology.com/en-global/dsm/7.1/software_spec/san_manager">SAN Manager Technical Specifications</a>, which footnotes it: &ldquo;the maximum number of LUNs, targets, and snapshots varies according to models&rdquo;. It is the ceiling for the whole product line, not for your NAS.</span>
         <span class="lang-zh">大家引用的那個數字——<strong>512 個 LUN、256 個 target</strong>——來自 Synology 的 <a href="https://www.synology.com/zh-tw/dsm/7.1/software_spec/san_manager">SAN Manager 技術規格</a>，而它自己註明：「LUN、target 與快照的最大數量會依機型而異」。那是整條產品線的上限，不是你那台 NAS 的。</span>
     </p>
 
@@ -362,7 +362,7 @@
     </div>
 
     <p>
-        <span class="lang-en">Every figure is quoted from that model's own datasheet. <strong>Three things in the table matter more than any row.</strong> The series does not predict the number. The numbers are not monotonic with generation — a <strong>DS1825+</strong> (2025) publishes 128 where the older <strong>DS1821+</strong> publishes 256. And on J, Value and some small Plus models the limit is <strong>4 LUNs</strong>: four virtual disks for the whole storage, which one VM with a system and a data disk half exhausts.</span>
+        <span class="lang-en">Every figure is quoted from that model's own datasheet. <strong>Three things in the table matter more than any row.</strong> The series does not predict the number. The numbers are not monotonic with generation —a <strong>DS1825+</strong> (2025) publishes 128 where the older <strong>DS1821+</strong> publishes 256. And on J, Value and some small Plus models the limit is <strong>4 LUNs</strong>: four virtual disks for the whole storage, which one VM with a system and a data disk half exhausts.</span>
         <span class="lang-zh">每一個數字都引自該機型自己的規格表。<strong>表裡有三件事比任何單一列都重要</strong>。系列不能預測數字。數字和世代不是單調的——<strong>DS1825+</strong>（2025 年）公布 128，而更舊的 <strong>DS1821+</strong> 公布 256。而在 J、Value 和某些小型 Plus 機型上，上限是 <strong>4 個 LUN</strong>：整個 storage 只有四顆虛擬磁碟，一台有系統碟和資料碟的 VM 就用掉一半。</span>
     </p>
 
@@ -372,24 +372,24 @@
     </div>
 
     <p>
-        <span class="lang-en"><strong>So ask the NAS.</strong> <code>SYNO.Core.System</code> <code>info</code> with <code>type=define</code> reports the model's own ceilings, and neither public reference client reads them. The plugin reads all three — LUNs, targets, and snapshots per LUN — and refuses before the NAS does. The snapshot ceiling is <strong>shared with any schedule set in SAN Manager</strong>, so the count includes snapshots this plugin did not take. Full sourced table and every official link: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/LIMITS.md">docs/LIMITS.md</a>.</span>
+        <span class="lang-en"><strong>So ask the NAS.</strong> <code>SYNO.Core.System</code> <code>info</code> with <code>type=define</code> reports the model's own ceilings, and neither public reference client reads them. The plugin reads all three —LUNs, targets, and snapshots per LUN —and refuses before the NAS does. The snapshot ceiling is <strong>shared with any schedule set in SAN Manager</strong>, so the count includes snapshots this plugin did not take. Full sourced table and every official link: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/LIMITS.md">docs/LIMITS.md</a>.</span>
         <span class="lang-zh"><strong>所以要問 NAS</strong>。<code>SYNO.Core.System</code> 的 <code>info</code>（<code>type=define</code>）會回報機型自己的上限，而兩份公開的參考實作都沒有讀它。這個 plugin 會讀三個上限——LUN、target、每個 LUN 的快照——並且在 NAS 之前先拒絕。快照上限是<strong>和 SAN Manager 裡設定的排程共用的</strong>，所以計數包含不是這個 plugin 拍的快照。附出處的完整表格與所有官方連結：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/LIMITS_zh-TW.md">docs/LIMITS_zh-TW.md</a>。</span>
     </p>
 
     <a href="LIMITS.md" class="btn btn--outline"><span class="lang-en">Every model's published limits, with sources</span><span class="lang-zh">各機型公布的上限，附出處</span></a>
 
     <p>
-        <span class="lang-en">At the ceiling DSM refuses cleanly — <strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots. Nothing is damaged, but the refusal reaches an operator as an allocation failure with a five-digit number in it while <code>pvesm status</code> goes on showing terabytes free, because free space is not the problem and adding disks will not fix it.</span>
+        <span class="lang-en">At the ceiling DSM refuses cleanly —<strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots. Nothing is damaged, but the refusal reaches an operator as an allocation failure with a five-digit number in it while <code>pvesm status</code> goes on showing terabytes free, because free space is not the problem and adding disks will not fix it.</span>
         <span class="lang-zh">開到上限時 DSM 會乾淨地拒絕——LUN 是 <strong>18990541</strong>、target 是 <strong>18990542</strong>、快照是 <strong>18990543</strong>。什麼都不會壞，但那個拒絕到操作者眼前是「配置失敗」加一個五位數字，而 <code>pvesm status</code> 還繼續顯示好幾 TB 可用——因為可用空間不是問題所在，加硬碟也解決不了。</span>
     </p>
 
     <div class="alert alert--info">
-        <span class="lang-en"><strong>So the plugin refuses first</strong>, with a message that names the real reason, and warns once while sixteen remain. <strong>The count includes LUNs this storage does not own</strong> — the owner's own and any Virtual Machine Manager disks consume the same ceiling. That is the second reason it never sends the types filter Synology's own client sends: that filter hides exactly those objects, so a client trusting it would under-count against the ceiling it was checking.</span>
+        <span class="lang-en"><strong>So the plugin refuses first</strong>, with a message that names the real reason, and warns once while sixteen remain. <strong>The count includes LUNs this storage does not own</strong> —the owner's own and any Virtual Machine Manager disks consume the same ceiling. That is the second reason it never sends the types filter Synology's own client sends: that filter hides exactly those objects, so a client trusting it would under-count against the ceiling it was checking.</span>
         <span class="lang-zh"><strong>所以 plugin 會先拒絕</strong>，用一句說得出真正原因的話，並在剩下十六個時警告一次。<strong>這個數量包含不屬於這個 storage 的 LUN</strong>——擁有者自己的、以及任何 Virtual Machine Manager 的磁碟，都吃同一個上限。這就是它從不送 Synology 自己那份型態過濾條件的第二個理由：那個過濾條件藏起來的正是這些物件，所以相信它的用戶端會在它正在檢查的那個上限上少算。</span>
     </div>
 
     <p>
-        <span class="lang-en">The three ceilings in the order they bite: <strong>LUNs</strong>, one per VM disk; <strong>snapshots per LUN</strong>, 256 and <em>shared with the user's own SAN Manager schedule</em>; and <strong>targets</strong>, irrelevant in the default <code>shared</code> mode which uses one — and the reason <code>per-volume</code> is not the default, since 128 targets would cap the storage <em>below</em> the LUN ceiling.</span>
+        <span class="lang-en">The three ceilings in the order they bite: <strong>LUNs</strong>, one per VM disk; <strong>snapshots per LUN</strong>, 256 and <em>shared with the user's own SAN Manager schedule</em>; and <strong>targets</strong>, irrelevant in the default <code>shared</code> mode which uses one —and the reason <code>per-volume</code> is not the default, since 128 targets would cap the storage <em>below</em> the LUN ceiling.</span>
         <span class="lang-zh">三個上限按會先咬到你的順序：<strong>LUN</strong>，每顆 VM 磁碟一個；<strong>每顆 LUN 的快照</strong>，256 個，而且<strong>和使用者自己的 SAN Manager 排程共用額度</strong>；以及 <strong>target</strong>，在預設的 <code>shared</code> 模式下無關緊要，因為只用一個——這也正是 <code>per-volume</code> 不是預設的原因，因為 128 個 target 會把 storage 卡在<strong>低於</strong> LUN 上限的地方。</span>
     </p>
 </section>
@@ -439,18 +439,18 @@
     </div>
 
     <p>
-        <span class="lang-en"><code>syno-portal</code> takes a list, tried in order and rotated on failure. The rotation happens <strong>inside</strong> the login and the request URL is built after it — a related project shipped a bug where the URL was built first, so every retry went on travelling to the address that had just been found dead.</span>
+        <span class="lang-en"><code>syno-portal</code> takes a list, tried in order and rotated on failure. The rotation happens <strong>inside</strong> the login and the request URL is built after it —a related project shipped a bug where the URL was built first, so every retry went on travelling to the address that had just been found dead.</span>
         <span class="lang-zh"><code>syno-portal</code> 收一份清單，依序嘗試、失敗就輪替。輪替發生在登入<strong>裡面</strong>，而請求的 URL 是在輪替之後才組——相關專案出過一個缺陷：URL 先組好了，所以每次重試都繼續送往剛剛才被判定死掉的那個位址。</span>
     </p>
 
     <p>
-        <span class="lang-en">On a UC chassis the second address need not be configured: <code>SYNO.Core.Network.Interface</code> accepts <code>relay_node=node0</code> and <code>node1</code> to enumerate the peer controller. On a single-controller NAS both answer with the same interfaces, so the mechanism is harmless where it is not needed — and on UC models a target's <code>network_portals</code> also carries a <code>controller_id</code>, which a single-controller NAS omits entirely.</span>
+        <span class="lang-en">On a UC chassis the second address need not be configured: <code>SYNO.Core.Network.Interface</code> accepts <code>relay_node=node0</code> and <code>node1</code> to enumerate the peer controller. On a single-controller NAS both answer with the same interfaces, so the mechanism is harmless where it is not needed —and on UC models a target's <code>network_portals</code> also carries a <code>controller_id</code>, which a single-controller NAS omits entirely.</span>
         <span class="lang-zh">UC 機箱的第二個位址不必手動設定：<code>SYNO.Core.Network.Interface</code> 接受 <code>relay_node=node0</code> 與 <code>node1</code> 來列舉對側控制器。在單控制器的 NAS 上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的——而 UC 機型上 target 的 <code>network_portals</code> 還會帶 <code>controller_id</code>，單控制器的 NAS 完全不回傳這個欄位。</span>
     </p>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">Neither has been run on hardware, and the plugin says so.</span><span class="lang-zh">兩種都沒有在實機上跑過，而 plugin 會說出這件事。</span></strong>
-        <span class="lang-en">SHA is low risk — one address that happens to move, which is already handled. UC is a genuine unknown: whether a LUN is owned by one controller, and whether a target's portals differ per controller, together decide whether a node still reaches its disk after a failover. So the plugin <strong>warns</strong> on <code>DSM UC</code> rather than refusing, and this page keeps saying unverified until someone reports a run.</span>
+        <span class="lang-en">SHA is low risk —one address that happens to move, which is already handled. UC is a genuine unknown: whether a LUN is owned by one controller, and whether a target's portals differ per controller, together decide whether a node still reaches its disk after a failover. So the plugin <strong>warns</strong> on <code>DSM UC</code> rather than refusing, and this page keeps saying unverified until someone reports a run.</span>
         <span class="lang-zh">SHA 風險低——就是一個會移動的位址，而那已經處理了。UC 是真正的未知：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同，這兩件合起來決定故障切換之後節點還找不找得到自己的磁碟。所以 plugin 偵測到 <code>DSM UC</code> 時<strong>發出警告</strong>而不是拒絕，而這一頁會一直寫著未驗證，直到有人回報實際運行結果。</span>
     </div>
 
@@ -467,25 +467,29 @@
         <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西，所以在正式環境做之前請先讀下面的警告。</span>
     </p>
 
-    <pre><code><span class="c"># on each node — the two packages PVE does not install for you</span>
+    <pre><code><span class="c"># on each node —the two packages PVE does not install for you</span>
 apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
-apt install ./jt-pve-storage-synology_all.deb
-systemctl restart pvedaemon pveproxy pvestatd</code></pre>
+apt install ./jt-pve-storage-synology_all.deb</code></pre>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">Every node, or the storage is invisible in the web interface</span><span class="lang-zh">每個節點都要裝，否則這個 storage 在網頁介面上看不到</span></strong>
-        <span class="lang-en"><code>pvesm add</code> writes to the cluster configuration, so one node is enough to create the storage — but the web interface is served by <strong>whichever node your browser is connected to</strong>, and <code>pveproxy</code> loads its plugin list at startup. A node without the plugin does not know the <code>synologysan</code> type and <strong>silently omits the storage from the list</strong>. The storage exists and works on the nodes that do have it; it just is not shown. That reads exactly like <code>pvesm add</code> having failed, and it did not.<br><br>So: install on every node, and <code>systemctl restart pvedaemon pveproxy pvestatd</code> on each — including the one you are browsing from. To limit the storage to the nodes that are ready, <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>.</span>
+        <span class="lang-en"><code>pvesm add</code> writes to the cluster configuration, so one node is enough to create the storage —but the web interface is served by <strong>whichever node your browser is connected to</strong>, and <code>pveproxy</code> loads its plugin list at startup. A node without the plugin does not know the <code>synologysan</code> type and <strong>silently omits the storage from the list</strong>. The storage exists and works on the nodes that do have it; it just is not shown. That reads exactly like <code>pvesm add</code> having failed, and it did not.<br><br>So: install on every node, and <code>systemctl restart pvedaemon pveproxy pvestatd</code> on each —including the one you are browsing from. To limit the storage to the nodes that are ready, <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>.</span>
         <span class="lang-zh"><code>pvesm add</code> 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 <code>pveproxy</code> 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 <code>synologysan</code> 這個類型，於是<strong>會把這個 storage 從清單裡靜靜略過</strong>。在有裝的節點上這個 storage 是存在而且可用的，只是沒有被顯示出來。這個症狀看起來就像 <code>pvesm add</code> 失敗了，但它並沒有。<br><br>所以：每個節點都要裝，而且每一台都要 <code>systemctl restart pvedaemon pveproxy pvestatd</code>——包含你正在瀏覽的那一台。若要先限制在已就緒的節點上，用 <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>。</span>
     </div>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">If a <code>dpkg -i</code> already failed here</span><span class="lang-zh">如果你已經用 <code>dpkg -i</code> 失敗過</span></strong>
-        <span class="lang-en">An earlier version of this page said <code>dpkg -i</code>. That leaves the package unpacked but <em>unconfigured</em>, and apt then refuses to solve anything else — you get <code>Unmet dependencies</code> naming <code>kpartx</code> and <code>sg3-utils-udev</code> as &ldquo;not going to be installed&rdquo;, which looks like a repository problem and is not. Clear it first:<br><br><code>dpkg --remove jt-pve-storage-synology</code><br><br>then run the block above. If the prerequisites still will not resolve after that, it really is the repositories — check <code>apt policy kpartx sg3-utils-udev</code>: <code>kpartx</code> comes from Debian <code>trixie/main</code> and <code>sg3-utils-udev</code> from the Proxmox VE repository.</span>
+        <span class="lang-en">An earlier version of this page said <code>dpkg -i</code>. That leaves the package unpacked but <em>unconfigured</em>, and apt then refuses to solve anything else —you get <code>Unmet dependencies</code> naming <code>kpartx</code> and <code>sg3-utils-udev</code> as &ldquo;not going to be installed&rdquo;, which looks like a repository problem and is not. Clear it first:<br><br><code>dpkg --remove jt-pve-storage-synology</code><br><br>then run the block above. If the prerequisites still will not resolve after that, it really is the repositories —check <code>apt policy kpartx sg3-utils-udev</code>: <code>kpartx</code> comes from Debian <code>trixie/main</code> and <code>sg3-utils-udev</code> from the Proxmox VE repository.</span>
         <span class="lang-zh">本頁先前的版本寫的是 <code>dpkg -i</code>。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 <code>Unmet dependencies</code>，說 <code>kpartx</code> 和 <code>sg3-utils-udev</code>「not going to be installed」，看起來像套件庫的問題，但不是。先清掉它：<br><br><code>dpkg --remove jt-pve-storage-synology</code><br><br>然後再跑上面那段。如果清掉之後前置套件還是裝不起來，那才真的是套件庫問題——用 <code>apt policy kpartx sg3-utils-udev</code> 檢查：<code>kpartx</code> 來自 Debian 的 <code>trixie/main</code>，而 <code>sg3-utils-udev</code> 來自 Proxmox VE 的套件庫。</span>
+    </div>
+
+    <div class="note">
+        <span class="lang-en"><strong>No service restart is needed, and this was measured rather than assumed.</strong> The package installs into <code>/usr/share/perl5/PVE</code>, which <code>pve-manager</code> watches with an <code>interest-noawait</code> trigger —that is the <em>Processing triggers for pve-manager</em> line in the output. Its postinst runs <code>reload-or-try-restart</code> on <code>pvedaemon</code>, <code>pvestatd</code>, <code>pveproxy</code>, <code>spiceproxy</code> and <code>pvescheduler</code>.<br><br>A reload is enough: with the package removed, <code>pvedaemon</code> does not list <code>synologysan</code> among the storage types it accepts; install it and the daemon validates <code>synologysan</code> options immediately —with its <strong>PID unchanged</strong> throughout. If something in your environment blocks <code>deb-systemd-invoke</code>, <code>systemctl restart pvedaemon pveproxy pvestatd</code> is the fallback.</span>
+        <span class="lang-zh"><strong>不需要重啟服務，而這是實測出來的，不是假設的。</strong>這個套件會安裝到 <code>/usr/share/perl5/PVE</code> 底下，而 <code>pve-manager</code> 用一個 <code>interest-noawait</code> trigger 監看那個路徑——那就是輸出裡「Processing triggers for pve-manager」那一行。它的 postinst 會對 <code>pvedaemon</code>、<code>pvestatd</code>、<code>pveproxy</code>、<code>spiceproxy</code>、<code>pvescheduler</code> 執行 <code>reload-or-try-restart</code>。<br><br>reload 就夠了：把套件移除後，<code>pvedaemon</code> 的可用 storage 類型清單裡沒有 <code>synologysan</code>；裝回去之後，daemon 立刻就會驗證 <code>synologysan</code> 的選項——而全程它的 <strong>PID 都沒有變</strong>。如果你的環境有什麼東西擋住 <code>deb-systemd-invoke</code>，備援做法是 <code>systemctl restart pvedaemon pveproxy pvestatd</code>。</span>
     </div>
 
     <div class="note">
@@ -494,12 +498,12 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
     </div>
 
     <div class="note">
-        <span class="lang-en"><strong><code>open-iscsi</code> and <code>multipath-tools</code> are the two a Proxmox VE node can genuinely be missing</strong> — nothing in PVE pulls them in, and installing <code>multipath-tools</code> is the step the maintenance window is really about. The four Perl modules the package also needs are dependencies of 86 to 151 PVE packages each, so they are already there.<br><br>Then <strong><code>apt install ./…</code>, not <code>dpkg -i</code></strong>: <code>dpkg</code> does not resolve dependencies, so on a node without <code>multipath-tools</code> it unpacks and fails with <em>dependency problems&nbsp;— leaving unconfigured</em>. The leading <code>./</code> is required, or apt treats the argument as a package name.</span>
-        <span class="lang-zh"><strong>用 <code>apt install ./…</code>，不是 <code>dpkg -i</code>。</strong>這個套件相依於 <code>open-iscsi</code>、<code>multipath-tools</code> 和四個 Perl 模組，而 <code>dpkg</code> 不會處理相依性——在沒有 <code>multipath-tools</code> 的節點上，它會解開套件然後以「dependency problems — leaving unconfigured」失敗。<code>apt</code> 會把它們一起裝上。前面的 <code>./</code> 是必要的，否則 apt 會把它當成套件名稱。</span>
+        <span class="lang-en"><strong><code>open-iscsi</code> and <code>multipath-tools</code> are the two a Proxmox VE node can genuinely be missing</strong> —nothing in PVE pulls them in, and installing <code>multipath-tools</code> is the step the maintenance window is really about. The four Perl modules the package also needs are dependencies of 86 to 151 PVE packages each, so they are already there.<br><br>Then <strong><code>apt install ./…</code>, not <code>dpkg -i</code></strong>: <code>dpkg</code> does not resolve dependencies, so on a node without <code>multipath-tools</code> it unpacks and fails with <em>dependency problems&nbsp;—leaving unconfigured</em>. The leading <code>./</code> is required, or apt treats the argument as a package name.</span>
+        <span class="lang-zh"><strong>用 <code>apt install ./…</code>，不是 <code>dpkg -i</code>。</strong>這個套件相依於 <code>open-iscsi</code>、<code>multipath-tools</code> 和四個 Perl 模組，而 <code>dpkg</code> 不會處理相依性——在沒有 <code>multipath-tools</code> 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。<code>apt</code> 會把它們一起裝上。前面的 <code>./</code> 是必要的，否則 apt 會把它當成套件名稱。</span>
     </div>
 
     <div class="note">
-        <span class="lang-en">That URL always points at the newest release, so it does not go stale. It works because the <code>beta1</code> suffix is gone from 0.6.5 onwards — releases are no longer flagged as prereleases, which GitHub's <code>latest</code> used to skip — and because the release publishes the package a second time under this version-free name alongside the versioned one. To pin a version instead, take the URL from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
+        <span class="lang-en">That URL always points at the newest release, so it does not go stale. It works because the <code>beta1</code> suffix is gone from 0.6.5 onwards —releases are no longer flagged as prereleases, which GitHub's <code>latest</code> used to skip —and because the release publishes the package a second time under this version-free name alongside the versioned one. To pin a version instead, take the URL from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
         <span class="lang-zh">那個網址永遠指向最新的發行版，所以不會過期。它之所以有用，是因為從 0.6.5 起 <code>beta1</code> 字樣拿掉了——發行版不再被標記為預發行版，而 GitHub 的 <code>latest</code> 原本會跳過那些——以及因為發行流程會在帶版本號的那份之外，額外用這個不帶版本號的名稱再發布一份。若要固定版本，請從<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>取用網址。從 clone 安裝：<code>make install</code>。</span>
     </div>
 
@@ -510,12 +514,12 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">Schedule the first install.</span><span class="lang-zh">第一次安裝請排維護時段。</span></strong>
-        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> — a <strong>node-wide</strong> command. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing.<br><br><strong>Measured: it does not disturb another vendor's storage.</strong> On multipath-tools 0.11.1, with continuous direct reads running against an existing unrelated map, a <code>multipathd reconfigure</code> gave <strong>1776 reads and 0 failures</strong>, the map's device-mapper <strong>event counter did not move at all</strong> — so it was never reloaded — and its path stayed <code>active ready running</code>. Reconfigure re-reads the configuration but only reloads a map whose resulting configuration actually changed, and this drop-in matches <code>vendor "SYNOLOGY"</code> alone. The maintenance window is advice for a first install on a production node, not a known outage.<br><br>The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
+        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> —a <strong>node-wide</strong> command. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing.<br><br><strong>Measured: it does not disturb another vendor's storage.</strong> On multipath-tools 0.11.1, with continuous direct reads running against an existing unrelated map, a <code>multipathd reconfigure</code> gave <strong>1776 reads and 0 failures</strong>, the map's device-mapper <strong>event counter did not move at all</strong> —so it was never reloaded —and its path stayed <code>active ready running</code>. Reconfigure re-reads the configuration but only reloads a map whose resulting configuration actually changed, and this drop-in matches <code>vendor "SYNOLOGY"</code> alone. The maintenance window is advice for a first install on a production node, not a known outage.<br><br>The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
         <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——這是一個<strong>節點層級</strong>的命令。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。<br><br><strong>實測：它不會動到別的廠商的儲存。</strong>在 multipath-tools 0.11.1 上，一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 <code>multipathd reconfigure</code>：<strong>1776 次讀取、0 次失敗</strong>，那個 map 的 device-mapper <strong>事件計數器完全沒有動</strong>——代表它從未被重新載入——而它的路徑維持 <code>active ready running</code>。reconfigure 會重讀設定，但只會重新載入「設定結果真的有變」的 map，而這個 drop-in 只匹配 <code>vendor "SYNOLOGY"</code>。排維護時段是給正式節點第一次安裝的建議，不是已知的中斷。<br><br>這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
     </div>
 
     <div class="note">
-        <span class="lang-en"><strong>Four of these plugins can share a node</strong> — this one and the DellEMC, NetApp and PureStorage siblings are developed together on a node that has all of them. But <code>PVE::SectionConfig::init</code> <strong>dies on a duplicate property name</strong>, and the failure is not scoped to the offending plugin: every storage on the node stops working. The <code>syno-</code> prefix exists for that reason.</span>
+        <span class="lang-en"><strong>Four of these plugins can share a node</strong> —this one and the DellEMC, NetApp and PureStorage siblings are developed together on a node that has all of them. But <code>PVE::SectionConfig::init</code> <strong>dies on a duplicate property name</strong>, and the failure is not scoped to the offending plugin: every storage on the node stops working. The <code>syno-</code> prefix exists for that reason.</span>
         <span class="lang-zh"><strong>四支 plugin 可以共存於同一個節點</strong>——這一支和 DellEMC、NetApp、PureStorage 三支相關專案就是在一台同時裝了全部的節點上開發的。但 <code>PVE::SectionConfig::init</code> <strong>遇到重複的屬性名稱會直接 die</strong>，而且失敗範圍不限於出問題的那一支：節點上每一個 storage 都會停止運作。<code>syno-</code> 這個前置字串就是為此存在的。</span>
     </div>
 </section>
@@ -541,19 +545,19 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
     </p>
 
     <div class="note">
-        <span class="lang-en"><strong>The password never lands in <code>/etc/pve/storage.cfg</code>.</strong> It is declared to Proxmox VE as a sensitive property, so PVE strips it out and hands it to the plugin, which writes it to <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> — mode <code>0600</code>, root only, and replicated to every node by the cluster filesystem. <strong>If you installed a version before 0.5.3~beta1, run <code>pvesm set &lt;storage&gt; --syno-password '&lt;password&gt;'</code> once to move it, and treat the old value as disclosed.</strong></span>
+        <span class="lang-en"><strong>The password never lands in <code>/etc/pve/storage.cfg</code>.</strong> It is declared to Proxmox VE as a sensitive property, so PVE strips it out and hands it to the plugin, which writes it to <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> —mode <code>0600</code>, root only, and replicated to every node by the cluster filesystem. <strong>If you installed a version before 0.5.3~beta1, run <code>pvesm set &lt;storage&gt; --syno-password '&lt;password&gt;'</code> once to move it, and treat the old value as disclosed.</strong></span>
         <span class="lang-zh"><strong>密碼不會進到 <code>/etc/pve/storage.cfg</code>。</strong>它對 Proxmox VE 宣告為機密屬性，所以 PVE 會把它拿掉並交給 plugin，由 plugin 寫入 <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code>——權限 <code>0600</code>、只有 root、並由叢集檔案系統複寫到每個節點。<strong>如果你裝過 0.5.3~beta1 之前的版本，請執行一次 <code>pvesm set &lt;storage&gt; --syno-password '&lt;密碼&gt;'</code> 把它搬過去，並且把舊的值視為已經洩漏。</strong></span>
     </div>
 
     <h3 class="subsection-title"><span class="lang-en">Finding the snapshots in SAN Manager</span><span class="lang-zh">在 SAN Manager 裡找到快照</span></h3>
 
     <p>
-        <span class="lang-en">SAN Manager's <strong>Snapshot</strong> page manages <em>schedules</em>. Expanding a LUN there shows its schedule, when the last snapshot was taken and a <strong>restore-point count</strong> — but not the snapshot names. To see the names, go to <strong>LUN → select the LUN → Snapshot</strong>.</span>
+        <span class="lang-en">SAN Manager's <strong>Snapshot</strong> page manages <em>schedules</em>. Expanding a LUN there shows its schedule, when the last snapshot was taken and a <strong>restore-point count</strong> —but not the snapshot names. To see the names, go to <strong>LUN → select the LUN → Snapshot</strong>.</span>
         <span class="lang-zh">SAN Manager 的<strong>快照</strong>頁面管理的是「排程」。在那裡展開一個 LUN 會看到它的排程、最近一次快照的時間，以及一個<strong>還原點數量</strong>——但不會列出快照名稱。要看名稱，請到 <strong>LUN → 選擇該 LUN → 快照</strong>。</span>
     </p>
 
     <p>
-        <span class="lang-en">A snapshot this plugin took carries Proxmox VE's own snapshot name verbatim — <code>install1</code> in PVE is <code>install1</code> on the NAS — with <code>taken_by</code> set to <code>jt-pve-storage-synology</code> and a description naming the storage. That marker is the ownership gate: the plugin lists, deletes and rolls back only snapshots carrying it, so a schedule you set up in SAN Manager is never touched by a VM operation.</span>
+        <span class="lang-en">A snapshot this plugin took carries Proxmox VE's own snapshot name verbatim —<code>install1</code> in PVE is <code>install1</code> on the NAS —with <code>taken_by</code> set to <code>jt-pve-storage-synology</code> and a description naming the storage. That marker is the ownership gate: the plugin lists, deletes and rolls back only snapshots carrying it, so a schedule you set up in SAN Manager is never touched by a VM operation.</span>
         <span class="lang-zh">這個 plugin 拍的快照會一字不差地帶著 Proxmox VE 自己的快照名稱——PVE 裡叫 <code>install1</code>，NAS 上就是 <code>install1</code>——並且 <code>taken_by</code> 設為 <code>jt-pve-storage-synology</code>，描述裡帶著 storage 名稱。那個標記就是所有權閘門：plugin 只會列出、刪除、倒回帶有它的快照，所以你在 SAN Manager 設的排程永遠不會被某個 VM 操作動到。</span>
     </p>
 
@@ -579,12 +583,12 @@ pvesm set mysyno --delete nodes
 pvesm status --storage mysyno</code></pre>
 
     <p>
-        <span class="lang-en">Two reasons to use it. <strong>A node without the plugin installed</strong> will otherwise log <em>unknown storage type</em> on every <code>pvestatd</code> poll — restricting the storage is the clean way to stage a rollout. And <strong>a node with no route to the NAS's data portals</strong> has no business trying: it will fail to activate volumes rather than fail politely.</span>
+        <span class="lang-en">Two reasons to use it. <strong>A node without the plugin installed</strong> will otherwise log <em>unknown storage type</em> on every <code>pvestatd</code> poll —restricting the storage is the clean way to stage a rollout. And <strong>a node with no route to the NAS's data portals</strong> has no business trying: it will fail to activate volumes rather than fail politely.</span>
         <span class="lang-zh">有兩個理由要用它。<strong>沒有裝 plugin 的節點</strong>否則會在每一次 <code>pvestatd</code> 輪詢時記錄「unknown storage type」——限制節點是分批上線最乾淨的做法。而<strong>連不到 NAS 資料 portal 的節點</strong>本來就不該去嘗試：它會在啟用磁碟時失敗，而不是禮貌地略過。</span>
     </p>
 
     <div class="note">
-        <span class="lang-en"><strong><code>shared</code> is forced on and cannot be turned off.</strong> The plugin registers itself in <code>SHARED_STORAGE</code>, because a LUN on a NAS is reachable from every node by construction — so <code>nodes</code> restricts <em>which nodes may use it</em>, and never implies the storage is node-local. Live migration works between any two nodes the list allows.</span>
+        <span class="lang-en"><strong><code>shared</code> is forced on and cannot be turned off.</strong> The plugin registers itself in <code>SHARED_STORAGE</code>, because a LUN on a NAS is reachable from every node by construction —so <code>nodes</code> restricts <em>which nodes may use it</em>, and never implies the storage is node-local. Live migration works between any two nodes the list allows.</span>
         <span class="lang-zh"><strong><code>shared</code> 是強制開啟的，不能關掉。</strong>這個 plugin 會把自己註冊進 <code>SHARED_STORAGE</code>，因為 NAS 上的 LUN 依其本質就是每個節點都能連到的——所以 <code>nodes</code> 限制的是<strong>哪些節點可以使用它</strong>，絕不代表這個 storage 是節點本機的。在清單允許的任何兩個節點之間，即時遷移都可以運作。</span>
     </div>
 
@@ -610,7 +614,7 @@ pvesm status --storage mysyno</code></pre>
         <tr><td><code>syno-chap-username</code><br><code>syno-chap-password</code></td><td>—</td><td><span class="lang-en">Set both or neither. A username with no secret is refused: an empty CHAP secret admits anyone while reporting that CHAP is on</span><span class="lang-zh">兩個要一起設。只設帳號不設密鑰會被拒絕：空的 CHAP 密鑰會誰都放進來，卻回報 CHAP 是開著的</span></td></tr>
         <tr><td><code>syno-otp</code></td><td>—</td><td><span class="lang-en">One-time code, once. The device token DSM issues is stored and the option can then be removed</span><span class="lang-zh">一次性代碼，只需一次。DSM 發出的 device token 會被存起來，之後就可以移除這個選項</span></td></tr>
         <tr><td><code>syno-ssl-verify</code><br><code>syno-tls-ca</code></td><td><code>0</code></td><td><span class="lang-en">Off by default because DSM ships a self-signed certificate. Turn it on with your own CA</span><span class="lang-zh">預設關閉，因為 DSM 出廠是自簽憑證。用你自己的 CA 時再開啟</span></td></tr>
-        <tr><td><code>syno-port</code></td><td><code>5001</code></td><td><span class="lang-en">DSM port. HTTPS only — plain HTTP is refused</span><span class="lang-zh">DSM 連接埠。只走 HTTPS——純 HTTP 一律拒絕</span></td></tr>
+        <tr><td><code>syno-port</code></td><td><code>5001</code></td><td><span class="lang-en">DSM port. HTTPS only —plain HTTP is refused</span><span class="lang-zh">DSM 連接埠。只走 HTTPS——純 HTTP 一律拒絕</span></td></tr>
         <tr><td><code>nodes</code><br><span class="lang-en"><em>PVE-level</em></span><span class="lang-zh">「PVE 層級」</span></td><td><span class="lang-en">all nodes</span><span class="lang-zh">全部節點</span></td><td><span class="lang-en">Which nodes may use this storage. Use it to stage a rollout, or to exclude a node with no route to the data portals. <code>shared</code> stays on either way</span><span class="lang-zh">哪些節點可以使用這個 storage。用它來分批上線，或排除連不到資料 portal 的節點。無論如何 <code>shared</code> 都維持開啟</span></td></tr>
         <tr><td><code>syno-iqn-prefix</code></td><td><code>iqn.2000-01.com.synology:</code></td><td><span class="lang-en">Prefix for generated target IQNs</span><span class="lang-zh">產生 target IQN 時使用的前置字串</span></td></tr>
         </tbody>
@@ -627,7 +631,7 @@ pve-syno-reap --storage mysyno --remove
 pvesm remove mysyno</code></pre>
 
     <p>
-        <span class="lang-en"><code>on_delete_hook</code> runs on <strong>one</strong> node — the one where <code>pvesm remove</code> was typed. The others are never told, and <strong>nothing in Proxmox VE calls <code>deactivate_storage</code></strong> to clean them up. So the per-node step above is the procedure, not a formality.</span>
+        <span class="lang-en"><code>on_delete_hook</code> runs on <strong>one</strong> node —the one where <code>pvesm remove</code> was typed. The others are never told, and <strong>nothing in Proxmox VE calls <code>deactivate_storage</code></strong> to clean them up. So the per-node step above is the procedure, not a formality.</span>
         <span class="lang-zh"><code>on_delete_hook</code> 只在<strong>一個</strong>節點上執行——就是打 <code>pvesm remove</code> 的那個。其他節點不會被通知，而且 <strong>Proxmox VE 裡沒有任何東西會呼叫 <code>deactivate_storage</code></strong> 去清理它們。所以上面那個逐節點步驟是真正要做的程序，不是形式。</span>
     </p>
 </section>
@@ -654,7 +658,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </ul>
 
     <div class="note">
-        <span class="lang-en"><strong>Nothing in Proxmox VE calls <code>deactivate_storage</code></strong> — verified across the whole <code>/usr/share/perl5/PVE</code> tree — so this cleanup is the operator's, not PVE's. Neither leftover is dangerous: every consumer re-checks for a device before acting, and device identity always comes from the kernel's WWID. But they accumulate. The tool never touches a device that is in use, and skips rather than assumes anything whose state it cannot establish.</span>
+        <span class="lang-en"><strong>Nothing in Proxmox VE calls <code>deactivate_storage</code></strong> —verified across the whole <code>/usr/share/perl5/PVE</code> tree —so this cleanup is the operator's, not PVE's. Neither leftover is dangerous: every consumer re-checks for a device before acting, and device identity always comes from the kernel's WWID. But they accumulate. The tool never touches a device that is in use, and skips rather than assumes anything whose state it cannot establish.</span>
         <span class="lang-zh"><strong>Proxmox VE 裡沒有任何東西會呼叫 <code>deactivate_storage</code></strong>——對整個 <code>/usr/share/perl5/PVE</code> 目錄樹驗證過——所以這個清理工作屬於管理者，不屬於 PVE。兩種殘留都不危險：每個使用者在動作之前都會重新檢查裝置，而裝置身分一律來自核心的 WWID。但它們會累積。這個工具絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。</span>
     </div>
 </section>
@@ -667,7 +671,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </p>
 
     <p>
-        <span class="lang-en">It creates nothing, deletes nothing, and logs out after itself. The password is prompted for with echo off — never passed on the command line, where it would be visible in <code>ps</code> and in the shell history.</span>
+        <span class="lang-en">It creates nothing, deletes nothing, and logs out after itself. The password is prompted for with echo off —never passed on the command line, where it would be visible in <code>ps</code> and in the shell history.</span>
         <span class="lang-zh">它不建立、不刪除任何東西，跑完會自己登出。密碼以關閉回顯的方式提示輸入——絕不從命令列傳入，那會在 <code>ps</code> 和 shell 歷史裡看得到。</span>
     </p>
 
@@ -686,7 +690,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
             <th><span class="lang-en">What it does</span><span class="lang-zh">作用</span></th>
         </tr></thead>
         <tbody>
-        <tr><td><code>--probe-methods</code></td><td><span class="lang-en">Asks which snapshot-restore method names exist. Opt-in — see below</span><span class="lang-zh">探測哪些快照還原方法名稱存在。需明確開啟，見下</span></td></tr>
+        <tr><td><code>--probe-methods</code></td><td><span class="lang-en">Asks which snapshot-restore method names exist. Opt-in —see below</span><span class="lang-zh">探測哪些快照還原方法名稱存在。需明確開啟，見下</span></td></tr>
         <tr><td><code>--otp &lt;code&gt;</code></td><td><span class="lang-en">For an account with 2-factor authentication. Reports the device token DSM issues</span><span class="lang-zh">用於開啟兩步驟驗證的帳號。會回報 DSM 發出的 device token</span></td></tr>
         <tr><td><code>--verify</code></td><td><span class="lang-en">Verify the TLS certificate. Off by default because DSM ships a self-signed one</span><span class="lang-zh">驗證 TLS 憑證。預設關閉，因為 DSM 出廠是自簽憑證</span></td></tr>
         <tr><td><code>--json</code></td><td><span class="lang-en">Also print the findings as JSON</span><span class="lang-zh">同時以 JSON 輸出結果</span></td></tr>
@@ -697,7 +701,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     <h3 class="subsection-title"><span class="lang-en">About <code>--probe-methods</code></span><span class="lang-zh">關於 <code>--probe-methods</code></span></h3>
 
     <p>
-        <span class="lang-en">It names a LUN and snapshot uuid the NAS has never issued, so a method that exists can only refuse — and the refusal code proves it is there. DSM answers <strong>103</strong> for a method it does not have, and an object-not-found code for one it does. Nothing it could act on is real, but the names being sent are destructive ones, so it asks first.</span>
+        <span class="lang-en">It names a LUN and snapshot uuid the NAS has never issued, so a method that exists can only refuse —and the refusal code proves it is there. DSM answers <strong>103</strong> for a method it does not have, and an object-not-found code for one it does. Nothing it could act on is real, but the names being sent are destructive ones, so it asks first.</span>
         <span class="lang-zh">它指名一個 NAS 從未發出過的 LUN 與快照 uuid，所以存在的方法只能拒絕——而拒絕的錯誤碼證明它在那裡。DSM 對沒有的方法回 <strong>103</strong>，對有的方法回「找不到物件」。它能動到的東西並不存在，但送出的畢竟是破壞性方法的名稱，所以先問過再做。</span>
     </p>
 
@@ -716,13 +720,13 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </p>
 
     <p>
-        <span class="lang-en">That is a limitation of DSM, not a shortcut taken here. What can still be taken away from the account is everything else — every shared folder, every application except DSM itself, and any address that is not one of your PVE nodes. A leaked credential then cannot be used to browse your files over SMB or Drive, which is the difference between an incident and a disaster.</span>
+        <span class="lang-en">That is a limitation of DSM, not a shortcut taken here. What can still be taken away from the account is everything else —every shared folder, every application except DSM itself, and any address that is not one of your PVE nodes. A leaked credential then cannot be used to browse your files over SMB or Drive, which is the difference between an incident and a disaster.</span>
         <span class="lang-zh">這是 DSM 的限制，不是這裡便宜行事。仍然可以從那個帳號拿掉的是其他一切——每一個共用資料夾、除 DSM 以外的每一個應用程式，以及任何不屬於你的 PVE 節點的位址。這樣一組洩漏的憑證就無法用來透過 SMB 或 Drive 翻你的檔案，而那是「一次事故」和「一場災難」的差別。</span>
     </p>
 
     <p>
         <div class="note">
-        <span class="lang-en"><strong>Probed on hardware, and it went further than expected.</strong> A temporary account was created on the test NAS, probed and deleted. DSM 7.1.1 offers exactly three groups — <code>administrators</code>, <code>http</code>, <code>users</code> — and <strong>none is iSCSI-specific</strong>. With no groups the account was refused at <strong>login</strong> with error <strong>402</strong>; as a member of <code>users</code>, also <strong>402</strong>. So a plain account does not get as far as being denied the storage calls. <code>SYNO.Core.User get</code> exposes no privilege fields, and the group API reports success while declining to add to <code>administrators</code> — so the minimum cannot be isolated through the API, and the probing stopped rather than guessing at an undocumented model on a production NAS. <strong>The account in use is an administrator and no smaller working configuration has been demonstrated.</strong></span>
+        <span class="lang-en"><strong>Probed on hardware, and it went further than expected.</strong> A temporary account was created on the test NAS, probed and deleted. DSM 7.1.1 offers exactly three groups —<code>administrators</code>, <code>http</code>, <code>users</code> —and <strong>none is iSCSI-specific</strong>. With no groups the account was refused at <strong>login</strong> with error <strong>402</strong>; as a member of <code>users</code>, also <strong>402</strong>. So a plain account does not get as far as being denied the storage calls. <code>SYNO.Core.User get</code> exposes no privilege fields, and the group API reports success while declining to add to <code>administrators</code> —so the minimum cannot be isolated through the API, and the probing stopped rather than guessing at an undocumented model on a production NAS. <strong>The account in use is an administrator and no smaller working configuration has been demonstrated.</strong></span>
         <span class="lang-zh"><strong>已在硬體上探測，而結果比預期更進一步。</strong>在測試用 NAS 上建立一個臨時帳號、探測、然後刪除。DSM 7.1.1 只提供三個群組——<code>administrators</code>、<code>http</code>、<code>users</code>——而<strong>沒有任何一個是 iSCSI 專用的</strong>。完全沒有群組時，該帳號在<strong>登入</strong>就被拒絕，錯誤 <strong>402</strong>；加入 <code>users</code> 之後，也是 <strong>402</strong>。所以一個普通帳號根本走不到「被拒絕儲存呼叫」那一步。<code>SYNO.Core.User get</code> 沒有公開任何權限欄位，而群組 API 回報成功卻沒有真的加進 <code>administrators</code>——所以無法透過 API 隔離出最小集合，而探測就此停止，不去對一台正式 NAS 上未公開的模型做猜測。<strong>使用中的帳號是管理員，而沒有任何更小的可用設定被示範過。</strong></span>
     </div>
 
@@ -738,7 +742,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
         <tbody>
         <tr>
             <td><strong>DSM</strong></td>
-            <td><span class="lang-en"><strong>7.0 or later</strong>, and only 7.1.1 verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> — an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
+            <td><span class="lang-en"><strong>7.0 or later</strong>, and only 7.1.1 verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
         </tr>
         <tr>
             <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
@@ -746,11 +750,11 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
         </tr>
         <tr>
             <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
-            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> — and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>——而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
+            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> —and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>——而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
         </tr>
         <tr>
             <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
-            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused — DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕——DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
+            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused —DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕——DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
         </tr>
         <tr>
             <td><strong>Proxmox VE</strong></td>
@@ -766,11 +770,11 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
 
     <div class="module-list">
         <div class="module-item">
-            <div class="module-item__name">0.1.x – 0.3.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">Specification, project rules, the read-only probe, and the API layer — sessions, discovery, JSON parameters, error codes, portal failover — then LUN and target handling, with the iSCSI, multipath and WWID-tracking layers ported from the related projects rather than rewritten</span><span class="lang-zh">規格、專案規則、唯讀探索工具，以及 API 層——工作階段、探索、JSON 參數、錯誤碼、portal 換手——然後是 LUN 與 target 處理，而 iSCSI、multipath、WWID 追蹤三層是從相關專案移植而非重寫</span></div>
+            <div class="module-item__name">0.1.x –0.3.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">Specification, project rules, the read-only probe, and the API layer —sessions, discovery, JSON parameters, error codes, portal failover —then LUN and target handling, with the iSCSI, multipath and WWID-tracking layers ported from the related projects rather than rewritten</span><span class="lang-zh">規格、專案規則、唯讀探索工具，以及 API 層——工作階段、探索、JSON 參數、錯誤碼、portal 換手——然後是 LUN 與 target 處理，而 iSCSI、multipath、WWID 追蹤三層是從相關專案移植而非重寫</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">0.4.x – 0.5.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
+            <div class="module-item__name">0.4.x –0.5.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
             <div class="module-item__desc"><span class="lang-en">The plugin itself: the volume lifecycle, snapshots, rollback, clones and resize, all driven through <code>pvesm</code> against the NAS. Then two nodes, live migration, and real two-portal multipath with a path failed under load</span><span class="lang-zh">plugin 本體：磁碟生命週期、快照、倒回、複本與擴充，全部透過 <code>pvesm</code> 對 NAS 實際跑過。然後是兩個節點、即時遷移，以及在負載下斷掉一條路徑的真正雙 portal multipath</span></div>
         </div>
         <div class="module-item">
@@ -799,9 +803,9 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </p>
 
     <ul>
-        <li><span class="lang-en"><strong>R-1</strong> — the output of <code>--probe-methods</code> on any DSM</span><span class="lang-zh"><strong>R-1</strong>——任何 DSM 上 <code>--probe-methods</code> 的輸出</span></li>
+        <li><span class="lang-en"><strong>R-1</strong> —the output of <code>--probe-methods</code> on any DSM</span><span class="lang-zh"><strong>R-1</strong>——任何 DSM 上 <code>--probe-methods</code> 的輸出</span></li>
         <li><span class="lang-en">A LUN's uuid together with its WWID from a host that has it attached, to test the derivation rule against a second sample</span><span class="lang-zh">一顆 LUN 的 uuid，加上在掛著它的主機上讀到的 WWID，用第二個樣本檢驗那條衍生規則</span></li>
-        <li><span class="lang-en">Whether granting a non-administrator only the <strong>DSM application privilege</strong> in Control Panel lets it authenticate — and if so, which iSCSI calls then answer <strong>105</strong>. Probed here with a temporary account: with no groups, and as a member of <code>users</code>, it was refused at <em>login</em> with <strong>402</strong>, so it never reached the storage calls</span><span class="lang-zh">在控制台只給非管理員<strong>DSM 應用程式權限</strong>，它能不能通過認證——如果可以，接著哪些 iSCSI 呼叫會回 <strong>105</strong>。這裡用一個臨時帳號探測過：完全沒有群組時、以及加入 <code>users</code> 之後，都在「登入」這一步就被拒絕，錯誤 <strong>402</strong>，所以它根本沒有走到儲存呼叫</span></li>
+        <li><span class="lang-en">Whether granting a non-administrator only the <strong>DSM application privilege</strong> in Control Panel lets it authenticate —and if so, which iSCSI calls then answer <strong>105</strong>. Probed here with a temporary account: with no groups, and as a member of <code>users</code>, it was refused at <em>login</em> with <strong>402</strong>, so it never reached the storage calls</span><span class="lang-zh">在控制台只給非管理員<strong>DSM 應用程式權限</strong>，它能不能通過認證——如果可以，接著哪些 iSCSI 呼叫會回 <strong>105</strong>。這裡用一個臨時帳號探測過：完全沒有群組時、以及加入 <code>users</code> 之後，都在「登入」這一步就被拒絕，錯誤 <strong>402</strong>，所以它根本沒有走到儲存呼叫</span></li>
         <li><span class="lang-en">Anything the probe reports that contradicts this page</span><span class="lang-zh">探索工具回報的任何與本頁矛盾的內容</span></li>
     </ul>
 </section>
@@ -854,7 +858,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
 <script>
 // Language lives in the URL (?lang=zh), not in localStorage and not in the
 // browser's locale. Both languages ship in the page, so the switch is a class
-// on <html> and needs no reload — but the URL changes with it, which is what
+// on <html> and needs no reload —but the URL changes with it, which is what
 // makes a language shareable. pushState rather than replaceState, so the back
 // button returns to the language the reader came from.
 function applyLang(lang) {
@@ -870,7 +874,7 @@ function currentLang() {
 function toggleLang() {
     var next = currentLang() === 'en' ? 'zh' : 'en';
     var url = new URL(location.href);
-    // English is the default, so it needs no parameter — a clean URL is the
+    // English is the default, so it needs no parameter —a clean URL is the
     // English page.
     if (next === 'zh') { url.searchParams.set('lang', 'zh'); }
     else { url.searchParams.delete('lang'); }
