@@ -515,6 +515,10 @@ sub flush_map {
     my ($name, %opt) = @_;
     return 0 if !defined $name || !length $name;
 
+    # Optional, and what makes the verification below possible. Callers that have
+    # it should pass it; the WWID is how this module identifies anything.
+    my $wwid = $opt{wwid};
+
     # Stop queueing first, or the flush waits forever for I/O that can never
     # complete once the paths are gone.
     eval { run_cmd([ 'multipathd', 'disablequeueing', 'map', $name ],
@@ -522,21 +526,51 @@ sub flush_map {
     eval { run_cmd([ 'dmsetup', 'message', $name, '0', 'fail_if_no_path' ],
                    timeout => 15, allow_nonzero => 1) };
 
+    # THE MAP NAME, NOT A /dev/mapper PATH — and that was a real defect for the
+    # whole life of this function.
+    #
+    # Measured on 2026-08-07: `multipath -f /dev/mapper/<wwid>` answers **device
+    # not found** and exits 1, while `multipath -f <wwid>` exits 0 and removes
+    # the map. The symlink exists and points at the right dm device; multipath
+    # simply does not accept that form.
+    #
+    # And the wrong form was invisible, twice over. The code below treated
+    # "device not found" as SUCCESS — correctly, for the case it was written for:
+    # after `fail_if_no_path`, multipathd may have removed the map already. So a
+    # flush that never happened was indistinguishable from one that was already
+    # done. Then multipathd covered for it: a map with no paths gets cleaned up on
+    # its own, so `free_image` and `_detach_local` usually looked correct. The
+    # leftover only surfaced when a storage was removed before multipathd got
+    # round to it.
+    #
+    # Third time in one day that a command reported success for work it did not
+    # do, so this one does not take the command's word for it: the map is looked
+    # up again afterwards.
     my ($out, $err, $rc) = eval {
-        run_cmd([ 'multipath', '-f', "/dev/mapper/$name" ],
-                timeout => 30, allow_nonzero => 1);
+        run_cmd([ 'multipath', '-f', $name ], timeout => 30, allow_nonzero => 1);
     };
     my $failure = $@;
 
-    # Measured: after fail_if_no_path, multipathd may have removed the map
-    # already, and `multipath -f` then answers "device not found". That is
-    # success. Treating it as an error is how a delete path reports a failure
-    # for work that is complete.
-    my $text = join(' ', grep { defined } ($out, $err, $failure));
-    return 1 if $text =~ /device not found|map not found/i;
+    # The map is gone or it is not, and that is checkable. `map_is_gone` is
+    # three-valued, so read `defined` first — undef means the stat never came
+    # back, which is not "removed".
+    # Declared unconditionally: `my $x = ... if ...` keeps its value between
+    # calls in Perl, which is a real trap and not a style opinion. perlcritic
+    # caught it, which is what putting it in release-check was for.
+    my $gone;
+    $gone = map_is_gone($wwid) if defined $wwid;
+    return 1 if defined $gone && $gone;
 
-    return 0 if $failure;
-    return ($rc // 0) == 0 ? 1 : 0;
+    # No WWID to check with: fall back to what the command said, including the
+    # "already removed" text that is a legitimate success.
+    if (!defined $wwid) {
+        my $text = join(' ', grep { defined } ($out, $err, $failure));
+        return 1 if $text =~ /device not found|map not found/i;
+        return 0 if $failure;
+        return ($rc // 0) == 0 ? 1 : 0;
+    }
+
+    return 0;
 }
 
 # Host cache symmetry, which the related projects had to learn the hard way.

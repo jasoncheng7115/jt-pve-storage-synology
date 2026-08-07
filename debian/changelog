@@ -1,3 +1,21 @@
+jt-pve-storage-synology (0.6.17-1) unstable; urgency=medium
+
+  * flush_map passed multipath the wrong kind of argument for the whole life of
+    the function. `multipath -f /dev/mapper/<wwid>` answers "device not found"
+    and exits 1; `multipath -f <wwid>` exits 0 and removes the map. The old code
+    treated "device not found" as success -- correct for the case it was written
+    for -- so a flush that never happened looked identical to one already done,
+    and multipathd covered for it by cleaning up path-less maps on its own. It
+    now passes the name and verifies with map_is_gone.
+  * DSM 7.1.1 -> 7.4.1 upgrade measured: every LUN uuid survived, so every WWID
+    did. That is the plugin's most basic assumption and it had never been tested.
+  * A whole-NAS outage measured: no process entered uninterruptible sleep, every
+    other storage stayed active, and _warn_once warned exactly once over the
+    whole outage. New error code 498 during a DSM upgrade -- and it is correctly
+    not treated as a credential error, so the storage recovered by itself.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 17:20:00 +0800
+
 jt-pve-storage-synology (0.6.16-1) unstable; urgency=medium
 
   * A DS925+ on DSM 7.3.2-86009 Update 4 was driven end to end over a VPN:

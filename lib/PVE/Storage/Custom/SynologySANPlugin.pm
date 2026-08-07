@@ -1656,7 +1656,7 @@ sub _detach_local {
         # to ask which sd devices belonged to it.
         my $slaves = PVE::Storage::Custom::Synology::Multipath::slaves_of_map($wwid);
 
-        PVE::Storage::Custom::Synology::Multipath::flush_map($map);
+        PVE::Storage::Custom::Synology::Multipath::flush_map($map, wwid => $wwid);
 
         # IF THE MAP SURVIVED, its paths are holding it, and that is not a
         # hypothetical: it is what a node sees when the LUN was deleted from
@@ -1681,7 +1681,7 @@ sub _detach_local {
         my $gone = PVE::Storage::Custom::Synology::Multipath::map_is_gone($wwid);
         if (defined $gone && !$gone) {
             PVE::Storage::Custom::Synology::ISCSI::remove_sd_device($_) for @$slaves;
-            PVE::Storage::Custom::Synology::Multipath::flush_map($map);
+            PVE::Storage::Custom::Synology::Multipath::flush_map($map, wwid => $wwid);
         }
     }
 

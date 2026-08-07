@@ -6,6 +6,51 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.17] - 2026-08-07
+
+### Fixed
+
+- **`flush_map` passed `multipath` the wrong kind of argument, for the whole life
+  of the function.** Measured:
+
+  ```
+  multipath -f /dev/mapper/<wwid>   →  "device not found", exit 1
+  multipath -f <wwid>               →  exit 0, the map is removed
+  ```
+
+  The symlink exists and points at the right dm device; multipath does not accept
+  that form. The wrong form was invisible **twice over**: the code treated
+  *device not found* as success — correct for the case it was written for, since
+  after `fail_if_no_path` multipathd may have removed the map already — so a
+  flush that never happened was indistinguishable from one already done. Then
+  multipathd covered for it, because a map with no paths is cleaned up on its
+  own. The leftover only surfaced when a storage was removed before multipathd
+  got round to it. It now passes the name **and looks the map up again** rather
+  than trusting the exit status: the third time in one day that a command
+  reported success for work it did not do.
+
+### Verified
+
+- **A DSM 7.1.1 → 7.4.1-90080 upgrade preserved every LUN uuid**, so every WWID
+  survived. That is this plugin's most basic assumption — the storage's identity
+  is pinned to the uuid — and it had never been through a major-version upgrade.
+  Proven against the tracking file the plugin itself wrote before the upgrade,
+  not against a note.
+- **A whole-NAS outage does not hang the node.** Management and data path went
+  down together for the first time, for about fourteen minutes:
+  **zero processes in uninterruptible sleep**, `pvestatd`/`pvedaemon`/`pveproxy`
+  all responsive, the API answering in 0.88 s, and **all seven other storages
+  active** — only this one inactive. The kernel failed the paths rather than
+  queueing (`fast_io_fail_tmo 5`, then `no_path_retry 18`), which is what rule 4
+  exists for. The storage returned to `active` **by itself** once the NAS came
+  back, with no intervention.
+- **`_warn_once` warns once.** Over the whole outage, with `pvestatd` polling
+  every ~10 s, its journal carried **one** message about this storage.
+- **A new error code: 498, during a DSM upgrade.** DSM answers HTTP but refuses
+  the login. It is **not** in the credential-error set, which is what saved the
+  storage: a latched credential failure would have left it dead until an operator
+  ran `pvesm set`. That was luck rather than design, and it is now recorded.
+
 ## [0.6.16] - 2026-08-07
 
 ### Verified

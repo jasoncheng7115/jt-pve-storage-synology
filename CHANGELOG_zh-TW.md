@@ -4,6 +4,26 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.17] - 2026-08-07
+
+### 修正
+
+- **`flush_map` 傳給 `multipath` 的參數形式從一開始就是錯的**。量測到的：
+
+  ```
+  multipath -f /dev/mapper/<wwid>   →  「device not found」，離開碼 1
+  multipath -f <wwid>               →  離開碼 0，map 真的被移除
+  ```
+
+  那個 symlink 存在，而且指向正確的 dm 裝置；multipath 就是不接受那種形式。而錯的形式**被掩蓋了兩層**：程式把「device not found」當成成功——對它原本寫的那個情境是對的，因為 `fail_if_no_path` 之後 multipathd 可能已經先移除了 map——所以「從來沒發生的清除」和「已經完成的清除」長得一模一樣。然後 multipathd 又幫它遮著，因為沒有路徑的 map 會被自己清掉。只有在「storage 比 multipathd 先被移除」時才露出來。現在它傳名稱，**而且會再查一次 map 是不是真的不在了**，不相信離開碼：這是同一天第三次遇到「指令回報成功卻沒做事」。
+
+### 已驗證
+
+- **DSM 7.1.1 → 7.4.1-90080 升級保住了每一顆 LUN 的 uuid**，所以每一個 WWID 都活下來了。那是這個 plugin 最根本的假設——storage 的身分釘在 uuid 上——而它從來沒有經歷過大版本升級。這是拿 plugin 自己在升級前寫下的追蹤檔對出來的，不是拿筆記對的。
+- **整台 NAS 中斷不會讓節點卡死**。管理連線與資料路徑第一次同時斷，約十四分鐘：**零個行程進入不可中斷睡眠**，`pvestatd`／`pvedaemon`／`pveproxy` 全部有回應，API 在 0.88 秒內回答，而**其他七個 storage 全部 active**——只有這一個 inactive。核心讓路徑失敗而不是排隊（`fast_io_fail_tmo 5`，然後 `no_path_retry 18`），那正是規則 4 存在的理由。NAS 回來之後 storage **自己**回到 `active`，沒有任何介入。
+- **`_warn_once` 真的只警告一次**。整段中斷期間 `pvestatd` 每 ~10 秒輪詢一次，它的日誌裡關於這個 storage 只有**一**筆訊息。
+- **一個新的錯誤碼：498，出現在 DSM 升級期間**。DSM 答得出 HTTP，但拒絕登入。它**不在**憑證錯誤集合裡，而那正是救了這個 storage 的東西：一個被閂鎖的憑證失敗會讓它一直死著，直到操作者跑 `pvesm set`。那是運氣好而不是設計，現在記下來了。
+
 ## [0.6.16] - 2026-08-07
 
 ### 已驗證

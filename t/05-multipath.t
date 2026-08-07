@@ -184,4 +184,49 @@ SKIP: {
            'no call site bare-negates a three-valued cache helper');
 }
 
+# --- flush_map passed multipath the wrong kind of argument for its whole life ---
+#
+# Measured on 2026-08-07:
+#
+#   multipath -f /dev/mapper/<wwid>   ->  "device not found", exit 1
+#   multipath -f <wwid>               ->  exit 0, the map is removed
+#
+# The symlink exists and points at the right dm device; multipath simply does not
+# accept that form. And the wrong form was invisible twice over: the old code
+# treated "device not found" as success — correct for the case it was written
+# for, since multipathd may have removed the map already — so a flush that never
+# happened looked identical to one that was already done. Then multipathd covered
+# for it, because a map with no paths is cleaned up on its own. The leftover only
+# surfaced when a storage was removed before multipathd got round to it.
+{
+    open(my $fh, '<', 'lib/PVE/Storage/Custom/Synology/Multipath.pm')
+        or BAIL_OUT('cannot read Multipath.pm');
+    my $src = do { local $/; <$fh> };
+    close($fh);
+    (my $code = $src) =~ s/^\s*#.*$//mg;   # this file's comments discuss both forms
+
+    my ($flush) = $code =~ /\nsub flush_map \{(.*?)\n\}/s;
+    ok(defined $flush, 'found flush_map');
+
+    like($flush, qr/'multipath',\s*'-f',\s*\$name/,
+         "it passes multipath -f the map NAME");
+    unlike($flush, qr{/dev/mapper/\$name},
+           'and not a /dev/mapper path, which multipath rejects');
+
+    # It must not take the command's word for it. Third time in one day that a
+    # command reported success for work it did not do.
+    like($flush, qr/map_is_gone/,
+         'and it looks the map up again rather than trusting the exit status');
+
+    # Both call sites must hand over the WWID, or the verification cannot run.
+    open(my $pf, '<', 'lib/PVE/Storage/Custom/SynologySANPlugin.pm')
+        or BAIL_OUT('cannot read the plugin');
+    my $psrc = do { local $/; <$pf> };
+    close($pf);
+    (my $pcode = $psrc) =~ s/^\s*#.*$//mg;
+    my @calls = ($pcode =~ /flush_map\(([^)]*)\)/g);
+    is(scalar @calls, 2, 'the plugin calls flush_map twice');
+    like($_, qr/wwid\s*=>/, "and passes the wwid: $_") for @calls;
+}
+
 done_testing();
