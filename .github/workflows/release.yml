@@ -97,10 +97,27 @@ jobs:
           } > notes.md
           cat notes.md
 
+      # A SECOND COPY UNDER A STABLE NAME.
+      #
+      # `/releases/latest/download/<asset>` needs the exact asset filename, and the
+      # real one carries the version — so there was no URL that stayed correct
+      # across releases, and the documentation shipped a `wget` that 404'd. This
+      # copy gives one: /releases/latest/download/jt-pve-storage-synology_all.deb
+      #
+      # It is a copy, not a rename: the versioned asset stays, because `releases/`
+      # archives it under that name and a tester must be able to fetch exactly what
+      # they run.
+      - name: Also publish the .deb under a version-free name
+        run: |
+          src=$(ls artifacts/jt-pve-storage-synology_*_all.deb | head -1)
+          cp "$src" artifacts/jt-pve-storage-synology_all.deb
+          ls -la artifacts/
+
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/jt-pve-storage-synology_*_all.deb
+            artifacts/jt-pve-storage-synology_all.deb
             artifacts/SHA256SUMS
           body_path: notes.md
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}

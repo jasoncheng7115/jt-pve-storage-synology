@@ -6,6 +6,57 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.4] - 2026-08-07
+
+**The `beta1` suffix is gone from this release onwards.** Versions are now plain
+`0.6.4`, the tag is `v0.6.4`, and the package is
+`jt-pve-storage-synology_0.6.4-1_all.deb`. Earlier releases keep their `~beta1`
+names — renaming history would break the upgrade instructions that refer to them.
+
+Two consequences worth knowing:
+
+- **GitHub's `latest` now works.** The release workflow marked a release as a
+  prerelease when the tag contained `beta`, and GitHub's `latest` skips
+  prereleases — which is why `/releases/latest/download/…` answered 404 and the
+  documented install command had to carry a version. From 0.6.4 the release is a
+  normal one.
+- **The `.deb` is published a second time under a version-free name**,
+  `jt-pve-storage-synology_all.deb`, so
+  `/releases/latest/download/jt-pve-storage-synology_all.deb` stays correct across
+  releases. The versioned asset stays too: `releases/` archives it under that name,
+  and a tester must be able to fetch exactly what they run.
+
+This is still a 0.x release. What 1.0.0 waits on has not changed — a second model,
+a second DSM version, and the minimum DSM privileges settled — and
+`docs/TESTING.md` remains the register.
+
+### Added
+
+- `--nodes` is documented: how to restrict the storage to some nodes, why to do it
+  while staging a rollout, and the thing that is easy to get backwards — `shared`
+  is forced on and cannot be turned off, so `nodes` restricts *which nodes may use
+  it* and never makes the storage node-local.
+
+### Fixed in the documentation, all found by installing on a clean node
+
+- The install command used `/releases/latest/download/…`, which **404s**, and then
+  `dpkg -i`, which **does not resolve dependencies** — on a node without
+  `multipath-tools` it unpacks and leaves the package unconfigured. Now
+  `apt install ./…`, with the recovery step for anyone who already hit it.
+- The prerequisites were never stated. Checked rather than guessed:
+  `open-iscsi` and `multipath-tools` have **zero** PVE reverse-dependencies, so a
+  node can genuinely lack them; the four Perl modules are dependencies of 86 to 151
+  PVE packages each and are always present.
+- **A storage can be invisible in the web interface.** The interface is served by
+  whichever node the browser is connected to, and a node without the plugin does not
+  know the type and silently omits the storage from the list — which reads exactly
+  like `pvesm add` having failed.
+- The install warning said `multipathd reconfigure` "re-reads configuration for
+  every map on the node", which is true and reads like a threat. **Measured
+  instead**: on multipath-tools 0.11.1, with continuous reads against an unrelated
+  map, 1776 reads and 0 failures, and the map's device-mapper event counter did not
+  move — it was never reloaded.
+
 ## [0.6.3~beta1] - 2026-08-07
 
 **R-14 probed on hardware, and this page's previous answer to it was wrong.**

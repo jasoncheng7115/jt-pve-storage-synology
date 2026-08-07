@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.6.3~beta1
+VERSION = 0.6.4
 
 DESTDIR =
 PREFIX   = /usr
@@ -222,6 +222,12 @@ check-secrets:
 # Writing a command into documentation without running it is the same fault as
 # believing an array's success reply, and this project has a rule about that.
 #
+# A URL for the version being released is reported as `pending` rather than failing:
+# release-check runs BEFORE the tag is pushed, so that asset cannot exist yet. Every
+# other URL must return 200. Skipping only the one version this run is preparing
+# keeps the guard strict — an install URL left pointing at an older release still
+# fails, and so does one pointing at a version that was never published.
+#
 # It matches only a `wget` or `curl` USING that path, not any mention of it. The
 # first version matched the string anywhere and condemned the paragraph that
 # explains why not to use it — the sixth time in this project that a guard could
@@ -240,7 +246,14 @@ check-doc-urls:
 		echo "         unconfigured. Document 'apt install ./<file>.deb'."; \
 		bad=1; \
 	fi; \
+	pending=v$$(echo "$(VERSION)" | tr '~' '-'); \
 	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
+		case "$$u" in \
+			*/releases/download/$$pending/*) \
+				echo "  pending  $$u"; \
+				echo "           (this release is not published yet — release-check runs first)"; \
+				continue;; \
+		esac; \
 		code=$$(curl -sL -o /dev/null -w '%{http_code}' --max-time 20 "$$u"); \
 		if [ "$$code" != "200" ]; then echo "  ERROR: $$code for $$u"; bad=1; \
 		else echo "  ok $$code  $$u"; fi; \

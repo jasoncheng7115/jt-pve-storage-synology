@@ -55,6 +55,29 @@ for my $file (@ARGV) {
         $body =~ s/($MOVABLE)(\*\*) +(?=\S)/$2$1/g;   # 。** 只 -> **。只
         $body =~ s/($PUNCT) +(?=\S)/$1/g;             # 。 只    -> 。只
 
+        # AND REPAIR what is already broken.
+        #
+        # The rule above only avoids CREATING the fault — it needs a space to
+        # remove. It cannot touch 「。**版」, which is the fault itself. That gap
+        # was found the honest way: an ad hoc regex produced the broken form in
+        # CHANGELOG_zh-TW.md, this tool was run over it, and check-zh still
+        # reported it. A fixer that can only prevent is half a fixer.
+        #
+        # Only a CLOSING run is moved, so the runs are counted in order — 「，**錯誤
+        # 402**」 opens after a comma and is perfectly legal.
+        my @runs;
+        while ($body =~ /\*\*/g) { push @runs, pos($body) - 2 }
+        for my $i (reverse 0 .. $#runs) {
+            next if $i % 2 == 0;                     # this one opens
+            my $pos = $runs[$i];
+            next if $pos == 0;
+            my $before = substr($body, $pos - 1, 1);
+            my $after  = length($body) > $pos + 2 ? substr($body, $pos + 2, 1) : ' ';
+            next if $before !~ /$MOVABLE/;
+            next if $after =~ /\s/ || $after !~ /\w/;
+            substr($body, $pos - 1, 3) = '**' . $before;
+        }
+
         if ($body ne $orig) { $line = "$body\n"; $changed++ }
     }
 

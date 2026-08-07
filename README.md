@@ -245,8 +245,8 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
-apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.4/jt-pve-storage-synology_0.6.4-1_all.deb
+apt install ./jt-pve-storage-synology_0.6.4-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
 
