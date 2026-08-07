@@ -1510,6 +1510,28 @@ sub activate_volume {
         if !PVE::Storage::Custom::Synology::Multipath::ensure_map($wwid, $found,
                timeout => 20);
 
+    # A RESIZE ONLY EVER REACHED ONE NODE, and a guest can be started on any of
+    # them. `volume_resize` runs where the guest is; every other node's map goes
+    # on presenting the old size until something refreshes it, and a live
+    # migration onto such a node would hand the guest a device SMALLER than its
+    # own configuration says. So reconcile here, where the LUN's size is already
+    # in hand and costs no extra call to the NAS.
+    #
+    # A warning, not a refusal: an activation that fails stops a VM from
+    # starting, and a short device is a correctness problem rather than a
+    # data-loss one. The no-change path — every activation that is not the first
+    # after a resize — reads two sysfs files and does nothing.
+    if (defined $obj->{size}) {
+        my $mapname = PVE::Storage::Custom::Synology::Multipath::map_name_for_wwid($wwid);
+        my $have = PVE::Storage::Custom::Synology::Multipath::map_size_bytes($wwid);
+        if (defined $mapname && defined $have && $have < $obj->{size}) {
+            my $slaves = PVE::Storage::Custom::Synology::Multipath::slaves_of_map($wwid);
+            PVE::Storage::Custom::Synology::ISCSI::rescan_device($_) for @$slaves;
+            $class->_grow_node_device($storeid, $wwid, $mapname, $obj->{size},
+                $slaves);
+        }
+    }
+
     return 1;
 }
 
@@ -1632,10 +1654,47 @@ sub volume_resize {
         # node went on reporting the old size.
         my $slaves = PVE::Storage::Custom::Synology::Multipath::slaves_of_map($wwid);
         PVE::Storage::Custom::Synology::ISCSI::rescan_device($_) for @$slaves;
-        PVE::Storage::Custom::Synology::Multipath::resize_map($map);
+        $class->_grow_node_device($storeid, $wwid, $map, $new->{size}, $slaves,
+            fatal => 1);
     }
 
     return $new->{size};
+}
+
+# A RESIZE THAT REACHED THE ARRAY AND NOT THE NODE MUST SAY SO.
+#
+# PVE's very next step after `volume_resize` is `block_resize`, issued with no
+# tolerance at all for a device that has not caught up. When the map is still
+# short, QEMU answers "Cannot grow device files" — an unexplained failure of a
+# plugin that had, on the array, done exactly what was asked. Worse, PVE writes
+# the VM configuration only after `block_resize` succeeds, so the NAS is left at
+# the new size while the configuration still claims the old one.
+#
+# The mechanics of the wait, and the udev race behind it, are in
+# Multipath::grow_map. This is where it becomes a message an operator can act on.
+sub _grow_node_device {
+    my ($class, $storeid, $wwid, $map, $want, $slaves, %opt) = @_;
+    return 1 if !defined $want || !$want;
+
+    my $r = PVE::Storage::Custom::Synology::Multipath::grow_map(
+        $wwid, $map, $want, $slaves);
+    return 1 if $r->{ok};
+
+    my $have = defined $r->{size} ? "$r->{size} bytes"
+                                  : 'a size that could not be read';
+    my $why = $r->{paths_ready}
+        ? "The paths carry the new size but the map did not follow."
+        : "This node's paths to the LUN are still reporting the old size.";
+    my $msg = "storage '$storeid': the LUN is $want bytes on the NAS, but this"
+      . " node's multipath map '$map' is presenting $have after "
+      . PVE::Storage::Custom::Synology::Multipath::RESIZE_SETTLE_TIMEOUT
+      . "s. $why The guest has NOT been given the new space. Nothing is damaged"
+      . " and the NAS is correct — refresh the node with 'multipathd resize map"
+      . " $map' and run the resize again to the same size.\n";
+
+    die $msg if $opt{fatal};
+    warn $msg;
+    return 0;
 }
 
 sub volume_snapshot {

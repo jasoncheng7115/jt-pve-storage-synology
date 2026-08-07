@@ -172,15 +172,13 @@ sub dm_uuid_path {
     return '/dev/disk/by-id/dm-uuid-mpath-' . lc($wwid);
 }
 
-# The map's device-mapper name (mpathc, or the wwid, or an alias — whatever the
-# node's policy produced). Read from the link rather than assumed.
-sub map_name_for_wwid {
-    _not_a_method($_[0]);
+# The kernel's own name for the map behind a WWID — `dm-9`, not `mpathc`. The
+# readlink is bounded because a stat under /dev on a dead multipath device is
+# uninterruptible sleep.
+sub _dm_basename {
     my ($wwid) = @_;
     my $link = dm_uuid_path($wwid) or return undef;
 
-    # A glob and a file test under /dev are both stat(2) on a path that may be
-    # a dead multipath device, so both are bounded.
     my $target = eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         alarm(5);
@@ -192,10 +190,114 @@ sub map_name_for_wwid {
     return undef if !defined $target;
 
     my ($dm) = $target =~ m{([^/]+)\z} or return undef;   # e.g. dm-9
+    return $dm =~ /\A[A-Za-z0-9_-]+\z/ ? $dm : undef;
+}
+
+# The map's device-mapper name (mpathc, or the wwid, or an alias — whatever the
+# node's policy produced). Read from the link rather than assumed.
+sub map_name_for_wwid {
+    _not_a_method($_[0]);
+    my ($wwid) = @_;
+    my $dm = _dm_basename($wwid) or return undef;
     my $name = sysfs_read_with_timeout("/sys/block/$dm/dm/name", 3);
     return undef if !defined $name;
     chomp $name;
     return length($name) ? $name : undef;
+}
+
+# ---------------------------------------------------------------------------
+# What size the KERNEL is presenting
+# ---------------------------------------------------------------------------
+#
+# `/sys/block/<dev>/size` is in 512-byte sectors whatever the device's logical
+# block size is — that unit is the sysfs interface's, not the disk's. undef
+# means the size could not be read, which is never the same as "unchanged".
+
+sub _sysfs_size_bytes {
+    my ($base) = @_;
+    return undef if !defined $base || $base !~ /\A[A-Za-z0-9_-]+\z/;
+    my $sectors = sysfs_read_with_timeout("/sys/block/$base/size", 3);
+    return undef if !defined $sectors;
+    chomp $sectors;
+    return undef if $sectors !~ /\A[0-9]+\z/;
+    return $sectors * 512;
+}
+
+# For one path (`sdb`, or `/dev/sdb`).
+sub device_size_bytes {
+    _not_a_method($_[0]);
+    my ($dev) = @_;
+    return undef if !defined $dev;
+    my ($base) = $dev =~ m{([^/]+)\z} or return undef;
+    return _sysfs_size_bytes($base);
+}
+
+# For the map behind a WWID.
+sub map_size_bytes {
+    _not_a_method($_[0]);
+    my ($wwid) = @_;
+    my $dm = _dm_basename($wwid) or return undef;
+    return _sysfs_size_bytes($dm);
+}
+
+# How long to wait for a resize to reach the map. Generous, because the cost of
+# being wrong is asymmetric: a few seconds added to a `qm resize` against a
+# failed one the operator has to unpick by hand.
+use constant RESIZE_SETTLE_TIMEOUT => 60;
+
+# MAKE THE MAP MATCH THE PATHS, AND ANSWER WITH WHAT ACTUALLY HAPPENED.
+#
+# `multipathd resize map` takes the new size from multipathd's OWN udev view of
+# the first path. That view is refreshed by the uevent the capacity change
+# raises — which has not been processed yet, microseconds after the sysfs write
+# that caused it. multipathd then compares the stale size against the map's
+# size, finds them equal, logs "map is still the same size" and exits **0**. The
+# map never grows and nothing reports a problem.
+#
+# Measured on host-108, 2026-08-07. The NAS grew the LUN to 33 GiB and sdb
+# picked it up — `detected capacity change from 67108864 to 69206016` — while
+# dm-0 stayed at 67108864. So: poll the paths until they carry the new size,
+# re-issue the map resize until the map does too. A retry is cheap and
+# idempotent — `resize map` on a map already at the right size is a no-op — and
+# it is what actually rides out the udev delay.
+#
+# Returns { size => <bytes or undef>, ok => 0|1, paths_ready => 0|1 }. `ok` is
+# the only thing a caller should branch on, and it is never true on a size that
+# could not be read.
+sub grow_map {
+    _not_a_method($_[0]);
+    my ($wwid, $map, $want, $slaves, %opt) = @_;
+    $slaves //= [];
+
+    my $timeout = defined $opt{timeout} ? $opt{timeout} : RESIZE_SETTLE_TIMEOUT;
+    my $pause   = defined $opt{pause}   ? $opt{pause}   : 0.2;
+    my $deadline = time + $timeout;
+
+    my ($seen, $paths_ready);
+    while (1) {
+        $seen = map_size_bytes($wwid);
+        last if defined $seen && $seen >= $want;
+
+        # The paths first. multipathd cannot grow a map past what a path
+        # reports, so asking before they have caught up is the no-op above.
+        $paths_ready = @$slaves ? 1 : 0;
+        for my $sd (@$slaves) {
+            my $sz = device_size_bytes($sd);
+            if (!defined $sz || $sz < $want) { $paths_ready = 0; last }
+        }
+        resize_map($map) if $paths_ready;
+
+        $seen = map_size_bytes($wwid);
+        last if defined $seen && $seen >= $want;
+        last if time >= $deadline;
+        select(undef, undef, undef, $pause);
+    }
+
+    return {
+        size        => $seen,
+        ok          => (defined $seen && $seen >= $want) ? 1 : 0,
+        paths_ready => $paths_ready ? 1 : 0,
+    };
 }
 
 # What a caller should open. Returns undef when the map is not there — which is
@@ -272,18 +374,7 @@ sub slaves_of_map {
     my ($wwid) = @_;
     _not_a_method($_[0]) if @_ && defined $_[0] && $_[0] eq __PACKAGE__;
 
-    my $link = dm_uuid_path($wwid) or return [];
-    my $target = eval {
-        local $SIG{ALRM} = sub { die "timeout\n" };
-        alarm(5);
-        my $t = readlink($link);
-        alarm(0);
-        $t;
-    };
-    alarm(0);
-    return [] if !defined $target;
-
-    my ($dm) = $target =~ m{([^/]+)\z} or return [];
+    my $dm = _dm_basename($wwid) or return [];
 
     # Bounded together with the file tests that follow it, not just the glob.
     my @slaves = eval {

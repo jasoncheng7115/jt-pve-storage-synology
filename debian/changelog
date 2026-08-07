@@ -1,3 +1,23 @@
+jt-pve-storage-synology (0.6.6-1) unstable; urgency=medium
+
+  * Fix a disk resize that reached the NAS but not the node. multipathd
+    answers `resize map` from its own udev view of a path, which is still
+    stale microseconds after the sysfs rescan that changed it — so it found
+    the sizes equal, reported success, and left the map short. PVE's next
+    step is block_resize, which then failed with "Cannot grow device files"
+    and left the NAS and the VM configuration disagreeing about the size.
+    The map is now polled until it carries the new size, and the resize
+    fails with an explanation if it never does.
+  * activate_volume reconciles a map that is smaller than its LUN, so a
+    migration onto a node that missed the resize no longer hands the guest a
+    device smaller than its own configuration says.
+  * Document why Proxmox VE and DSM disagree about the volume size: they do
+    not — PVE divides by 1000 and DSM by 1024, and both write "TB".
+  * Show the snapshot description in the README and on the documentation
+    site, since that is the change 0.6.5 is hardest to see without a picture.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 11:40:00 +0800
+
 jt-pve-storage-synology (0.6.5-1) unstable; urgency=medium
 
   * Put the Proxmox VE snapshot name in the DSM description. SAN Manager's

@@ -70,6 +70,23 @@ its structure is its own.
 | **Rollback** | `restore_snapshot`. The LUN's uuid is unchanged and newer snapshots survive |
 | Attach / detach | iSCSI login, device discovered by the kernel's own identification, dm-multipath |
 
+### Your PVE snapshot names are visible in SAN Manager
+
+SAN Manager's snapshot list has columns for time, consistency state,
+description, status and lock — and **no name column at all**. The API does carry
+a `name`, and the plugin sets it to Proxmox VE's own snapshot name and matches on
+it, but nothing in DSM displays it. So from **0.6.5** the plugin writes the name
+into the **description** too, as `<snapshot> (Proxmox VE <storage>)`:
+
+![The same two snapshots: Proxmox VE's snapshot list above, SAN Manager's below, with each PVE snapshot name in the DSM description column](docs/images/snapshot-description-en.png)
+
+Before that every snapshot of every disk on a storage read `Proxmox VE <storage>`
+and looked identical, so the one question an operator has in front of that list —
+*which PVE snapshot is this row?* — could only be answered by going back to
+Proxmox VE and comparing timestamps. Descriptions are written when the snapshot
+is taken and DSM never rewrites them, so snapshots taken by an older build keep
+the old text.
+
 ### Rollback, and why it took a while to get here
 
 Neither reference implementation has a snapshot rollback: Kubernetes and Cinder
@@ -356,6 +373,30 @@ storage's LUN prefix.
 `/etc/pve/priv/storage/<storage>.syno`, mode `0600`, root only, replicated to every
 node. Full option list and the removal procedure: the
 [documentation site](https://jasoncheng7115.github.io/jt-pve-storage-synology/#configure).
+
+### Why the size in Proxmox VE does not match the size in DSM
+
+It does — the two count in different units and both call them TB.
+
+The plugin reports the DSM volume's `size_total_byte` and `size_free_byte`
+**verbatim, in bytes**, and does no arithmetic on either. Everything after that
+is display. Proxmox VE's storage summary formats bytes with SI units, dividing
+by 1000; DSM's Storage Manager divides by 1024 and still writes "TB". So the
+same volume reads:
+
+| | Total | Used |
+|---|---|---|
+| Proxmox VE | 15.36 TB | 4.32 TB |
+| DSM Storage Manager | 14 TB | 3.9 TB |
+
+Both are 15,356,124,401,664 and 4,318,122,532,864 bytes. The ratio between the
+two columns is 2⁴⁰ ÷ 10¹², which is 1.0995 — and 15.36 ÷ 14 is 1.0971, the same
+number once DSM's rounding to two significant figures is allowed for. The
+percentages agree, which is the quick check: 28.12% against 28%.
+
+Proxmox VE is not consistent with itself here either — a VM's memory is shown as
+`4.00 GiB`, binary and labelled as such, on the same interface. That is Proxmox
+VE's convention and the plugin does not attempt to second-guess it.
 
 ## The discovery tool
 

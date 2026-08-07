@@ -4,6 +4,20 @@
 
 哪些事實已在實機上驗證、哪些沒有，記錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)——要判斷某一版能不能信任，那份文件比這一份有用。
 
+## [0.6.6] - 2026-08-07
+
+### 修正
+
+- **磁碟擴充只到了 NAS，沒有到節點。**`qm resize` 正確地把 LUN 擴大了，然後以 `qmp command 'block_resize' failed - Cannot grow device files` 失敗，留下 NAS 已經是新容量、而 VM 設定檔還宣稱舊容量的狀態。原因是：`multipathd resize map` 的新容量來自 multipathd 自己的 **udev 視圖**，而在觸發變更的 sysfs 重新掃描之後幾微秒，那個視圖還沒更新。multipathd 拿過期的容量和 map 的容量比對，發現一樣，記下「map is still the same size」然後以 **0** 結束。所以 map 從來沒有長大，也沒有任何東西回報有問題，而 PVE 的下一步——`block_resize`，對還沒跟上的裝置完全沒有容忍度——才是失敗的那一個。實機量測：NAS 把 LUN 擴到 33 GiB，`sdb` 也跟上了（`detected capacity change from 67108864 to 69206016`），而 `dm-0` 停在 67108864。現在會輪詢 map 直到它帶著新容量，過程中重新發出 resize，而**一個始終沒有到達節點的擴充會帶著說明失敗**，不再交給 QEMU 去產生一個不相干的訊息。
+
+- **比自己 LUN 還小的 map 會在啟用時對齊。**`volume_resize` 只在擁有該 guest 的節點上執行，所以其他每一個節點都還呈現舊容量；即時遷移到其中一台，會把一個比它自己設定檔還小的裝置交給 guest。`activate_volume` 現在會比對兩者——LUN 的容量在那裡本來就已經拿到了，所以不需要多打一次 NAS——並且是警告而不是拒絕，因為啟用失敗會讓 VM 開不起來。
+
+### 文件
+
+- **為什麼 Proxmox VE 和 DSM 報的容量不一樣**。其實沒有不一樣：plugin 把儲存空間的 `size_total_byte` 與 `size_free_byte` 以位元組原封不動傳出去，沒有做任何運算，然後 PVE 除以 1000、DSM 除以 1024——兩邊都寫「TB」。15.36 TB 和 14 TB 是同樣的 15,356,124,401,664 位元組。
+- 0.6.5 加入的快照描述，現在在兩份 README 和文件網站上都**看得到**。這是一個看圖比看字容易得多的改動。
+- 修正文件網站上「SAN Manager 在 LUN → 快照 底下會列出快照**名稱**」的說法。它列出的是快照本身；任何地方都沒有名稱欄。
+
 ## [0.6.5] - 2026-08-07
 
 ### 修正

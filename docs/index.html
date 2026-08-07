@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.5 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.6 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -558,19 +558,60 @@ apt install ./jt-pve-storage-synology_all.deb</code></pre>
     <h3 class="subsection-title"><span class="lang-en">Finding the snapshots in SAN Manager</span><span class="lang-zh">在 SAN Manager 裡找到快照</span></h3>
 
     <p>
-        <span class="lang-en">SAN Manager's <strong>Snapshot</strong> page manages <em>schedules</em>. Expanding a LUN there shows its schedule, when the last snapshot was taken and a <strong>restore-point count</strong> —but not the snapshot names. To see the names, go to <strong>LUN → select the LUN → Snapshot</strong>.</span>
-        <span class="lang-zh">SAN Manager 的<strong>快照</strong>頁面管理的是「排程」。在那裡展開一個 LUN 會看到它的排程、最近一次快照的時間，以及一個<strong>還原點數量</strong>——但不會列出快照名稱。要看名稱，請到 <strong>LUN → 選擇該 LUN → 快照</strong>。</span>
+        <span class="lang-en">SAN Manager's <strong>Snapshot</strong> page manages <em>schedules</em>. Expanding a LUN there shows its schedule, when the last snapshot was taken and a <strong>restore-point count</strong> —but not the snapshots themselves. To list them, go to <strong>LUN → select the LUN → Snapshot</strong>, or open <strong>Snapshot List</strong> from the Snapshot page.</span>
+        <span class="lang-zh">SAN Manager 的<strong>快照</strong>頁面管理的是「排程」。在那裡展開一個 LUN 會看到它的排程、最近一次快照的時間，以及一個<strong>還原點數量</strong>——但不會列出快照本身。要列出快照，請到 <strong>LUN → 選擇該 LUN → 快照</strong>，或從快照頁面開啟<strong>快照清單</strong>。</span>
     </p>
 
     <p>
-        <span class="lang-en">A snapshot this plugin took carries Proxmox VE's own snapshot name verbatim —<code>install1</code> in PVE is <code>install1</code> on the NAS —with <code>taken_by</code> set to <code>jt-pve-storage-synology</code> and a description naming the storage. That marker is the ownership gate: the plugin lists, deletes and rolls back only snapshots carrying it, so a schedule you set up in SAN Manager is never touched by a VM operation.</span>
-        <span class="lang-zh">這個 plugin 拍的快照會一字不差地帶著 Proxmox VE 自己的快照名稱——PVE 裡叫 <code>install1</code>，NAS 上就是 <code>install1</code>——並且 <code>taken_by</code> 設為 <code>jt-pve-storage-synology</code>，描述裡帶著 storage 名稱。那個標記就是所有權閘門：plugin 只會列出、刪除、倒回帶有它的快照，所以你在 SAN Manager 設的排程永遠不會被某個 VM 操作動到。</span>
+        <span class="lang-en"><strong>SAN Manager has no Name column.</strong> Its snapshot list shows time, consistency state, description, status and lock. The API does carry a <code>name</code>, and the plugin sets it to Proxmox VE's own snapshot name and matches on it —but nothing in DSM displays it. So from <strong>0.6.5</strong> the plugin writes the name into the <strong>description</strong> as well, as <code>&lt;snapshot&gt; (Proxmox VE &lt;storage&gt;)</code>:</span>
+        <span class="lang-zh"><strong>SAN Manager 沒有「名稱」欄位。</strong>它的快照清單只有時間、一致性狀態、描述、狀態與鎖定。API 裡確實有 <code>name</code>，plugin 也會把它設成 Proxmox VE 自己的快照名稱並據以比對——但 DSM 沒有任何地方會顯示它。所以從 <strong>0.6.5</strong> 起，plugin 也會把名稱寫進<strong>描述</strong>，格式是 <code>&lt;快照名稱&gt; (Proxmox VE &lt;storage&gt;)</code>：</span>
+    </p>
+
+    <div class="diagram">
+        <img src="images/snapshot-description-en.png" class="lang-en"
+             alt="The same two snapshots: Proxmox VE's snapshot list above, SAN Manager's snapshot list below, with each PVE snapshot name appearing in the DSM description column">
+        <img src="images/snapshot-description-zh.png" class="lang-zh"
+             alt="同樣的兩個快照：上方是 Proxmox VE 的快照清單，下方是 SAN Manager 的快照清單，每個 PVE 快照名稱都出現在 DSM 的描述欄位">
+    </div>
+
+    <p>
+        <span class="lang-en">Before that every snapshot of every disk on a storage read <code>Proxmox VE &lt;storage&gt;</code> and looked identical, so the one question an operator has in front of that list —<em>which PVE snapshot is this row?</em> —could only be answered by going back to Proxmox VE and comparing timestamps. Descriptions are written when the snapshot is taken and DSM never rewrites them, so snapshots taken by an older build keep the old text.</span>
+        <span class="lang-zh">在那之前，一個 storage 上每顆磁碟的每個快照，描述都是 <code>Proxmox VE &lt;storage&gt;</code>，長得一模一樣，所以操作者站在那份清單前唯一會問的問題——<strong>這一列是哪一個 PVE 快照？</strong>——只能回到 Proxmox VE 比對時間才答得出來。描述是拍快照當下寫進去的，DSM 不會回頭改寫，所以舊版拍的快照會保留舊的文字。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">Every snapshot also carries <code>taken_by</code> set to <code>jt-pve-storage-synology</code>. That marker is the ownership gate: the plugin lists, deletes and rolls back only snapshots carrying it, so a schedule you set up in SAN Manager is never touched by a VM operation.</span>
+        <span class="lang-zh">每個快照同時帶著 <code>taken_by</code>，值是 <code>jt-pve-storage-synology</code>。那個標記就是所有權閘門：plugin 只會列出、刪除、倒回帶有它的快照，所以你在 SAN Manager 設的排程永遠不會被某個 VM 操作動到。</span>
     </p>
 
     <div class="note">
         <span class="lang-en">The same page is a quick way to confirm the storage is doing what it should: a LUN this plugin created reads <strong>Btrfs, second-level snapshot</strong> and offers snapshots, while a thick-provisioned LUN shows <em>&ldquo;Thick Provisioning LUN does not support snapshots&rdquo;</em>. That is the difference <code>pvesm add</code> refuses an ext4 volume over.</span>
         <span class="lang-zh">同一個頁面也是確認 storage 運作正常的快方法：這個 plugin 建立的 LUN 會顯示<strong>Btrfs、秒級快照</strong>並且支援快照，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。這正是 <code>pvesm add</code> 之所以會拒絕 ext4 儲存空間的那個差別。</span>
     </div>
+
+    <h3 class="subsection-title"><span class="lang-en">Why the size in Proxmox VE does not match the size in DSM</span><span class="lang-zh">為什麼 Proxmox VE 顯示的容量和 DSM 對不起來</span></h3>
+
+    <p>
+        <span class="lang-en">It does —the two count in different units and both call them TB. The plugin reports the DSM volume's <code>size_total_byte</code> and <code>size_free_byte</code> <strong>verbatim, in bytes</strong>, and does no arithmetic on either. Everything after that is display: Proxmox VE's storage summary divides by 1000 and writes TB, DSM's Storage Manager divides by 1024 and also writes TB.</span>
+        <span class="lang-zh">其實是對得上的——兩邊用不同的單位在算，而且都寫成 TB。plugin 把 DSM 儲存空間的 <code>size_total_byte</code> 與 <code>size_free_byte</code> <strong>原封不動、以位元組</strong>回報，兩個數字都沒有做任何運算。之後全都是顯示的事：Proxmox VE 的 storage 摘要除以 1000 寫成 TB，DSM 的 Storage Manager 除以 1024 也寫成 TB。</span>
+    </p>
+
+    <table>
+        <thead><tr>
+            <th></th>
+            <th><span class="lang-en">Total</span><span class="lang-zh">總容量</span></th>
+            <th><span class="lang-en">Used</span><span class="lang-zh">已使用</span></th>
+        </tr></thead>
+        <tbody>
+        <tr><td>Proxmox VE</td><td>15.36 TB</td><td>4.32 TB</td></tr>
+        <tr><td>DSM Storage Manager</td><td>14 TB</td><td>3.9 TB</td></tr>
+        </tbody>
+    </table>
+
+    <p>
+        <span class="lang-en">Both are 15,356,124,401,664 and 4,318,122,532,864 bytes. The ratio between the two rows is 2<sup>40</sup> ÷ 10<sup>12</sup> = 1.0995, and 15.36 ÷ 14 = 1.0971 once DSM's rounding to two significant figures is allowed for. The percentages are the quick check, and they agree: <strong>28.12%</strong> against <strong>28%</strong>. Proxmox VE is not consistent with itself here either —a VM's memory reads <code>4.00 GiB</code>, binary and labelled as such, on the same interface. That is Proxmox VE's convention and the plugin does not second-guess it.</span>
+        <span class="lang-zh">兩邊都是 15,356,124,401,664 與 4,318,122,532,864 位元組。兩列之間的比值是 2<sup>40</sup> ÷ 10<sup>12</sup> = 1.0995，而 15.36 ÷ 14 = 1.0971，扣掉 DSM 進位到兩位有效數字後就是同一個數。百分比是最快的檢查點，而它們一致：<strong>28.12%</strong> 對 <strong>28%</strong>。Proxmox VE 自己其實也不一致——同一個介面上，VM 的記憶體顯示為 <code>4.00 GiB</code>，用的是二進位單位而且標示清楚。那是 Proxmox VE 的慣例，plugin 不會去猜它想怎麼顯示。</span>
+    </p>
 
     <h3 class="subsection-title"><span class="lang-en">Restricting it to some nodes</span><span class="lang-zh">只讓某幾個節點可以用</span></h3>
 

@@ -6,6 +6,44 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.6] - 2026-08-07
+
+### Fixed
+
+- **A disk resize reached the NAS but not the node.** `qm resize` grew the LUN
+  correctly and then failed with `qmp command 'block_resize' failed - Cannot grow
+  device files`, leaving the NAS at the new size while the VM configuration still
+  claimed the old one. The cause: `multipathd resize map` takes the new size from
+  multipathd's own **udev view** of a path, and that view has not been refreshed
+  microseconds after the sysfs rescan that changed it. multipathd compared the
+  stale size against the map's, found them equal, logged *map is still the same
+  size* and exited **0**. So the map never grew, nothing reported a problem, and
+  PVE's very next step — `block_resize`, which has no tolerance at all for a
+  device that has not caught up — was the thing that failed. Measured on hardware:
+  the NAS grew the LUN to 33 GiB, `sdb` picked it up (`detected capacity change
+  from 67108864 to 69206016`), and `dm-0` stayed at 67108864. The map is now polled
+  until it carries the new size, with the resize re-issued as it waits, and a
+  resize that never reaches the node **fails with an explanation** instead of
+  leaving QEMU to produce an unrelated one.
+- **A map smaller than its LUN is reconciled at activation.** `volume_resize` runs
+  only on the node that owns the guest, so every other node went on presenting the
+  old size; a live migration onto one of them would have handed the guest a device
+  smaller than its own configuration says. `activate_volume` now compares the two —
+  the LUN's size is already in hand there, so it costs no extra call to the NAS —
+  and warns rather than refusing, because an activation that fails stops a VM from
+  starting.
+
+### Documentation
+
+- **Why Proxmox VE and DSM report different sizes.** They do not: the plugin
+  passes the volume's `size_total_byte` and `size_free_byte` through in bytes and
+  does no arithmetic, and then PVE divides by 1000 while DSM divides by 1024 —
+  both writing "TB". 15.36 TB and 14 TB are the same 15,356,124,401,664 bytes.
+- The snapshot description added in 0.6.5 is now **shown** in both READMEs and on
+  the documentation site. It is a change that is much easier to see than to read.
+- Corrected the documentation-site claim that SAN Manager lists snapshot *names*
+  under LUN → Snapshot. It lists the snapshots; there is no name column anywhere.
+
 ## [0.6.5] - 2026-08-07
 
 ### Fixed

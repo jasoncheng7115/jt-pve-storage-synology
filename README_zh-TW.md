@@ -43,6 +43,14 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 | **倒回** | `restore_snapshot`。LUN 的 uuid 不變，較新的快照也存活 |
 | 掛上／卸離 | iSCSI 登入，裝置由核心自己的識別找出，dm-multipath |
 
+### 你在 PVE 取的快照名稱，在 SAN Manager 裡看得到
+
+SAN Manager 的快照清單有時間、一致性狀態、描述、狀態與鎖定這幾欄——**完全沒有名稱欄**。API 裡確實有 `name`，plugin 也會把它設成 Proxmox VE 自己的快照名稱並據以比對，但 DSM 沒有任何地方會顯示它。所以從 **0.6.5** 起，plugin 也會把名稱寫進**描述**，格式是 `<快照名稱> (Proxmox VE <storage>)`：
+
+![同樣的兩個快照：上方是 Proxmox VE 的快照清單，下方是 SAN Manager 的，每個 PVE 快照名稱都出現在 DSM 的描述欄](docs/images/snapshot-description-zh.png)
+
+在那之前，一個 storage 上每顆磁碟的每個快照，描述都是 `Proxmox VE <storage>`，長得一模一樣，所以操作者站在那份清單前唯一會問的問題——**這一列是哪一個 PVE 快照？**——只能回到 Proxmox VE 比對時間才答得出來。描述是拍快照當下寫進去的，DSM 不會回頭改寫，所以舊版拍的快照會保留舊的文字。
+
 ### 倒回，以及為什麼繞了一段路才走到這裡
 
 兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個**新的** volume」來還原，所以兩者都不需要。這個方法是靠對一台 DSM 詢問九個候選名稱找到的，其中一個回答了——**`restore_snapshot`**，收 `src_lun_uuid` 與 `snapshot_uuid`。
@@ -202,6 +210,21 @@ pvesm status --storage mysyno          # 確認
 如果那個儲存空間不是 Btrfs、機型不支援 iSCSI target 或快照、或者這個 storage id 會摺疊成與既有 storage 相同的 LUN 前置字串，`pvesm add` 會當場拒絕。
 
 **密碼不會進到 `/etc/pve/storage.cfg`**。它會寫到 `/etc/pve/priv/storage/<storage>.syno`，權限 `0600`、只有 root、並複寫到每個節點。完整選項清單與移除程序：[文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh#configure)。
+
+### 為什麼 Proxmox VE 顯示的容量和 DSM 對不起來
+
+其實是對的上的——兩邊用不同的單位在算，而且都寫成 TB。
+
+plugin 把 DSM 儲存空間的 `size_total_byte` 與 `size_free_byte` **原封不動、以位元組**回報，兩個數字都沒有做任何運算。之後全都是顯示的事。Proxmox VE 的 storage 摘要用 SI 單位格式化位元組，除以 1000；DSM 的 Storage Manager 除以 1024，卻一樣寫「TB」。所以同一個儲存空間會讀成：
+
+| | 總容量 | 已使用 |
+|---|---|---|
+| Proxmox VE | 15.36 TB | 4.32 TB |
+| DSM Storage Manager | 14 TB | 3.9 TB |
+
+兩邊都是 15,356,124,401,664 與 4,318,122,532,864 位元組。兩欄之間的比值是 2⁴⁰ ÷ 10¹²，也就是 1.0995——而 15.36 ÷ 14 是 1.0971，扣掉 DSM 進位到兩位有效數字之後就是同一個數。百分比是最快的檢查點：28.12% 對 28%。
+
+Proxmox VE 自己其實也不一致——同一個介面上，VM 的記憶體顯示為 `4.00 GiB`，用的是二進位單位而且標示清楚。那是 Proxmox VE 的慣例，plugin 不會去猜它想怎麼顯示。
 
 ## 探索工具
 
