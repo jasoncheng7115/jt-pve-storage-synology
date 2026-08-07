@@ -153,6 +153,7 @@ SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經�
 apt update
 apt install -y open-iscsi multipath-tools
 
+cd /tmp
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
