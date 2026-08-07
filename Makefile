@@ -281,6 +281,17 @@ release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nop
 	if [ "$$badge" != "$(VERSION)" ]; then \
 		echo "  ERROR: the Pages site badge says '$$badge'"; fail=1; \
 	fi; \
+	dl_tag=v$$(echo "$(VERSION)" | tr '~' '-'); \
+	dl_asset=jt-pve-storage-synology_$$(echo "$(VERSION)" | tr '~' '.')-1_all.deb; \
+	for f in docs/index.html README.md README_zh-TW.md; do \
+		for u in $$(grep -ohE 'releases/download/[^ "<)]+' $$f 2>/dev/null | sort -u); do \
+			if [ "$$u" != "releases/download/$$dl_tag/$$dl_asset" ]; then \
+				echo "  ERROR: $$f documents $$u"; \
+				echo "         expected releases/download/$$dl_tag/$$dl_asset"; fail=1; \
+			fi; \
+		done; \
+	done; \
+	echo "  install URL:      releases/download/$$dl_tag/$$dl_asset"; \
 	if [ "$$fail" = "1" ]; then \
 		echo ""; \
 		echo "A release whose files disagree about its own version is worse"; \

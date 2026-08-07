@@ -471,21 +471,14 @@
         <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西，所以在正式環境做之前請先讀下面的警告。</span>
     </p>
 
-    <pre><code><span class="c"># on each node — resolves the newest release, prereleases included</span>
-url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
-      | grep -o 'https://[^"]*_all\.deb' | sed -n 1p)
-curl -fLO "$url"
-dpkg -i jt-pve-storage-synology_*_all.deb
+    <pre><code><span class="c"># on each node</span>
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
+dpkg -i jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd</code></pre>
 
     <div class="note">
-        <span class="lang-en"><strong><code>sed -n 1p</code>, not <code>head -1</code>.</strong> Both print the first line, but <code>head</code> exits immediately and closes the pipe, so <code>curl</code> gets EPIPE and prints <code>curl: (23) Failure writing output to destination</code> to stderr — every time, on a command that actually succeeded. <code>sed -n 1p</code> reads to the end, so it stays quiet. A documented command must not look like it failed.</span>
-        <span class="lang-zh"><strong>用 <code>sed -n 1p</code>，不是 <code>head -1</code></strong>。兩者都只印第一行，但 <code>head</code> 會立刻結束並關閉管線，於是 <code>curl</code> 收到 EPIPE，把 <code>curl: (23) Failure writing output to destination</code> 印到 stderr——每一次都印，而那個命令其實是成功的。<code>sed -n 1p</code> 會讀到結尾，所以不會出聲。一個寫進文件的命令不可以看起來像失敗了。</span>
-    </div>
-
-    <div class="note">
-        <span class="lang-en"><strong>Why not <code>/releases/latest/download/…</code>?</strong> Because there is no latest release: every 0.x here is tagged as a <em>prerelease</em>, and GitHub's <code>latest</code> deliberately skips those — so every such URL answers <strong>404</strong>. It will start working when 1.0.0 ships. Until then the command above asks the API for the newest release of any kind. To pin a version instead, take the URL straight from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>.</span>
-        <span class="lang-zh"><strong>為什麼不用 <code>/releases/latest/download/…</code>？</strong>因為根本沒有 latest release：這裡每一個 0.x 都標記為<strong>預發行版</strong>，而 GitHub 的 <code>latest</code> 刻意會跳過它們——所以那種網址一律回 <strong>404</strong>。等 1.0.0 出來之後它就會開始有用。在那之前，上面這個命令是去問 API 要「最新的任何一種發行版」。若要固定版本，直接從<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>複製網址。</span>
+        <span class="lang-en">The version is in the URL on purpose. <strong><code>/releases/latest/download/…</code> answers 404 here</strong>, because every 0.x is tagged as a prerelease and GitHub's <code>latest</code> skips those — it will work from 1.0.0. Newer builds are on the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
+        <span class="lang-zh">網址裡帶版本號是刻意的。<strong>這裡的 <code>/releases/latest/download/…</code> 會回 404</strong>，因為每一個 0.x 都標記為預發行版，而 GitHub 的 <code>latest</code> 會跳過它們——從 1.0.0 起才能用。更新的版本在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>。從 clone 安裝：<code>make install</code>。</span>
     </div>
 
     <p>
@@ -495,8 +488,8 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">Schedule the first install.</span><span class="lang-zh">第一次安裝請排維護時段。</span></strong>
-        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> — which is <strong>node-wide</strong>. The stanza matches only Synology devices, but the reconfigure re-reads configuration for every map on the node. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing. The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
-        <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——那是<strong>節點層級</strong>的。那段設定只匹配 Synology 裝置，但 reconfigure 會重讀節點上每一個 map 的設定。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
+        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> — a <strong>node-wide</strong> command. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing.<br><br><strong>Measured: it does not disturb another vendor's storage.</strong> On multipath-tools 0.11.1, with continuous direct reads running against an existing unrelated map, a <code>multipathd reconfigure</code> gave <strong>1776 reads and 0 failures</strong>, the map's device-mapper <strong>event counter did not move at all</strong> — so it was never reloaded — and its path stayed <code>active ready running</code>. Reconfigure re-reads the configuration but only reloads a map whose resulting configuration actually changed, and this drop-in matches <code>vendor "SYNOLOGY"</code> alone. The maintenance window is advice for a first install on a production node, not a known outage.<br><br>The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
+        <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——這是一個<strong>節點層級</strong>的命令。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。<br><br><strong>實測：它不會動到別的廠商的儲存。</strong>在 multipath-tools 0.11.1 上，一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 <code>multipathd reconfigure</code>：<strong>1776 次讀取、0 次失敗</strong>，那個 map 的 device-mapper <strong>事件計數器完全沒有動</strong>——代表它從未被重新載入——而它的路徑維持 <code>active ready running</code>。reconfigure 會重讀設定，但只會重新載入「設定結果真的有變」的 map，而這個 drop-in 只匹配 <code>vendor "SYNOLOGY"</code>。排維護時段是給正式節點第一次安裝的建議，不是已知的中斷。<br><br>這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
     </div>
 
     <div class="note">

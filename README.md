@@ -240,21 +240,28 @@ storage and starts breaking it.
 On every node of the cluster.
 
 ```bash
-# resolves the newest release, prereleases included
-url=$(curl -fsSL https://api.github.com/repos/jasoncheng7115/jt-pve-storage-synology/releases \
-      | grep -o 'https://[^"]*_all\.deb' | sed -n 1p)
-curl -fLO "$url"
-dpkg -i jt-pve-storage-synology_*_all.deb
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
+dpkg -i jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
 
-**Not `/releases/latest/download/…`** — there is no latest release. Every 0.x here
-is tagged as a prerelease and GitHub's `latest` deliberately skips those, so such a
-URL answers **404**. It will work once 1.0.0 ships. From a clone, `make install`.
+The version is in the URL on purpose: `/releases/latest/download/…` answers **404**
+here, because every 0.x is tagged as a prerelease and GitHub's `latest` skips those.
+Newer builds are on the [releases page](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases).
+From a clone, `make install`.
 
 > **Schedule the first install.** `activate_storage` writes a multipath drop-in for
 > `vendor "SYNOLOGY"` and, when that file changes, runs `multipathd reconfigure` —
-> which is **node-wide**. It runs once, when the file first appears or changes.
+> a **node-wide** command. It runs once, when the file first appears or changes.
+>
+> **Measured: it does not disturb another vendor's storage.** On multipath-tools
+> 0.11.1, with continuous direct reads against an existing unrelated map, a
+> `multipathd reconfigure` gave **1776 reads and 0 failures**, the map's
+> device-mapper **event counter did not move** — so it was never reloaded — and its
+> path stayed `active ready running`. Reconfigure re-reads configuration but only
+> reloads a map whose configuration actually changed. The maintenance window is
+> advice for a first install on a production node, not a known outage.
+>
 > The drop-in is mandatory rather than tuning: without it multipath's generic
 > defaults apply, and those include `no_path_retry "queue"`, which turns the loss
 > of every path into an unkillable process instead of an I/O error.
