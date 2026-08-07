@@ -282,9 +282,29 @@
 <section class="doc-section" id="account">
     <h2 class="section-title"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></h2>
 
+    <p class="section-subtitle">
+        <span class="lang-en">Create a dedicated account for the plugin. It has to be in <code>administrators</code>, and everything else can be taken away.</span>
+        <span class="lang-zh">為這個 plugin 建立一個專用帳號。它必須在 <code>administrators</code> 群組裡，而其他一切都可以拿掉。</span>
+    </p>
+
+    <pre><code><span class="comment"># DSM → Control Panel → User &amp; Group → Create</span>
+<span class="cmd">Name</span>              pve-storage        <span class="comment"># this is what --syno-username gets</span>
+<span class="cmd">Groups</span>            <span class="string">administrators</span>     <span class="comment"># REQUIRED — DSM has nothing smaller, see below</span>
+<span class="cmd">Shared folders</span>    No access          <span class="comment"># to every one of them</span>
+<span class="cmd">Home folder</span>       not created
+<span class="cmd">Applications</span>      Deny all except <span class="string">DSM</span>   <span class="comment"># the API logs in through DSM itself</span>
+<span class="cmd">Quota</span>             none
+<span class="cmd">Speed limit</span>       none
+<span class="cmd">2FA</span>               optional           <span class="comment"># the plugin can carry the device token</span>
+
+<span class="comment"># then, still in Control Panel</span>
+<span class="cmd">Security</span> → Firewall   allow the DSM port only from your PVE node addresses
+<span class="cmd">Security</span> → Account    leave <span class="string">Auto Block</span> on — the plugin is written not to trip it</code></pre>
+
+
     <p>
-        <span class="lang-en">Do not give this plugin your <code>admin</code> account. And there is one thing DSM will not let you restrict, which you should know before deciding how to network the NAS: <strong>SAN Manager's API has no privilege you can grant for "manage LUNs"</strong>. There is no SAN operator role, and the per-user Application privileges list does not contain SAN Manager, so the account has to be an administrator.</span>
-        <span class="lang-zh">不要把 <code>admin</code> 帳號給這個 plugin。而且有一件事 DSM 不讓你限制，你應該在決定 NAS 的網路配置之前先知道：<strong>SAN Manager 的 API 沒有任何一個可以單獨授予的「管理 LUN」權限</strong>。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager，所以帳號必須是管理員。</span>
+        <span class="lang-en">Never use the built-in <code>admin</code> account for this. And there is one thing DSM will not let you restrict, which you should know before deciding how to network the NAS: <strong>SAN Manager's API has no privilege you can grant for "manage LUNs"</strong>. There is no SAN operator role, and the per-user Application privileges list does not contain SAN Manager, so the account has to be an administrator.</span>
+        <span class="lang-zh">絕對不要拿內建的 <code>admin</code> 帳號來做這件事。而且有一件事 DSM 不讓你限制，你應該在決定 NAS 的網路配置之前先知道：<strong>SAN Manager 的 API 沒有任何一個可以單獨授予的「管理 LUN」權限</strong>。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager，所以帳號必須是管理員。</span>
     </p>
 
     <p>
