@@ -349,35 +349,32 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # check what you got
 > 0.6.5: `apt` prints a `DOWNGRADING:` line, and with `-y` it does not stop to
 > ask. That is why the version check is the last line of the block.
 
-No service restart is needed, and that was measured rather than assumed. The package
-installs into `/usr/share/perl5/PVE`, which `pve-manager` watches with an
-`interest-noawait` trigger — the *Processing triggers for pve-manager* line in the
-output — and its postinst runs `reload-or-try-restart` on `pvedaemon`, `pvestatd`,
-`pveproxy`, `spiceproxy` and `pvescheduler`. A reload is enough: with the package
-removed `pvedaemon` does not list `synologysan` among the storage types it accepts,
-and installing it makes the daemon validate `synologysan` options immediately — with
-its PID unchanged throughout — `exec(2)` keeps the PID while replacing the running
-program, which is exactly what `pvedaemon restart` does when the trigger HUPs it:
+**Every node, including the one you browse from**, and keep them on the same
+version. A storage operation runs on the node that owns the guest, not the node
+serving the interface — so a mixed-version cluster behaves differently depending on
+where a VM happens to be, and a node *without* the plugin makes the storage
+**invisible** in the web interface rather than reporting an error. **No service
+restart is needed**: the package's own trigger reloads the daemons.
 
-```
-pvedaemon[1333139]: received signal HUP
-pvedaemon[1333139]: server shutdown (restart)
-systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
-pvedaemon[1333139]: restarting server
-pvedaemon[1333139]: starting 3 worker(s)
+```bash
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   # run on every node
 ```
 
-So this holds for an **upgrade** as much as a first install: the master re-execs and
-forks fresh workers that read the new modules from disk. Workers already serving a
-request finish on the old code — about five seconds, in the run above — so an
-operation started during the upgrade may complete on the version you just replaced.
-If something blocks `deb-systemd-invoke`, `systemctl restart pvedaemon pveproxy
-pvestatd` is the fallback.
+> **Schedule the first install.** `activate_storage` writes a multipath drop-in for
+> `vendor "SYNOLOGY"` and, when that file changes, runs `multipathd reconfigure` —
+> a **node-wide** command. Measured: with continuous direct reads against an
+> existing unrelated map, a reconfigure gave **1776 reads and 0 failures** and the
+> map's device-mapper event counter did not move, so it was never reloaded. The
+> window is advice for a first install on a production node, not a known outage.
+
+Why each of those is true, the mixed-version symptom that is hard to read, why the
+line is `apt install ./…` and not `dpkg -i`, and what to do if an older version of
+this page already led you into that — [Notes for the curious](docs/TESTING.md#notes-for-the-curious).
 
 ## Upgrading
 
 The same commands. `apt install` on a newer `.deb` upgrades in place, the same
-trigger reloads the daemons, and **no restart is needed** — see the journal above.
+trigger reloads the daemons, and **no restart is needed**.
 
 ```bash
 cd /tmp
@@ -403,66 +400,6 @@ Three things that are only true of an upgrade:
   replaces Perl modules, and it does not touch iSCSI sessions, multipath maps or the
   drop-in in `/etc/multipath/conf.d`.
 
-
-> **Keep the version the same on every node.** A storage operation runs on the node
-> that owns the guest, using *that node's* copy of the plugin — not the one on the
-> node you are browsing from. A cluster with mixed versions therefore behaves
-> differently depending on where a VM happens to be, and the symptom is baffling: a
-> fix you installed is simply absent for some guests. Check with
-> `dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'` on each node.
-
-> **Every node, or the storage is invisible in the web interface.** `pvesm add`
-> writes to the cluster configuration, so one node is enough to create the storage —
-> but the web interface is served by *whichever node your browser is connected to*,
-> and `pveproxy` loads its plugin list at startup. A node without the plugin does
-> not know the `synologysan` type and **silently omits the storage from the list**.
-> It exists and works on the nodes that do have it; it just is not shown — which
-> reads exactly like `pvesm add` having failed, and it did not. Install on every
-> node and restart the daemons on each, including the one you are browsing from. To
-> limit the storage to the nodes that are ready:
-> `pvesm set <storage> --nodes nodeA,nodeB`.
-
-> **If a `dpkg -i` already failed here.** An earlier version of this page said
-> `dpkg -i`. That leaves the package unpacked but *unconfigured*, and apt then
-> refuses to solve anything else — you get `Unmet dependencies` naming `kpartx`
-> and `sg3-utils-udev` as "not going to be installed", which looks like a
-> repository problem and is not. Run `dpkg --remove jt-pve-storage-synology`
-> first, then the block above. If the prerequisites still will not resolve, check
-> `apt policy kpartx sg3-utils-udev` — `kpartx` comes from Debian `trixie/main`
-> and `sg3-utils-udev` from the Proxmox VE repository.
-
-`open-iscsi` and `multipath-tools` are the two a Proxmox VE node can genuinely be
-missing — nothing in PVE pulls them in, and installing `multipath-tools` is what the
-maintenance window is really about. The four Perl modules the package also needs are
-dependencies of 86 to 151 PVE packages each, so they are already there.
-
-Then `apt install ./…`, not `dpkg -i`: `dpkg` does not resolve dependencies —
-on a node without `multipath-tools` it unpacks and then fails with *dependency
-problems — leaving unconfigured*. The leading `./` is required, or apt treats the
-argument as a package name.
-
-That URL always points at the newest release, so it does not go stale — the `beta1`
-suffix is gone from 0.6.4 onwards, so releases are no longer flagged as prereleases
-(which GitHub's `latest` used to skip), and each release publishes the package a
-second time under this version-free name. To pin a version, take the URL from the
-[releases page](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases).
-From a clone, `make install`.
-
-> **Schedule the first install.** `activate_storage` writes a multipath drop-in for
-> `vendor "SYNOLOGY"` and, when that file changes, runs `multipathd reconfigure` —
-> a **node-wide** command. It runs once, when the file first appears or changes.
->
-> **Measured: it does not disturb another vendor's storage.** On multipath-tools
-> 0.11.1, with continuous direct reads against an existing unrelated map, a
-> `multipathd reconfigure` gave **1776 reads and 0 failures**, the map's
-> device-mapper **event counter did not move** — so it was never reloaded — and its
-> path stayed `active ready running`. Reconfigure re-reads configuration but only
-> reloads a map whose configuration actually changed. The maintenance window is
-> advice for a first install on a production node, not a known outage.
->
-> The drop-in is mandatory rather than tuning: without it multipath's generic
-> defaults apply, and those include `no_path_retry "queue"`, which turns the loss
-> of every path into an unkillable process instead of an I/O error.
 
 Four of these plugins can share a node — but `PVE::SectionConfig::init` **dies on a
 duplicate property name**, and every storage on the node then stops working. The

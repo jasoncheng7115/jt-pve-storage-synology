@@ -1317,3 +1317,143 @@ If you run any of this on your own NAS, the results are worth more than
 anything on this page — particularly a model or DSM version that is not the one
 above, and particularly R-1. Model, DSM version, volume filesystem, and what
 the NAS answered.
+
+---
+
+## Notes for the curious
+
+None of this is needed to install or run the plugin. It is here because each item
+cost something to establish, and a reader who hits one of them should be able to
+find out why rather than guess.
+
+### Why every node, and why a mixed-version cluster is confusing
+
+A storage operation runs on the node that **owns the guest**, using *that node's*
+copy of the plugin — not the one on the node serving the web interface. So a
+cluster with mixed versions behaves differently depending on where a VM happens
+to be, and the symptom is baffling: a fix you installed is simply absent for some
+guests.
+
+Seen for real: a snapshot taken on a node still running an older build carried the
+old DSM description, while the node the browser was connected to had been
+upgraded. The two `apt` runs were even distinguishable by their
+*Reading database … N files* counts.
+
+A node **without** the plugin is worse than a node with an old one, because it
+fails silently: `pvesm add` writes to the cluster configuration, so one node is
+enough to create the storage — but `pveproxy` loads its plugin list at startup,
+and a node that does not know the `synologysan` type **omits the storage from the
+list** rather than reporting an error. The storage exists and works on the nodes
+that do have it. That reads exactly like `pvesm add` having failed, and it did not.
+
+### Why no service restart is needed
+
+The package installs into `/usr/share/perl5/PVE`, which `pve-manager` watches with
+an `interest-noawait` trigger — the *Processing triggers for pve-manager* line in
+the output. Its postinst runs `reload-or-try-restart` on `pvedaemon`, `pvestatd`,
+`pveproxy`, `spiceproxy` and `pvescheduler`.
+
+A reload is enough because `pvedaemon`'s `ExecReload` is `pvedaemon restart`, which
+`exec(2)`s the daemon — replacing the running program while keeping the PID:
+
+```
+pvedaemon[1333139]: received signal HUP
+pvedaemon[1333139]: server shutdown (restart)
+systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
+pvedaemon[1333139]: restarting server
+pvedaemon[1333139]: starting 3 worker(s)
+```
+
+Same PID throughout, so this holds for an **upgrade** as much as a first install:
+the master re-execs and forks fresh workers that read the new modules from disk.
+Workers already serving a request finish on the old code — about five seconds in
+the run above — so an operation started during the upgrade may complete on the
+version you just replaced. If something in your environment blocks
+`deb-systemd-invoke`, `systemctl restart pvedaemon pveproxy pvestatd` is the
+fallback.
+
+### If a `dpkg -i` already failed here
+
+`open-iscsi` and `multipath-tools` are the two packages a Proxmox VE node can
+genuinely be missing — nothing in PVE pulls them in, and installing
+`multipath-tools` is the step the maintenance window is really about. The four
+Perl modules the package also needs are dependencies of 86 to 151 PVE packages
+each, so they are already there.
+
+That is also why the install line is `apt install ./…` and not `dpkg -i`: `dpkg`
+does not resolve dependencies, so on a node without `multipath-tools` it unpacks
+the package and then fails with *dependency problems — leaving unconfigured*. The
+leading `./` is required, or apt reads the argument as a package name.
+
+An earlier version of the documentation said `dpkg -i`. That leaves the package
+unpacked but *unconfigured*, and apt then refuses to solve anything else — you get
+`Unmet dependencies` naming `kpartx` and `sg3-utils-udev` as "not going to be
+installed", which looks like a repository problem and is not. Clear it first:
+
+```bash
+dpkg --remove jt-pve-storage-synology
+```
+
+then run the install block. If the prerequisites still will not resolve after
+that, it really is the repositories — check `apt policy kpartx sg3-utils-udev`:
+`kpartx` comes from Debian `trixie/main` and `sg3-utils-udev` from the Proxmox VE
+repository.
+
+`cd /tmp` is not cosmetic either: apt's `_apt` user cannot read `/root`, so a
+download there makes apt fall back to running unsandboxed as root and print
+*Download is performed unsandboxed as root*. Harmless, but noise on a document
+meant to be copied verbatim.
+
+### How the rollback method was found
+
+Neither reference implementation has a snapshot rollback: Kubernetes and Cinder
+both restore by cloning a snapshot into a **new** volume, so neither needed one,
+and Synology documents none of it. The method was found by asking a DSM about
+**nine candidate names**, one of which answered — `restore_snapshot`, taking
+`src_lun_uuid` and `snapshot_uuid`.
+
+Finding the name was not enough to enable it, because three things had to be true
+and none was knowable in advance:
+
+| | |
+|---|---|
+| The LUN's uuid must not change | **It does not.** So the SCSI serial and the WWID survive |
+| Snapshots newer than the restored one must survive | **They do.** Restoring to the oldest of three left all three in place |
+| It must be observable afterwards | `restored_time` records the epoch second of the restore |
+
+The second is the reason the related projects **refuse** a rollback past newer
+snapshots: on those arrays the newer ones are destroyed. Here nothing is
+destroyed, so that restriction is not needed and a disk can be rolled back
+repeatedly.
+
+`--probe-methods` in the discovery tool exists to make this kind of question
+answerable without guessing. It names a LUN and snapshot uuid the NAS has never
+issued, so a method that exists can only refuse — and the refusal code proves it
+is there. DSM answers **103** for a method it does not have.
+
+### Why cloning from a snapshot needs the command line
+
+The web interface will not let you, and the error is
+`Full clone feature is not supported for a snapshot of ...`.
+
+The GUI hardcodes **full clone** for anything that is not a template —
+`isTemplate ? 'clone' : 'copy'` in `pvemanagerlib.js` — and a *full* clone means
+Proxmox VE reads the source itself with `qemu-img convert`, addressing the disk
+**at the snapshot**. A Synology LUN has no device at a snapshot, so the plugin
+declares that unsupported and PVE refuses before it starts. Declaring it supported
+is worse: PVE begins the operation and fails partway, with a message about a path
+rather than about what was asked.
+
+The **linked** clone does work from a snapshot, and `--full 0` is required —
+omitting `--full` is not the same thing, because PVE defaults it to *true* for
+anything that is not a template:
+
+```bash
+qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
+```
+
+On this array "linked" understates it: DSM's `clone_from_snapshot` makes a
+**reflink**, so the new LUN is independent — deleting the source snapshot
+afterwards does not affect it — while costing no space when it is made. Measured:
+a template's LUN was deleted while a linked clone of it was **running**, and the
+clone kept running.

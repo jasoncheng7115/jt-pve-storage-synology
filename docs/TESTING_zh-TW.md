@@ -871,3 +871,79 @@ nft delete table inet mptest      # 然後它必須恢復
 ## 回報
 
 如果你在自己的 NAS 上跑過上面任何一項，結果比這份文件裡的任何內容都有價值——尤其是型號或 DSM 版本和上面不同的時候，尤其是 R-1。請附上型號、DSM 版本、儲存空間的檔案系統，以及 NAS 的回應。
+
+---
+
+## 給想深入的人
+
+以下沒有任何一項是安裝或使用這個 plugin 所必需的。它們寫在這裡，是因為每一項都是付出代價才確立的，而撞到其中任何一項的讀者，應該能查到原因而不是靠猜。
+
+### 為什麼每個節點都要裝，以及版本混雜的叢集為什麼難懂
+
+一個 storage 操作是在**擁有那個 guest 的節點**上執行的，用的是**那個節點上的** plugin——不是提供網頁介面的那一台。所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同，而症狀很難懂：你明明裝好的修正，對某些 guest 就是不存在。
+
+真實遇過：在一個還跑著舊版的節點上拍的快照，帶的是舊的 DSM 描述，而瀏覽器所連的那台已經升級了。那兩次 `apt` 甚至可以從「Reading database …N files」的數字分辨出來。
+
+**沒有裝** plugin 的節點比裝了舊版更糟，因為它是靜默失敗的：`pvesm add` 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但 `pveproxy` 在啟動時就把 plugin 清單載入了，而不認得 `synologysan` 這個類型的節點會**把這個 storage 從清單裡略過**，而不是回報錯誤。在有裝的節點上這個 storage 是存在而且可用的。這個症狀看起來就像 `pvesm add` 失敗了，但它並沒有。
+
+### 為什麼不需要重啟服務
+
+這個套件會安裝到 `/usr/share/perl5/PVE` 底下，而 `pve-manager` 用一個 `interest-noawait` trigger 監看那個路徑——就是輸出裡「Processing triggers for pve-manager」那一行。它的 postinst 會對 `pvedaemon`、`pvestatd`、`pveproxy`、`spiceproxy`、`pvescheduler` 執行 `reload-or-try-restart`。
+
+reload 就夠了，因為 `pvedaemon` 的 `ExecReload` 就是 `pvedaemon restart`，而它對自己做的是 `exec(2)`——換掉整個執行中的程式，但保留 PID：
+
+```
+pvedaemon[1333139]: received signal HUP
+pvedaemon[1333139]: server shutdown (restart)
+systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
+pvedaemon[1333139]: restarting server
+pvedaemon[1333139]: starting 3 worker(s)
+```
+
+全程都是同一個 PID，所以這對**升級**和第一次安裝一樣成立：主行程重新 exec，然後 fork 出全新的 worker，從磁碟讀取新的模組。已經在處理請求的舊 worker 會用舊的程式碼跑完——上面那次大約五秒——所以升級當下已經開始的操作，可能會在你剛換掉的那一版上完成。如果你的環境有什麼東西擋住 `deb-systemd-invoke`，備援做法是 `systemctl restart pvedaemon pveproxy pvestatd`。
+
+### 如果你已經用 `dpkg -i` 失敗過
+
+`open-iscsi` 與 `multipath-tools` 是一台 Proxmox VE 節點真的可能缺少的兩個套件——PVE 裡沒有任何東西會把它們帶進來，而安裝 `multipath-tools` 才是那個維護時段真正要做的事。這個套件另外需要的四個 Perl 模組，各自是 86 到 151 個 PVE 套件的相依項，所以它們本來就在。
+
+那也是為什麼安裝那一行是 `apt install ./…` 而不是 `dpkg -i`：`dpkg` 不會處理相依性，所以在沒有 `multipath-tools` 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。前面的 `./` 是必要的，否則 apt 會把它當成套件名稱。
+
+文件先前的版本寫的是 `dpkg -i`。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先清掉它：
+
+```bash
+dpkg --remove jt-pve-storage-synology
+```
+
+然後再跑安裝那一段。如果清掉之後前置套件還是裝不起來，那才真的是套件庫問題——用 `apt policy kpartx sg3-utils-udev` 檢查：`kpartx` 來自 Debian 的 `trixie/main`，而 `sg3-utils-udev` 來自 Proxmox VE 的套件庫。
+
+`cd /tmp` 也不是多餘的：apt 的 `_apt` 使用者讀不到 `/root`，所以下載到那裡會讓 apt 退回以 root 身分非沙箱執行，並印出一行「Download is performed unsandboxed as root」。無害，但對一份要被原樣複製的文件來說是雜訊。
+
+### 倒回這個方法是怎麼找到的
+
+兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個**新的** volume」來還原，所以兩者都不需要，而 Synology 完全沒有記載。這個方法是靠對一台 DSM 詢問**九個候選名稱**找到的，其中一個回答了——`restore_snapshot`，收 `src_lun_uuid` 與 `snapshot_uuid`。
+
+但找到名稱還不足以把它打開，因為有三件事必須成立，而事先沒有一件是可知的：
+
+| | |
+|---|---|
+| LUN 的 uuid 不可以變 | **它不會變**。所以 SCSI 序號與 WWID 都存活 |
+| 比還原點更新的快照必須存活 | **會存活**。還原到三個之中最舊的那一個，三個都還在 |
+| 事後必須看得出來 | `restored_time` 會記錄還原當下的 epoch 秒 |
+
+第二件正是相關專案**拒絕**越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。
+
+探索工具裡的 `--probe-methods` 就是為了讓這種問題可以在不猜的情況下被回答。它送的是一組 NAS 從來沒有發出過的 LUN 與快照 uuid，所以一個存在的方法只可能拒絕——而拒絕的代碼就證明它在那裡。DSM 對不存在的方法回 **103**。
+
+### 為什麼從快照複製需要用指令列
+
+網頁介面不會讓你做，而錯誤訊息是 `Full clone feature is not supported for a snapshot of ...`。
+
+GUI 對任何「不是範本」的東西一律寫死用**完整複製**——`pvemanagerlib.js` 裡的 `isTemplate ? 'clone' : 'copy'`——而「完整」複製的意思是 Proxmox VE 自己用 `qemu-img convert` 去讀來源，而且是定址到**快照當下的那顆磁碟**。Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 就在動手之前拒絕。宣告支援反而更糟：PVE 會開始做、做到一半失敗，而訊息講的是路徑，不是你要求的那件事。
+
+**連結**複製從快照是可行的，而且**必須加 `--full 0`**——省略 `--full` 不等於同一件事，因為 PVE 對任何「不是範本」的東西把它預設為「真」：
+
+```bash
+qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
+```
+
+在這個陣列上「連結」這個字說得太保守：DSM 的 `clone_from_snapshot` 做的是 **reflink**，所以新的 LUN 是獨立的——之後刪掉來源快照也不影響它——而建立當下不佔空間。已量測：在複本**執行中**把範本的 LUN 刪除，複本照樣跑。

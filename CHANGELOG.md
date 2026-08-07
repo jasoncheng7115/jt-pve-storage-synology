@@ -6,6 +6,31 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.18] - 2026-08-07
+
+### Documentation
+
+- **Installing and Upgrading had become a wall.** Each finding had been appended
+  as another warning box until the page carried six in a row before an operator
+  reached anything actionable. They now carry the commands, the one trap that
+  **silently downgrades a node** (`wget` without `-O`), and the maintenance-window
+  note. Everything else — why every node, the mixed-version symptom, why
+  `apt install ./…` and not `dpkg -i`, the `reload-or-try-restart` journal — moved
+  to a new **Notes for the curious** section in `docs/TESTING.md`, which is where
+  this project keeps what it has measured. A general reader does not need it, and
+  the page was drowning.
+- **The Rollback section led with archaeology.** It opened by explaining that the
+  method was found by asking a DSM about nine candidate names and that none of the
+  three conditions was knowable in advance. It now opens with what a rollback
+  *does* and the two measured facts that make it safe; the discovery is in the
+  register.
+- **Two boxes were in the wrong section**: *cloning from a snapshot* sat under
+  Installing, and *schedule the first install* sat under Upgrading.
+- **The roadmap was stale.** It said `1.0.0` waits on a second model and a second
+  DSM version; both are done, so it now says what is actually left. `R-15` is
+  marked narrowed, with the 7.1.1 → 7.4.1 measurement and an explicit note that a
+  whole-NAS reboot is not a failover and does not answer it.
+
 ## [0.6.17] - 2026-08-07
 
 ### Fixed

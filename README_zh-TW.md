@@ -209,23 +209,20 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # 確認裝到的是�
 
 > **那個 `-O` 不是裝飾**。少了它，`wget` 不會覆蓋已經存在的檔案，而是把下載的東西存成 `jt-pve-storage-synology_all.deb.1`——接著 `apt install ./jt-pve-storage-synology_all.deb` 裝的就是上次留在 `/tmp` 裡的**舊檔案**。這在實機上發生過，把 0.6.7 靜靜降級成 0.6.5：`apt` 會印一行 `DOWNGRADING:`，而加了 `-y` 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。
 
-**不需要重啟服務**，而這是實測出來的，不是假設的。這個套件會安裝到 `/usr/share/perl5/PVE` 底下，而 `pve-manager` 用一個 `interest-noawait` trigger 監看那個路徑——就是輸出裡「Processing triggers for pve-manager」那一行——它的 postinst 會對 `pvedaemon`、`pvestatd`、`pveproxy`、`spiceproxy`、`pvescheduler` 執行 `reload-or-try-restart`。
 
-reload 就夠了，因為 `pvedaemon` 的 `ExecReload` 就是 `pvedaemon restart`，而它對自己做的是 `exec(2)`——換掉整個執行中的程式、但保留 PID：
+**每個節點都要裝，包含你正在瀏覽的那一台**，而且版本要一致。storage 操作是在擁有那個 guest 的節點上執行的，不是提供介面的那一台——所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同；而**沒有**裝 plugin 的節點會讓這個 storage 在網頁介面上**看不到**，而不是回報錯誤。**不需要重啟服務**：套件自己的 trigger 會重新載入 daemon。
 
-```
-pvedaemon[1333139]: received signal HUP
-pvedaemon[1333139]: server shutdown (restart)
-systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
-pvedaemon[1333139]: restarting server
-pvedaemon[1333139]: starting 3 worker(s)
+```bash
+dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   # 每個節點都跑一次
 ```
 
-所以這對**升級**和第一次安裝一樣成立：主行程重新 exec，然後 fork 出全新的 worker，從磁碟讀取新的模組。已經在處理請求的舊 worker 會用舊的程式碼跑完——上面那次是大約五秒——所以升級當下已經開始的操作，可能會在你剛換掉的那一版上完成。如果有什麼東西擋住 `deb-systemd-invoke`，備援做法是 `systemctl restart pvedaemon pveproxy pvestatd`。
+> **第一次安裝請排維護時段**。`activate_storage` 會寫一個對應 `vendor "SYNOLOGY"` 的 multipath drop-in，而當那個檔案變更時會執行 `multipathd reconfigure`——這是一個**節點層級**的命令。實測：一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 reconfigure，得到 **1776 次讀取、0 次失敗**，而那個 map 的 device-mapper 事件計數器完全沒有動——代表它從未被重新載入。這個時段是給正式節點第一次安裝的建議，不是已知的中斷。
+
+上面每一項為什麼成立、版本混雜時那個很難判讀的症狀、為什麼那一行是 `apt install ./…` 而不是 `dpkg -i`，以及本頁舊版本已經把你帶進那個坑時怎麼補救——[給想深入的人](docs/TESTING_zh-TW.md#給想深入的人)。
 
 ## 更新
 
-指令和安裝一樣。`apt install` 遇到比較新的 `.deb` 就是就地升級，同一個 trigger 會重新載入 daemon，**不需要重啟**——理由見上面那段 journal。
+指令和安裝一樣。`apt install` 遇到比較新的 `.deb` 就是就地升級，同一個 trigger 會重新載入 daemon，**不需要重啟**。
 
 ```bash
 cd /tmp
@@ -244,21 +241,7 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'
 - **不需要停掉任何東西**。執行中的 guest 會保有它們的裝置：這個套件換掉的是 Perl 模組，它不會動到 iSCSI 工作階段、multipath 對應，或 `/etc/multipath/conf.d` 裡的 drop-in。
 
 
-> **每個節點的版本要一致**。一個 storage 操作是在**擁有那個 guest 的節點**上執行的，用的是**那個節點上的** plugin——不是你瀏覽時所連的那一台。所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同，而症狀很難懂：你明明裝好的修正，對某些 guest 就是不存在。在每個節點上用 `dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'` 確認。
-
-> **每個節點都要裝，否則這個 storage 在網頁介面上看不到**。`pvesm add` 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由**你的瀏覽器所連上的那個節點**提供的，而 `pveproxy` 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 `synologysan` 這個類型，於是**會把這個 storage 從清單裡靜靜略過**。在有裝的節點上它是存在而且可用的，只是沒有被顯示出來——而這個症狀看起來就像 `pvesm add` 失敗了，但它並沒有。所以每個節點都要裝，包含你正在瀏覽的那一台。套件的 trigger 會自己重新載入 `pveproxy`，不需要手動重啟。若要先限制在已就緒的節點上：`pvesm set <storage> --nodes nodeA,nodeB`。
-
-> **如果你已經用 `dpkg -i` 失敗過**。本頁先前的版本寫的是 `dpkg -i`。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先執行 `dpkg --remove jt-pve-storage-synology`，然後再跑上面那段。如果清掉之後前置套件還是裝不起來，用 `apt policy kpartx sg3-utils-udev` 檢查——`kpartx` 來自 Debian 的 `trixie/main`，而 `sg3-utils-udev` 來自 Proxmox VE 的套件庫。
-
-`open-iscsi` 和 `multipath-tools` 是 Proxmox VE 節點真的可能沒有的兩個——PVE 不會拉進它們，而安裝 `multipath-tools` 正是那個維護時段真正在做的事。這個套件另外需要的四個 Perl 模組，各自是 86 到 151 個 PVE 套件的相依，所以一定已經在了。
-
-然後用 `apt install ./…`，不是 `dpkg -i`：`dpkg` 不會處理相依性——在沒有 `multipath-tools` 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。前面的 `./` 是必要的，否則 apt 會把它當成套件名稱。
-
-那個網址永遠指向最新的發行版，所以不會過期——從 0.6.4 起 `beta1` 字樣拿掉了，發行版不再被標記為預發行版（GitHub 的 `latest` 原本會跳過那些），而且每一次發行都會用這個不帶版本號的名稱額外發布一份。若要固定版本，請從[發行頁面](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases)取用網址。從 clone 安裝則是 `make install`。
-
-> **第一次安裝請排維護時段**。`activate_storage` 會寫一個對應 `vendor "SYNOLOGY"` 的 multipath drop-in，而當那個檔案變更時會執行 `multipathd reconfigure`——那是**節點層級**的。它只在檔案第一次出現或變更時執行一次。這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 `no_path_retry "queue"`，會把「失去所有路徑」變成一個殺不掉的行程，而不是一個 I/O 錯誤。
-
-四支這樣的 plugin 可以共存於同一個節點——但 `PVE::SectionConfig::init` **遇到重複的屬性名稱會直接 die**，屆時節點上每一個 storage 都會停止運作。`syno-` 這個前置字串就是為此存在的。
+四支這樣的 plugin 可以共存於同一個節點——但 `PVE::SectionConfig::init` **遇到重複的屬性名稱會直接 die**，而節點上每一個 storage 都會停止運作。`syno-` 這個前置字串就是為了這件事而存在。
 
 ## 設定 storage
 

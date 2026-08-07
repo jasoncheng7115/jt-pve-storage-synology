@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.17 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.18 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -270,8 +270,8 @@
             <div class="module-item__desc"><span class="lang-en">The minimum DSM privileges. Probed on hardware: DSM 7.1.1 has three groups and none is iSCSI-specific, and a non-administrator is refused at <strong>login</strong> with <strong>402</strong> —so it never reaches the storage calls. What remains is a Control Panel check that only the DSM interface can answer</span><span class="lang-zh">最小的 DSM 權限。已在硬體上探測：DSM 7.1.1 只有三個群組，沒有一個是 iSCSI 專用的，而非管理員在「登入」就被拒絕，錯誤 <strong>402</strong>——所以它根本走不到儲存呼叫。剩下的是一個只有 DSM 介面能回答的控制台檢查</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">R-15 / R-16</div>
-            <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> —no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a failover decides whether pinning a storage to it protects or breaks it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換後是否存活，決定了把 storage 釘在它上面是保護還是破壞</span></div>
+            <div class="module-item__name">R-15 / R-16 <span class="status-badge status-badge--partial"><span class="lang-en">narrowed</span><span class="lang-zh">已縮小</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> —no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a <em>failover</em> decides whether pinning a storage to it protects or breaks it.<br><br><strong>Narrowed on 2026-08-07:</strong> a DSM <strong>7.1.1 &rarr; 7.4.1 upgrade</strong> —a reboot of the whole NAS, which is the closest thing to a failover this project can reach —left <strong>every LUN uuid unchanged</strong>, so every WWID survived. That does not answer R-15, which is about a failover; it does mean the identity is not fragile in the way a major version change might have made it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在<strong>故障切換</strong>後是否存活，決定了把 storage 釘在它上面是保護還是破壞。<br><br><strong>2026-08-07 已縮小：</strong>一次 DSM <strong>7.1.1 &rarr; 7.4.1 升級</strong>——整台 NAS 重開機，是這個專案能碰到的、最接近故障切換的事件——之後<strong>每一顆 LUN 的 uuid 都沒有變</strong>，所以每一個 WWID 都存活。那沒有回答 R-15，因為 R-15 問的是故障切換；但它確實表示這個身分沒有「會被大版本變更弄壞」那種脆弱</span></div>
         </div>
         </div>
 
@@ -289,34 +289,25 @@
     <h2 class="section-title"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></h2>
 
     <p>
-        <span class="lang-en">Neither reference implementation has a snapshot rollback: Kubernetes and Cinder both restore by cloning a snapshot into a <em>new</em> volume, so neither needed one. The method was found by asking a DSM about nine candidate names, one of which answered —<strong><code>restore_snapshot</code></strong>, taking <code>src_lun_uuid</code> and <code>snapshot_uuid</code>.</span>
-        <span class="lang-zh">兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個<strong>新的</strong> volume」來還原，所以兩者都不需要。這個方法是靠對一台 DSM 詢問九個候選名稱找到的，其中一個回答了——<strong><code>restore_snapshot</code></strong>，收 <code>src_lun_uuid</code> 與 <code>snapshot_uuid</code>。</span>
+        <span class="lang-en"><strong>A disk can be rolled back to any of its snapshots, repeatedly, and it is the array that does the work.</strong> Two things make it safe, and both are measured rather than assumed:</span>
+        <span class="lang-zh"><strong>一顆磁碟可以倒回它的任何一個快照，而且可以反覆做，實際動作是由陣列完成的。</strong>有兩件事讓它安全，而兩件都是量測到的、不是假設的：</span>
     </p>
 
-    <p>
-        <span class="lang-en">Finding the name was not enough to enable it. Three things had to be true, and none was knowable in advance:</span>
-        <span class="lang-zh">找到名稱還不足以把它打開。有三件事必須成立，而事先沒有一件是可知的：</span>
-    </p>
+    <ul>
+        <li><span class="lang-en"><strong>The LUN's uuid does not change</strong>, so the SCSI serial and the WWID survive and a node does not suddenly find a different disk where its own was.</span><span class="lang-zh"><strong>LUN 的 uuid 不會變</strong>，所以 SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆。</span></li>
+        <li><span class="lang-en"><strong>Snapshots newer than the restored one survive.</strong> Restoring to the oldest of three left all three in place, and <code>restored_time</code> records the epoch second so the result is observable afterwards.</span><span class="lang-zh"><strong>比還原點更新的快照會存活。</strong>還原到三個之中最舊的那一個，三個都還在，而 <code>restored_time</code> 會記錄還原當下的 epoch 秒，所以事後看得出來。</span></li>
+    </ul>
 
-    <div class="table-wrap">
-    <table>
-        <tbody>
-        <tr>
-            <td><span class="lang-en">The LUN's uuid must not change</span><span class="lang-zh">LUN 的 uuid 不可以變</span></td>
-            <td><span class="lang-en"><strong>It does not.</strong> The SCSI serial and the WWID survive, so a node does not suddenly find a different disk where its own was</span><span class="lang-zh"><strong>它不會變。</strong>SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en">Snapshots newer than the restored one must survive</span><span class="lang-zh">比還原點更新的快照必須存活</span></td>
-            <td><span class="lang-en"><strong>They do.</strong> Restoring to the oldest of three left all three in place</span><span class="lang-zh"><strong>會存活。</strong>還原到三個之中最舊的那一個，三個都還在</span></td>
-        </tr>
-        <tr>
-            <td><span class="lang-en">It must be observable afterwards</span><span class="lang-zh">事後必須看得出來</span></td>
-            <td><span class="lang-en"><code>restored_time</code> records the epoch second of the restore</span><span class="lang-zh"><code>restored_time</code> 會記錄還原當下的 epoch 秒</span></td>
-        </tr>
-        </tbody>
-    </table>
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Schedule the first install.</span><span class="lang-zh">第一次安裝請排維護時段。</span></strong>
+        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> —a <strong>node-wide</strong> command. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing.<br><br><strong>Measured: it does not disturb another vendor's storage.</strong> On multipath-tools 0.11.1, with continuous direct reads running against an existing unrelated map, a <code>multipathd reconfigure</code> gave <strong>1776 reads and 0 failures</strong>, the map's device-mapper <strong>event counter did not move at all</strong> —so it was never reloaded —and its path stayed <code>active ready running</code>. Reconfigure re-reads the configuration but only reloads a map whose resulting configuration actually changed, and this drop-in matches <code>vendor "SYNOLOGY"</code> alone. The maintenance window is advice for a first install on a production node, not a known outage.<br><br>The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
+        <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——這是一個<strong>節點層級</strong>的命令。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。<br><br><strong>實測：它不會動到別的廠商的儲存。</strong>在 multipath-tools 0.11.1 上，一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 <code>multipathd reconfigure</code>：<strong>1776 次讀取、0 次失敗</strong>，那個 map 的 device-mapper <strong>事件計數器完全沒有動</strong>——代表它從未被重新載入——而它的路徑維持 <code>active ready running</code>。reconfigure 會重讀設定，但只會重新載入「設定結果真的有變」的 map，而這個 drop-in 只匹配 <code>vendor "SYNOLOGY"</code>。排維護時段是給正式節點第一次安裝的建議，不是已知的中斷。<br><br>這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
     </div>
 
+    <p class="muted">
+        <span class="lang-en">Why each of those is true, the mixed-version symptom that is hard to read, and what to do if an older version of this page told you to use <code>dpkg -i</code> —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">以上每一項為什麼成立、版本混雜時那個很難判讀的症狀，以及本頁舊版本叫你用 <code>dpkg -i</code> 時怎麼補救——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
+    </p>
     <div class="alert alert--success">
         <span class="lang-en">The second row is why the related projects <strong>refuse</strong> a rollback past newer snapshots: on those arrays the newer ones are destroyed, so letting PVE do it silently would delete snapshots the user could still see. Here nothing is destroyed, so that restriction is not needed and a disk can be rolled back repeatedly.</span>
         <span class="lang-zh">第二列正是相關專案<strong>拒絕</strong>越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
@@ -463,8 +454,8 @@
 <section class="doc-section" id="install">
     <h2 class="section-title"><span class="lang-en">Installing</span><span class="lang-zh">安裝</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">On every node of the cluster. The first install changes one node-wide thing, so read the warning below before doing it in production.</span>
-        <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西，所以在正式環境做之前請先讀下面的警告。</span>
+        <span class="lang-en">On every node of the cluster. The first install changes one node-wide thing — read the second warning before doing it in production.</span>
+        <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西——在正式環境做之前請先讀第二個警告。</span>
     </p>
 
     <pre><code><span class="c"># on each node —the two packages PVE does not install for you</span>
@@ -484,51 +475,22 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   <span class="c"># chec
         <span class="lang-zh">少了它，<code>wget</code> 不會覆蓋已經存在的檔案——它會把下載的東西存成 <code>jt-pve-storage-synology_all.deb.1</code>，接著 <code>apt install ./jt-pve-storage-synology_all.deb</code> 裝的就是上次留在 <code>/tmp</code> 裡的<strong>舊檔案</strong>。<br><br>這在實機上發生過，把 <strong>0.6.7 靜靜降級成 0.6.5</strong>。<code>apt</code> 確實會印一行 <code>DOWNGRADING:</code>，而加了 <code>-y</code> 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。</span>
     </div>
 
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Keep the version the same on every node</span><span class="lang-zh">每個節點的版本要一致</span></strong>
-        <span class="lang-en">A storage operation runs on the node that owns the guest, using <strong>that node's copy of the plugin</strong> —not the one on the node you are browsing from. So a cluster with mixed versions behaves differently depending on where a VM happens to be, and the symptom is baffling: a fix you installed is simply absent for some guests.<br><br>Seen for real: a snapshot taken on a node still running an older build carried the old DSM description, while the node the browser was connected to had been upgraded. The two <code>apt</code> runs were even distinguishable by their <em>Reading database …N files</em> counts. Upgrade every node, and check with:<br><br><code>dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></span>
-        <span class="lang-zh">一個 storage 操作是在<strong>擁有那個 guest 的節點</strong>上執行的，用的是<strong>那個節點上的 plugin</strong>——不是你瀏覽時所連的那一台。所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同，而症狀很難懂：你明明裝好的修正，對某些 guest 就是不存在。<br><br>真實遇過：在一個還跑著舊版的節點上拍的快照，帶的是舊的 DSM 描述，而瀏覽器所連的那台已經升級了。那兩次 <code>apt</code> 甚至可以從「Reading database …N files」的數字分辨出來。請升級每一個節點，並用這個確認：<br><br><code>dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></span>
-    </div>
-
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Every node, or the storage is invisible in the web interface</span><span class="lang-zh">每個節點都要裝，否則這個 storage 在網頁介面上看不到</span></strong>
-        <span class="lang-en"><code>pvesm add</code> writes to the cluster configuration, so one node is enough to create the storage —but the web interface is served by <strong>whichever node your browser is connected to</strong>, and <code>pveproxy</code> loads its plugin list at startup. A node without the plugin does not know the <code>synologysan</code> type and <strong>silently omits the storage from the list</strong>. The storage exists and works on the nodes that do have it; it just is not shown. That reads exactly like <code>pvesm add</code> having failed, and it did not.<br><br>So: install on every node, including the one you are browsing from. The package's own trigger reloads <code>pveproxy</code>, so no manual restart is needed. To limit the storage to the nodes that are ready, <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>.</span>
-        <span class="lang-zh"><code>pvesm add</code> 寫的是叢集設定，所以在一個節點上執行就足以建立這個 storage——但網頁介面是由<strong>你的瀏覽器所連上的那個節點</strong>提供的，而 <code>pveproxy</code> 在啟動時就把 plugin 清單載入了。沒有裝 plugin 的節點不認得 <code>synologysan</code> 這個類型，於是<strong>會把這個 storage 從清單裡靜靜略過</strong>。在有裝的節點上這個 storage 是存在而且可用的，只是沒有被顯示出來。這個症狀看起來就像 <code>pvesm add</code> 失敗了，但它並沒有。<br><br>所以：每個節點都要裝，包含你正在瀏覽的那一台。套件自己的 trigger 會重新載入 <code>pveproxy</code>，不需要手動重啟。若要先限制在已就緒的節點上，用 <code>pvesm set &lt;storage&gt; --nodes nodeA,nodeB</code>。</span>
-    </div>
-
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">If a <code>dpkg -i</code> already failed here</span><span class="lang-zh">如果你已經用 <code>dpkg -i</code> 失敗過</span></strong>
-        <span class="lang-en">An earlier version of this page said <code>dpkg -i</code>. That leaves the package unpacked but <em>unconfigured</em>, and apt then refuses to solve anything else —you get <code>Unmet dependencies</code> naming <code>kpartx</code> and <code>sg3-utils-udev</code> as &ldquo;not going to be installed&rdquo;, which looks like a repository problem and is not. Clear it first:<br><br><code>dpkg --remove jt-pve-storage-synology</code><br><br>then run the block above. If the prerequisites still will not resolve after that, it really is the repositories —check <code>apt policy kpartx sg3-utils-udev</code>: <code>kpartx</code> comes from Debian <code>trixie/main</code> and <code>sg3-utils-udev</code> from the Proxmox VE repository.</span>
-        <span class="lang-zh">本頁先前的版本寫的是 <code>dpkg -i</code>。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 <code>Unmet dependencies</code>，說 <code>kpartx</code> 和 <code>sg3-utils-udev</code>「not going to be installed」，看起來像套件庫的問題，但不是。先清掉它：<br><br><code>dpkg --remove jt-pve-storage-synology</code><br><br>然後再跑上面那段。如果清掉之後前置套件還是裝不起來，那才真的是套件庫問題——用 <code>apt policy kpartx sg3-utils-udev</code> 檢查：<code>kpartx</code> 來自 Debian 的 <code>trixie/main</code>，而 <code>sg3-utils-udev</code> 來自 Proxmox VE 的套件庫。</span>
-    </div>
-
-    <div class="note">
-        <span class="lang-en"><strong>No service restart is needed, and this was measured rather than assumed.</strong> The package installs into <code>/usr/share/perl5/PVE</code>, which <code>pve-manager</code> watches with an <code>interest-noawait</code> trigger —that is the <em>Processing triggers for pve-manager</em> line in the output. Its postinst runs <code>reload-or-try-restart</code> on <code>pvedaemon</code>, <code>pvestatd</code>, <code>pveproxy</code>, <code>spiceproxy</code> and <code>pvescheduler</code>.<br><br>A reload is enough because <code>pvedaemon</code>'s <code>ExecReload</code> is <code>pvedaemon restart</code>, which <code>exec(2)</code>s the daemon —replacing the running program while keeping the PID.</span>
-        <span class="lang-zh"><strong>不需要重啟服務，而這是實測出來的，不是假設的。</strong>這個套件會安裝到 <code>/usr/share/perl5/PVE</code> 底下，而 <code>pve-manager</code> 用一個 <code>interest-noawait</code> trigger 監看那個路徑——那就是輸出裡「Processing triggers for pve-manager」那一行。它的 postinst 會對 <code>pvedaemon</code>、<code>pvestatd</code>、<code>pveproxy</code>、<code>spiceproxy</code>、<code>pvescheduler</code> 執行 <code>reload-or-try-restart</code>。<br><br>reload 就夠了，因為 <code>pvedaemon</code> 的 <code>ExecReload</code> 就是 <code>pvedaemon restart</code>，而它對自己做的是 <code>exec(2)</code>——換掉整個執行中的程式，但保留 PID。</span>
-    </div>
-
-    <pre><code>pvedaemon[1333139]: received signal HUP
-pvedaemon[1333139]: server shutdown (restart)
-systemd[1]: Reloaded pvedaemon.service - PVE API Daemon.
-pvedaemon[1333139]: restarting server
-pvedaemon[1333139]: starting 3 worker(s)</code></pre>
 
     <p>
-        <span class="lang-en">Same PID throughout, so this holds for an <strong>upgrade</strong> as much as a first install: the master re-execs and forks fresh workers that read the new modules from disk. Workers already serving a request finish on the old code —about five seconds in the run above —so an operation started during the upgrade may complete on the version you just replaced. If something in your environment blocks <code>deb-systemd-invoke</code>, <code>systemctl restart pvedaemon pveproxy pvestatd</code> is the fallback.</span>
-        <span class="lang-zh">全程都是同一個 PID，所以這對<strong>升級</strong>和第一次安裝一樣成立：主行程重新 exec，然後 fork 出全新的 worker，從磁碟讀取新的模組。已經在處理請求的舊 worker 會用舊的程式碼跑完——上面那次大約五秒——所以升級當下已經開始的操作，可能會在你剛換掉的那一版上完成。如果你的環境有什麼東西擋住 <code>deb-systemd-invoke</code>，備援做法是 <code>systemctl restart pvedaemon pveproxy pvestatd</code>。</span>
+        <span class="lang-en"><strong>Every node, including the one you browse from</strong>, and keep them on the same version. A storage operation runs on the node that owns the guest, not the node serving the interface — so a mixed-version cluster behaves differently depending on where a VM happens to be, and a node without the plugin makes the storage <em>invisible</em> in the web interface rather than reporting an error. No service restart is needed: the package's own trigger reloads the daemons. Check with <code>dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code>.</span>
+        <span class="lang-zh"><strong>每個節點都要裝，包含你正在瀏覽的那一台</strong>，而且版本要一致。storage 操作是在擁有那個 guest 的節點上執行的，不是提供介面的那一台——所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同；而沒有裝 plugin 的節點會讓這個 storage 在網頁介面上<strong>看不到</strong>，而不是回報錯誤。不需要重啟服務：套件自己的 trigger 會重新載入 daemon。用 <code>dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code> 確認。</span>
     </p>
 
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Cloning from a snapshot: use the command line, not the button</span><span class="lang-zh">從快照複製：用指令列，不是按鈕</span></strong>
-        <span class="lang-en">The web interface will not let you, and the error says <code>Full clone feature is not supported for a snapshot of ...</code>. The GUI hardcodes <strong>full clone</strong> for anything that is not a template —<code>isTemplate ? 'clone' : 'copy'</code> in <code>pvemanagerlib.js</code> —and a <em>full</em> clone means Proxmox VE reads the source itself with <code>qemu-img convert</code>, addressing the disk <strong>at the snapshot</strong>. A Synology LUN has no device at a snapshot, so the plugin declares that unsupported and PVE refuses before it starts. Declaring it supported is worse: PVE begins the operation and fails partway, with a message about a path rather than about what was asked.<br><br>The <strong>linked</strong> clone does work from a snapshot, and the command line will give it to you:<br><br><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br>&nbsp;&nbsp;<strong><code>--full 0</code> is required</strong> —omitting <code>--full</code> defaults it to <em>true</em> for anything that is not a template<br><br>On this array "linked" understates it: DSM's <code>clone_from_snapshot</code> makes a <strong>reflink</strong>, so the new LUN is independent —deleting the source snapshot afterwards does not affect it —while costing no space when it is made. To get the button back, convert the source to a template first.</span>
-        <span class="lang-zh">網頁介面不會讓你做，錯誤訊息是 <code>Full clone feature is not supported for a snapshot of ...</code>。GUI 對任何「不是範本」的東西一律寫死用<strong>完整複製</strong>——<code>pvemanagerlib.js</code> 裡的 <code>isTemplate ? 'clone' : 'copy'</code>——而「完整」複製的意思是 Proxmox VE 自己用 <code>qemu-img convert</code> 去讀來源，而且是定址到<strong>快照當下的那顆磁碟</strong>。Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 就在動手之前拒絕。宣告支援反而更糟：PVE 會開始做、做到一半失敗，而訊息講的是路徑，不是你要求的那件事。<br><br><strong>連結</strong>複製從快照是可行的，指令列會給你：<br><br><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br>&nbsp;&nbsp;<strong>必須加 <code>--full 0</code></strong>——省略 <code>--full</code> 對「不是範本」的東西會預設為「真」<br><br>在這個陣列上「連結」這個字說得太保守：DSM 的 <code>clone_from_snapshot</code> 做的是 <strong>reflink</strong>，所以新的 LUN 是獨立的——之後刪掉來源快照也不影響它——而建立當下不佔空間。想把按鈕拿回來，就先把來源轉成範本。</span>
-    </div>
+    <p class="muted">
+        <span class="lang-en">The reasoning behind each line of that block —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">那一段每一行背後的理由——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
+    </p>
 
     <h3 class="subsection-title" id="upgrade"><span class="lang-en">Upgrading</span><span class="lang-zh">更新</span></h3>
 
     <p>
-        <span class="lang-en">The same commands. <code>apt install</code> on a newer <code>.deb</code> upgrades in place, the same trigger reloads the daemons, and <strong>no restart is needed</strong> —see the journal above.</span>
-        <span class="lang-zh">指令和安裝一樣。<code>apt install</code> 遇到比較新的 <code>.deb</code> 就是就地升級，同一個 trigger 會重新載入 daemon，<strong>不需要重啟</strong>——理由見上面那段 journal。</span>
+        <span class="lang-en">The same commands. <code>apt install</code> on a newer <code>.deb</code> upgrades in place, the same trigger reloads the daemons, and <strong>no restart is needed</strong>.</span>
+        <span class="lang-zh">指令和安裝一樣。<code>apt install</code> 遇到比較新的 <code>.deb</code> 就是就地升級，同一個 trigger 會重新載入 daemon，<strong>不需要重啟</strong>。</span>
     </p>
 
     <pre><code>cd /tmp
@@ -550,31 +512,10 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
         <li><span class="lang-en"><strong>Nothing needs to be stopped.</strong> Running guests keep their devices: the package replaces Perl modules, and does not touch iSCSI sessions, multipath maps or the drop-in in <code>/etc/multipath/conf.d</code>.</span><span class="lang-zh"><strong>不需要停掉任何東西。</strong>執行中的 guest 會保有它們的裝置：這個套件換掉的是 Perl 模組，它不會動到 iSCSI 工作階段、multipath 對應，或 <code>/etc/multipath/conf.d</code> 裡的 drop-in。</span></li>
     </ul>
 
-    <div class="note">
-        <span class="lang-en"><code>cd /tmp</code> is not cosmetic clutter: apt's <code>_apt</code> user cannot read <code>/root</code>, so downloading there makes apt fall back to running unsandboxed and print a <em>Download is performed unsandboxed as root</em> notice. Harmless, but it is noise on a page that is trying to be copied verbatim.</span>
-        <span class="lang-zh"><code>cd /tmp</code>不是多餘的：apt 的 <code>_apt</code> 使用者讀不到 <code>/root</code>，所以下載到那裡會讓 apt 退回以 root 身分非沙箱執行，並印出一行「Download is performed unsandboxed as root」的提示。無害，但對一份要被原樣複製的文件來說是雜訊。</span>
-    </div>
-
-    <div class="note">
-        <span class="lang-en"><strong><code>open-iscsi</code> and <code>multipath-tools</code> are the two a Proxmox VE node can genuinely be missing</strong> —nothing in PVE pulls them in, and installing <code>multipath-tools</code> is the step the maintenance window is really about. The four Perl modules the package also needs are dependencies of 86 to 151 PVE packages each, so they are already there.<br><br>Then <strong><code>apt install ./…</code>, not <code>dpkg -i</code></strong>: <code>dpkg</code> does not resolve dependencies, so on a node without <code>multipath-tools</code> it unpacks and fails with <em>dependency problems&nbsp;—leaving unconfigured</em>. The leading <code>./</code> is required, or apt treats the argument as a package name.</span>
-        <span class="lang-zh"><strong>用 <code>apt install ./…</code>，不是 <code>dpkg -i</code>。</strong>這個套件相依於 <code>open-iscsi</code>、<code>multipath-tools</code> 和四個 Perl 模組，而 <code>dpkg</code> 不會處理相依性——在沒有 <code>multipath-tools</code> 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。<code>apt</code> 會把它們一起裝上。前面的 <code>./</code> 是必要的，否則 apt 會把它當成套件名稱。</span>
-    </div>
-
-    <div class="note">
-        <span class="lang-en">That URL always points at the newest release, so it does not go stale. It works because the <code>beta1</code> suffix is gone from 0.6.5 onwards —releases are no longer flagged as prereleases, which GitHub's <code>latest</code> used to skip —and because the release publishes the package a second time under this version-free name alongside the versioned one. To pin a version instead, take the URL from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
-        <span class="lang-zh">那個網址永遠指向最新的發行版，所以不會過期。它之所以有用，是因為從 0.6.5 起 <code>beta1</code> 字樣拿掉了——發行版不再被標記為預發行版，而 GitHub 的 <code>latest</code> 原本會跳過那些——以及因為發行流程會在帶版本號的那份之外，額外用這個不帶版本號的名稱再發布一份。若要固定版本，請從<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>取用網址。從 clone 安裝：<code>make install</code>。</span>
-    </div>
-
-    <p>
-        <span class="lang-en">Or from a clone: <code>make install</code>. Every release's <code>.deb</code> is kept in <code>releases/</code> as well, so a tester on an earlier version can fetch exactly what they are running.</span>
-        <span class="lang-zh">或者從 clone 安裝：<code>make install</code>。每一個版本的 <code>.deb</code> 也都保留在 <code>releases/</code> 裡，所以跑舊版本的測試者可以拿到他實際在跑的那一個。</span>
+    <p class="muted">
+        <span class="lang-en">How the method was found, since Synology documents none of it —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">這個方法是怎麼找到的——因為 Synology 完全沒有記載——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
     </p>
-
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Schedule the first install.</span><span class="lang-zh">第一次安裝請排維護時段。</span></strong>
-        <span class="lang-en"><code>activate_storage</code> writes a multipath drop-in for <code>vendor "SYNOLOGY"</code> and, when that file changes, runs <code>multipathd reconfigure</code> —a <strong>node-wide</strong> command. It runs once, when the file first appears or changes; after that the no-change path writes nothing and reconfigures nothing.<br><br><strong>Measured: it does not disturb another vendor's storage.</strong> On multipath-tools 0.11.1, with continuous direct reads running against an existing unrelated map, a <code>multipathd reconfigure</code> gave <strong>1776 reads and 0 failures</strong>, the map's device-mapper <strong>event counter did not move at all</strong> —so it was never reloaded —and its path stayed <code>active ready running</code>. Reconfigure re-reads the configuration but only reloads a map whose resulting configuration actually changed, and this drop-in matches <code>vendor "SYNOLOGY"</code> alone. The maintenance window is advice for a first install on a production node, not a known outage.<br><br>The drop-in is mandatory rather than tuning: without it multipath's generic defaults apply, and those include <code>no_path_retry "queue"</code>, which turns the loss of every path into an unkillable process instead of an I/O error.</span>
-        <span class="lang-zh"><code>activate_storage</code> 會寫一個對應 <code>vendor "SYNOLOGY"</code> 的 multipath drop-in，而當那個檔案變更時會執行 <code>multipathd reconfigure</code>——這是一個<strong>節點層級</strong>的命令。它只在檔案第一次出現或變更時執行一次；之後沒有變更的路徑不會寫入、也不會 reconfigure。<br><br><strong>實測：它不會動到別的廠商的儲存。</strong>在 multipath-tools 0.11.1 上，一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 <code>multipathd reconfigure</code>：<strong>1776 次讀取、0 次失敗</strong>，那個 map 的 device-mapper <strong>事件計數器完全沒有動</strong>——代表它從未被重新載入——而它的路徑維持 <code>active ready running</code>。reconfigure 會重讀設定，但只會重新載入「設定結果真的有變」的 map，而這個 drop-in 只匹配 <code>vendor "SYNOLOGY"</code>。排維護時段是給正式節點第一次安裝的建議，不是已知的中斷。<br><br>這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 <code>no_path_retry "queue"</code>，會把「所有路徑都失去」變成一個殺不掉的行程，而不是一個 I/O 錯誤。</span>
-    </div>
 
     <div class="note">
         <span class="lang-en"><strong>Four of these plugins can share a node</strong> —this one and the DellEMC, NetApp and PureStorage siblings are developed together on a node that has all of them. But <code>PVE::SectionConfig::init</code> <strong>dies on a duplicate property name</strong>, and the failure is not scoped to the offending plugin: every storage on the node stops working. The <code>syno-</code> prefix exists for that reason.</span>
@@ -671,6 +612,13 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
         <span class="lang-en">Both are 15,356,124,401,664 and 4,318,122,532,864 bytes. The ratio between the two rows is 2<sup>40</sup> ÷ 10<sup>12</sup> = 1.0995, and 15.36 ÷ 14 = 1.0971 once DSM's rounding to two significant figures is allowed for. The percentages are the quick check, and they agree: <strong>28.12%</strong> against <strong>28%</strong>. Proxmox VE is not consistent with itself here either —a VM's memory reads <code>4.00 GiB</code>, binary and labelled as such, on the same interface. That is Proxmox VE's convention and the plugin does not second-guess it.</span>
         <span class="lang-zh">兩邊都是 15,356,124,401,664 與 4,318,122,532,864 位元組。兩列之間的比值是 2<sup>40</sup> ÷ 10<sup>12</sup> = 1.0995，而 15.36 ÷ 14 = 1.0971，扣掉 DSM 進位到兩位有效數字後就是同一個數。百分比是最快的檢查點，而它們一致：<strong>28.12%</strong> 對 <strong>28%</strong>。Proxmox VE 自己其實也不一致——同一個介面上，VM 的記憶體顯示為 <code>4.00 GiB</code>，用的是二進位單位而且標示清楚。那是 Proxmox VE 的慣例，plugin 不會去猜它想怎麼顯示。</span>
     </p>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Cloning from a snapshot needs the command line</span><span class="lang-zh">從快照複製要用指令列</span></strong>
+        <span class="lang-en">The web interface refuses it, and that refusal is correct. The <strong>linked</strong> clone works, and <code>--full 0</code> is required:<br><br><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this array the result is an independent reflink, not a dependent clone. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
+        <span class="lang-zh">網頁介面會拒絕，而那個拒絕是對的。<strong>連結</strong>複製可以用，而且必須加 <code>--full 0</code>：<br><br><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這個陣列上做出來的是獨立的 reflink，不是相依的複本。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
+    </div>
+
 
     <h3 class="subsection-title"><span class="lang-en">Restricting it to some nodes</span><span class="lang-zh">只讓某幾個節點可以用</span></h3>
 
@@ -885,11 +833,11 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
         </div>
         <div class="module-item">
             <div class="module-item__name">0.6.x <span class="status-badge status-badge--supported"><span class="lang-en">current</span><span class="lang-zh">目前</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">Credentials out of <code>storage.cfg</code> and into <code>/etc/pve/priv</code>; backup, restore and a guest booting from the NAS; three nodes at once; node crash, HA fencing and takeover; the orphan reaper; and the ceilings enforced before the NAS refuses</span><span class="lang-zh">憑證從 <code>storage.cfg</code> 搬進 <code>/etc/pve/priv</code>；備份、還原，以及一台從 NAS 開機的 guest；三個節點同時運作；節點當機、HA 圍籬與接手；孤兒回收工具；以及在 NAS 拒絕之前就先擋下的各項上限</span></div>
+            <div class="module-item__desc"><span class="lang-en">Credentials out of <code>storage.cfg</code> and into <code>/etc/pve/priv</code>; backup, restore and a guest booting from the NAS; five nodes at once; node crash, HA fencing and takeover; the orphan reaper; the ceilings enforced before the NAS refuses. Then a run from the web interface found what a shell never could: <strong>a PVE daemon has no <code>PATH</code></strong> and <strong>runs under <code>-T</code></strong>, so five defects lived in code that worked perfectly from <code>qm</code>. And a second NAS, a whole-NAS outage and a DSM 7.1 → 7.4 upgrade were each driven through</span><span class="lang-zh">憑證從 <code>storage.cfg</code> 搬進 <code>/etc/pve/priv</code>；備份、還原，以及一台從 NAS 開機的 guest；五個節點同時運作；節點當機、HA 圍籬與接手；孤兒回收工具；在 NAS 拒絕之前就先擋下的各項上限。然後一輪從網頁介面的實測找出了 shell 永遠找不到的東西：<strong>PVE 的 daemon 沒有 <code>PATH</code></strong>，而且<strong>在 <code>-T</code> 底下執行</strong>，所以有五個缺陷藏在「從 <code>qm</code> 跑完全正常」的程式碼裡。此外還跑過了第二台 NAS、一次整台 NAS 中斷，以及一次 DSM 7.1 → 7.4 升級</span></div>
         </div>
         <div class="module-item">
             <div class="module-item__name">1.0.0</div>
-            <div class="module-item__desc"><span class="lang-en">A second model and a second DSM version, and the minimum DSM privileges settled. Everything else on the <a href="#open">still-open</a> list either answered or documented as unanswerable. Every 0.x before it is a prerelease</span><span class="lang-zh">第二個機型與第二個 DSM 版本，以及確定最小的 DSM 權限。<a href="#open">尚未確認</a>清單上的其他每一項，不是有答案，就是被記載為無法回答。在它之前的每一個 0.x 都是預發行版</span></div>
+            <div class="module-item__desc"><span class="lang-en"><strong>A second model and a second DSM version are done</strong> — a DS925+ on DSM 7.3.2 driven end to end, and the DS918+ carried across a 7.1 → 7.4 upgrade with every LUN uuid intact. What is left: <strong>the minimum DSM privileges settled</strong>, the remaining operations repeated on a second model, and everything else on the <a href="#open">still-open</a> list either answered or documented as unanswerable. Every 0.x before it is a prerelease</span><span class="lang-zh"><strong>第二個機型與第二個 DSM 版本已經完成</strong>——一台 DS925+（DSM 7.3.2）完整跑過一輪，而 DS918+ 帶著全部 LUN uuid 完好地跨過了 7.1 → 7.4 升級。還剩下的是：<strong>確定最小的 DSM 權限</strong>、剩下那些操作也在第二個機型上重複一次，以及<a href="#open">尚未確認</a>清單上的其他每一項不是有答案就是被記載為無法回答。在它之前的每一個 0.x 都是預發行版</span></div>
         </div>
     </div>
 

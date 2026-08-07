@@ -735,3 +735,14 @@ mark.search-hl {
     border-radius: 2px;
     box-shadow: 0 0 0 1px rgba(245,158,11,0.3);
 }
+
+/* A pointer to the deeper page. Deliberately quiet: a general reader does not
+   need what is behind it, and the page was drowning in warning boxes before
+   this. The archaeology lives in docs/TESTING.md. */
+.muted {
+    font-size: 0.86rem;
+    color: var(--text-muted);
+    margin: 10px 0 22px;
+}
+.muted a { color: var(--text-muted); text-decoration: underline; }
+.muted a:hover { color: var(--text); }
