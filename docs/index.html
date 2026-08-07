@@ -475,8 +475,8 @@
 <section class="doc-section" id="install">
     <h2 class="section-title"><span class="lang-en">Installing</span><span class="lang-zh">安裝</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">On every node. Nothing needs restarting afterwards.</span>
-        <span class="lang-zh">每個節點都要裝。裝完不需要重啟任何東西。</span>
+        <span class="lang-en">On every node in the cluster. Nothing needs restarting afterwards.</span>
+        <span class="lang-zh">叢集中的每個節點都要裝。裝完不需要重啟任何東西。</span>
     </p>
 
     <pre><code><span class="comment"># open-iscsi and multipath-tools are the two PVE does not install for you</span>
@@ -497,8 +497,8 @@
     </div>
 
     <p>
-        <span class="lang-en"><strong>Every node, including the one you browse from</strong>, on the same version. A node without the plugin makes the storage <strong>invisible</strong> in the web interface rather than reporting an error. The first activation runs <code>multipathd reconfigure</code>, which is node-wide —measured not to disturb another vendor's maps, but give a production node a window.</span>
-        <span class="lang-zh"><strong>每個節點都要裝，包含你正在瀏覽的那一台</strong>，版本要一致。沒有裝的節點會讓這個 storage 在網頁介面上<strong>看不到</strong>，而不是回報錯誤。第一次啟用會執行 <code>multipathd reconfigure</code>，那是節點層級的命令——實測不會動到別的廠商的 map，但正式節點請排個時段。</span>
+        <span class="lang-en"><strong>Every node in the cluster, including the one you browse from</strong>, on the same version. A node without the plugin makes the storage <strong>invisible</strong> in the web interface rather than reporting an error. The first activation runs <code>multipathd reconfigure</code>, which is node-wide —measured not to disturb another vendor's maps, but give a production node a window.</span>
+        <span class="lang-zh"><strong>叢集中的每個節點都要裝，包含你正在瀏覽的那一台</strong>，版本要一致。沒有裝的節點會讓這個 storage 在網頁介面上<strong>看不到</strong>，而不是回報錯誤。第一次啟用會執行 <code>multipathd reconfigure</code>，那是節點層級的命令——實測不會動到別的廠商的 map，但正式節點請排個時段。</span>
     </p>
 
     <p class="muted">
@@ -537,8 +537,8 @@
 
     <h2 class="section-title"><span class="lang-en">Adding a synologysan storage in Proxmox VE</span><span class="lang-zh">在 Proxmox VE 新增 synologysan storage</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en"><strong>Run this once, on one node</strong> —unlike the install, which is every node. The storage is shared by construction, so the others pick it up.</span>
-        <span class="lang-zh"><strong>在其中一個節點上執行一次就好</strong>——和安裝相反，安裝是每個節點都要。這個 storage 依其本質就是共用的，其他節點會自己接手。</span>
+        <span class="lang-en"><strong>Run this once, on one node</strong> —unlike the install, which is every node in the cluster. The storage is shared by construction, so the others pick it up.</span>
+        <span class="lang-zh"><strong>在其中一個節點上執行一次就好</strong>——和安裝相反，安裝是叢集中每個節點都要。這個 storage 依其本質就是共用的，其他節點會自己接手。</span>
     </p>
 
     <div class="alert alert--warning">

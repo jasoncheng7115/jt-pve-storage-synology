@@ -195,7 +195,7 @@ SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經�
 叢集的每一個節點都要裝。
 
 ```bash
-# 每個節點都要 —— PVE 不會替你裝的兩個套件
+# 叢集中每個節點都要 —— PVE 不會替你裝的兩個套件
 apt update
 apt install -y open-iscsi multipath-tools
 
@@ -210,7 +210,7 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # 確認裝到的是�
 > **那個 `-O` 不是裝飾**。少了它，`wget` 不會覆蓋已經存在的檔案，而是把下載的東西存成 `jt-pve-storage-synology_all.deb.1`——接著 `apt install ./jt-pve-storage-synology_all.deb` 裝的就是上次留在 `/tmp` 裡的**舊檔案**。這在實機上發生過，把 0.6.7 靜靜降級成 0.6.5：`apt` 會印一行 `DOWNGRADING:`，而加了 `-y` 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。
 
 
-**每個節點都要裝，包含你正在瀏覽的那一台**，而且版本要一致。storage 操作是在擁有那個 guest 的節點上執行的，不是提供介面的那一台——所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同；而**沒有**裝 plugin 的節點會讓這個 storage 在網頁介面上**看不到**，而不是回報錯誤。**不需要重啟服務**：套件自己的 trigger 會重新載入 daemon。
+**叢集中的每個節點都要裝，包含你正在瀏覽的那一台**，而且版本要一致。storage 操作是在擁有那個 guest 的節點上執行的，不是提供介面的那一台——所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同；而**沒有**裝 plugin 的節點會讓這個 storage 在網頁介面上**看不到**，而不是回報錯誤。**不需要重啟服務**：套件自己的 trigger 會重新載入 daemon。
 
 ```bash
 dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   # 每個節點都跑一次

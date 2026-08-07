@@ -351,7 +351,7 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # check what you got
 > 0.6.5: `apt` prints a `DOWNGRADING:` line, and with `-y` it does not stop to
 > ask. That is why the version check is the last line of the block.
 
-**Every node, including the one you browse from**, and keep them on the same
+**Every node in the cluster, including the one you browse from**, and keep them on the same
 version. A storage operation runs on the node that owns the guest, not the node
 serving the interface — so a mixed-version cluster behaves differently depending on
 where a VM happens to be, and a node *without* the plugin makes the storage
