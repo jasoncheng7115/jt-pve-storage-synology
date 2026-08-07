@@ -183,8 +183,23 @@ pvesm add synologysan mysyno \
     --syno-username pve-storage \
     --syno-password '<密碼>' \
     --syno-location /volume1 \
-    --content       images
+    --content       images \
+    --nodes         pve1,pve2,pve3    # 選用：限制在這幾個節點
 ```
+
+### 只讓某幾個節點可以用
+
+`nodes` 是 Proxmox VE 自己的屬性，不是 `syno-` 開頭的，而它在這裡和在其他 storage 上一樣有效：
+
+```bash
+pvesm set mysyno --nodes pve1,pve2     # 限制一個既有的 storage
+pvesm set mysyno --delete nodes        # 重新開放給整個叢集
+pvesm status --storage mysyno          # 確認
+```
+
+有兩個理由要用它。**沒有裝 plugin 的節點**否則會在每一次 `pvestatd` 輪詢時記錄「unknown storage type」——限制節點是分批上線最乾淨的做法。而**連不到 NAS 資料 portal 的節點**本來就不該去嘗試；它會在啟用磁碟時失敗，而不是禮貌地略過。
+
+`shared` 是強制開啟、不能關掉的——這個 plugin 會把自己註冊進 `SHARED_STORAGE`，因為 NAS 上的 LUN 依其本質就是每個節點都連得到的。所以 `nodes` 限制的是**哪些節點可以使用它**，絕不會讓這個 storage 變成節點本機的。在清單允許的任何兩個節點之間，即時遷移都可以運作。
 
 如果那個儲存空間不是 Btrfs、機型不支援 iSCSI target 或快照、或者這個 storage id 會摺疊成與既有 storage 相同的 LUN 前置字串，`pvesm add` 會當場拒絕。
 

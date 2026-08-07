@@ -315,8 +315,31 @@ pvesm add synologysan mysyno \
     --syno-username pve-storage \
     --syno-password '<the password>' \
     --syno-location /volume1 \
-    --content       images
+    --content       images \
+    --nodes         pve1,pve2,pve3    # optional: restrict to these nodes
 ```
+
+### Restricting it to some nodes
+
+`nodes` is Proxmox VE's own property, not a `syno-` one, and it works here like on
+any other storage:
+
+```bash
+pvesm set mysyno --nodes pve1,pve2     # restrict an existing storage
+pvesm set mysyno --delete nodes        # open it to the whole cluster again
+pvesm status --storage mysyno          # check
+```
+
+Two reasons to use it. A node **without the plugin installed** will otherwise log
+*unknown storage type* on every `pvestatd` poll — restricting the storage is the
+clean way to stage a rollout. And a node with **no route to the NAS's data
+portals** has no business trying; it will fail to activate volumes rather than fail
+politely.
+
+`shared` is forced on and cannot be turned off — the plugin registers itself in
+`SHARED_STORAGE`, because a LUN on a NAS is reachable from every node by
+construction. So `nodes` restricts *which nodes may use it* and never makes the
+storage node-local. Live migration works between any two nodes the list allows.
 
 `pvesm add` refuses immediately if the volume is not Btrfs, if the model does not
 support iSCSI targets or snapshots, or if the storage id would fold onto an existing

@@ -536,7 +536,8 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
     --syno-username pve-storage \
     --syno-password '&lt;the password&gt;' \
     --syno-location /volume1 \
-    --content       images</code></pre>
+    --content       images \
+    --nodes         pve1,pve2,pve3    <span class="c"># optional: restrict to these nodes</span></code></pre>
 
     <p>
         <span class="lang-en"><code>pvesm add</code> refuses immediately if the volume is not Btrfs, if the model does not support iSCSI targets or snapshots, or if the storage id would fold onto an existing storage's LUN prefix. It is meant to fail there rather than at your first snapshot.</span>
@@ -546,6 +547,32 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
     <div class="note">
         <span class="lang-en"><strong>The password never lands in <code>/etc/pve/storage.cfg</code>.</strong> It is declared to Proxmox VE as a sensitive property, so PVE strips it out and hands it to the plugin, which writes it to <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> — mode <code>0600</code>, root only, and replicated to every node by the cluster filesystem. <strong>If you installed a version before 0.5.3~beta1, run <code>pvesm set &lt;storage&gt; --syno-password '&lt;password&gt;'</code> once to move it, and treat the old value as disclosed.</strong></span>
         <span class="lang-zh"><strong>密碼不會進到 <code>/etc/pve/storage.cfg</code>。</strong>它對 Proxmox VE 宣告為機密屬性，所以 PVE 會把它拿掉並交給 plugin，由 plugin 寫入 <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code>——權限 <code>0600</code>、只有 root、並由叢集檔案系統複寫到每個節點。<strong>如果你裝過 0.5.3~beta1 之前的版本，請執行一次 <code>pvesm set &lt;storage&gt; --syno-password '&lt;密碼&gt;'</code> 把它搬過去，並且把舊的值視為已經洩漏。</strong></span>
+    </div>
+
+    <h3 class="subsection-title"><span class="lang-en">Restricting it to some nodes</span><span class="lang-zh">只讓某幾個節點可以用</span></h3>
+
+    <p>
+        <span class="lang-en"><code>nodes</code> is Proxmox VE's own property, not a <code>syno-</code> one, and it works on this storage like any other. Set it at <code>pvesm add</code> time or later:</span>
+        <span class="lang-zh"><code>nodes</code> 是 Proxmox VE 自己的屬性，不是 <code>syno-</code> 開頭的，而它在這個 storage 上和在其他 storage 上一樣有效。可以在 <code>pvesm add</code> 時設定，也可以之後再設：</span>
+    </p>
+
+    <pre><code><span class="c"># restrict an existing storage</span>
+pvesm set mysyno --nodes pve1,pve2
+
+<span class="c"># open it to the whole cluster again</span>
+pvesm set mysyno --delete nodes
+
+<span class="c"># check</span>
+pvesm status --storage mysyno</code></pre>
+
+    <p>
+        <span class="lang-en">Two reasons to use it. <strong>A node without the plugin installed</strong> will otherwise log <em>unknown storage type</em> on every <code>pvestatd</code> poll — restricting the storage is the clean way to stage a rollout. And <strong>a node with no route to the NAS's data portals</strong> has no business trying: it will fail to activate volumes rather than fail politely.</span>
+        <span class="lang-zh">有兩個理由要用它。<strong>沒有裝 plugin 的節點</strong>否則會在每一次 <code>pvestatd</code> 輪詢時記錄「unknown storage type」——限制節點是分批上線最乾淨的做法。而<strong>連不到 NAS 資料 portal 的節點</strong>本來就不該去嘗試：它會在啟用磁碟時失敗，而不是禮貌地略過。</span>
+    </p>
+
+    <div class="note">
+        <span class="lang-en"><strong><code>shared</code> is forced on and cannot be turned off.</strong> The plugin registers itself in <code>SHARED_STORAGE</code>, because a LUN on a NAS is reachable from every node by construction — so <code>nodes</code> restricts <em>which nodes may use it</em>, and never implies the storage is node-local. Live migration works between any two nodes the list allows.</span>
+        <span class="lang-zh"><strong><code>shared</code> 是強制開啟的，不能關掉。</strong>這個 plugin 會把自己註冊進 <code>SHARED_STORAGE</code>，因為 NAS 上的 LUN 依其本質就是每個節點都能連到的——所以 <code>nodes</code> 限制的是<strong>哪些節點可以使用它</strong>，絕不代表這個 storage 是節點本機的。在清單允許的任何兩個節點之間，即時遷移都可以運作。</span>
     </div>
 
     <h3 class="subsection-title"><span class="lang-en">Every option</span><span class="lang-zh">所有選項</span></h3>
@@ -571,6 +598,7 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
         <tr><td><code>syno-otp</code></td><td>—</td><td><span class="lang-en">One-time code, once. The device token DSM issues is stored and the option can then be removed</span><span class="lang-zh">一次性代碼，只需一次。DSM 發出的 device token 會被存起來，之後就可以移除這個選項</span></td></tr>
         <tr><td><code>syno-ssl-verify</code><br><code>syno-tls-ca</code></td><td><code>0</code></td><td><span class="lang-en">Off by default because DSM ships a self-signed certificate. Turn it on with your own CA</span><span class="lang-zh">預設關閉，因為 DSM 出廠是自簽憑證。用你自己的 CA 時再開啟</span></td></tr>
         <tr><td><code>syno-port</code></td><td><code>5001</code></td><td><span class="lang-en">DSM port. HTTPS only — plain HTTP is refused</span><span class="lang-zh">DSM 連接埠。只走 HTTPS——純 HTTP 一律拒絕</span></td></tr>
+        <tr><td><code>nodes</code><br><span class="lang-en"><em>PVE-level</em></span><span class="lang-zh">「PVE 層級」</span></td><td><span class="lang-en">all nodes</span><span class="lang-zh">全部節點</span></td><td><span class="lang-en">Which nodes may use this storage. Use it to stage a rollout, or to exclude a node with no route to the data portals. <code>shared</code> stays on either way</span><span class="lang-zh">哪些節點可以使用這個 storage。用它來分批上線，或排除連不到資料 portal 的節點。無論如何 <code>shared</code> 都維持開啟</span></td></tr>
         <tr><td><code>syno-iqn-prefix</code></td><td><code>iqn.2000-01.com.synology:</code></td><td><span class="lang-en">Prefix for generated target IQNs</span><span class="lang-zh">產生 target IQN 時使用的前置字串</span></td></tr>
         </tbody>
     </table>
