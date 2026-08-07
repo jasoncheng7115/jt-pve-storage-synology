@@ -97,14 +97,34 @@ syntax:
 # empty. A tester on 0.3.1 could not have obtained 0.3.1. The archive was
 # reconstructed from GitHub and verified against each release's own published
 # checksum; this target is what stops it lapsing again.
+# The file is opened, not just counted. This check passed on a NINE-BYTE text file
+# saying "Not Found": the release workflow had not finished, curl saved the 404
+# body under the .deb's name, and existence was the only thing being tested. The
+# project's own notes already said `dpkg-deb --field <file> Version` is the
+# authority on what a file is; the guard was not using it.
+#
+# The `~` is normalised before comparing. GitHub rewrites it to `.` in an asset
+# name, so a `~beta1` package arrives as a `.beta1` FILE — already recorded in this
+# project's notes, and the first version of this check walked straight into it and
+# condemned twenty-two correct archives.
 check-release-archive:
 	@echo "Checking the release archive..."
 	@missing=0; \
 	for tag in $$(git tag -l 'v*' 2>/dev/null); do \
 		v=$$(echo "$$tag" | sed 's/^v//; s/-beta/.beta/'); \
-		if ! ls releases/*_$$v-*_all.deb >/dev/null 2>&1; then \
-			echo "  MISSING: $$tag has no .deb in releases/"; missing=1; \
+		f=$$(ls releases/*_$$v-*_all.deb 2>/dev/null | head -1); \
+		if [ -z "$$f" ]; then \
+			echo "  MISSING: $$tag has no .deb in releases/"; missing=1; continue; \
 		fi; \
+		got=$$(dpkg-deb --field "$$f" Version 2>/dev/null); \
+		if [ -z "$$got" ]; then \
+			echo "  NOT A PACKAGE: $$f is named like a .deb and is not one"; \
+			missing=1; continue; \
+		fi; \
+		gotn=$$(echo "$$got" | tr '~' '.'); \
+		case "$$gotn" in $$v-*) ;; *) \
+			echo "  WRONG VERSION: $$f contains $$got, not $$v"; missing=1;; \
+		esac; \
 	done; \
 	if [ "$$missing" = "1" ]; then \
 		echo ""; \
