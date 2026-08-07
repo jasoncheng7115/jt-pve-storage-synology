@@ -250,6 +250,17 @@ apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
 
+> **Every node, or the storage is invisible in the web interface.** `pvesm add`
+> writes to the cluster configuration, so one node is enough to create the storage —
+> but the web interface is served by *whichever node your browser is connected to*,
+> and `pveproxy` loads its plugin list at startup. A node without the plugin does
+> not know the `synologysan` type and **silently omits the storage from the list**.
+> It exists and works on the nodes that do have it; it just is not shown — which
+> reads exactly like `pvesm add` having failed, and it did not. Install on every
+> node and restart the daemons on each, including the one you are browsing from. To
+> limit the storage to the nodes that are ready:
+> `pvesm set <storage> --nodes nodeA,nodeB`.
+
 > **If a `dpkg -i` already failed here.** An earlier version of this page said
 > `dpkg -i`. That leaves the package unpacked but *unconfigured*, and apt then
 > refuses to solve anything else — you get `Unmet dependencies` naming `kpartx`
