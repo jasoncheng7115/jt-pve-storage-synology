@@ -1,3 +1,23 @@
+jt-pve-storage-synology (0.9.0-1) unstable; urgency=medium
+
+  * The jump from 0.6.x is deliberate. Every storage operation has now been driven
+    on real hardware from both interfaces, on two models and three DSM versions, on
+    a five-node production cluster, including a node crash, a path failure and a
+    whole-NAS outage. What is left before 1.0.0 is hardware nobody here has: a
+    Synology HA pair and a dual-controller chassis.
+  * The operational checklist now carries a "Driven from" column. B through D were
+    run twice, once from the web interface and once from the CLI; A is CLI-only
+    because the GUI has no page for it. Five defects in this project lived in code
+    that worked from a shell and failed from the button.
+  * "How to help" asked for register item numbers, a WWID derivation sample and an
+    error code, one of which was already answered. It now asks for four things
+    anyone can act on.
+  * The status summary was cut by about a third with every measured figure kept.
+  * The Chinese documents say 驗證紀錄 rather than 登記簿, and dates were dropped
+    from the documentation site.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 23:00:00 +0800
+
 jt-pve-storage-synology (0.6.26-1) unstable; urgency=medium
 
   * The snapshot ceiling now guards at the LOWER of the two numbers the NAS

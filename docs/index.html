@@ -118,7 +118,7 @@
         <!-- The version sits on this line, immediately after the class, because
              <code>make release-check</code> reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.26 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.9.0 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -144,17 +144,17 @@
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">It works on a cluster, and it has been run hard.</span><span class="lang-zh">它在叢集上可以用，而且被操得很兇。</span></strong>
-        <span class="lang-en"><strong>Driven on hardware:</strong> a guest booting from the NAS; backups in all three <code>vzdump</code> modes, restored byte-identical; live migration across five nodes; a crashed node's LUN taken over by a surviving node in <strong>3.6&nbsp;s</strong>, while the dead node's session was still registered on the NAS; two-portal multipath through a path failure —<strong>60 reads, 0 failures</strong>; and a whole-NAS outage that left the node itself untouched —no process in uninterruptible sleep, every other storage still active.</span>
-        <span class="lang-zh"><strong>已在實機上跑過：</strong>一台 guest 從 NAS 開機；三種 <code>vzdump</code> 模式的備份，還原成完全相同的位元組；跨五個節點的即時遷移；一個當掉節點的 LUN 由存活節點在 <strong>3.6&nbsp;秒</strong>內接手，而當時死掉節點的工作階段仍然登記在 NAS 上；兩個 portal 的 multipath 撐過一次路徑故障——<strong>60 次讀取，0 次失敗</strong>；以及一次整台 NAS 中斷，而節點本身毫髮無傷——沒有任何行程進入不可中斷睡眠，其他每一個 storage 都還是 active。</span>
-        <span class="lang-en"><strong>Two models and three DSM versions:</strong> a DS918+ on 7.1.1, carried across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> driven end to end.</span>
-        <span class="lang-zh"><strong>兩個機型、三個 DSM 版本：</strong>一台 DS918+（7.1.1），並帶著全部 LUN uuid 完好地跨過升級到 <strong>7.4.1</strong>；以及一台 DS925+（<strong>7.3.2</strong>）完整跑過一輪。</span>
-        <span class="lang-en"><strong>What is still honest to say:</strong> no Synology HA or dual-controller chassis has ever been near it, and the DSM account needs administrator rights because DSM offers no narrower one. Around <strong>thirty</strong> defects were found by running it that no amount of reading had shown —two releases could not add a storage at all —so assume there are more. Where something could not be established, the plugin <strong>refuses the operation</strong> rather than guessing; the itemised list of what is and is not verified is <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#not-verified">the register</a>.</span>
-        <span class="lang-zh"><strong>仍然該誠實說的是：</strong>從來沒有任何 Synology HA 或雙控制器機箱接近過它，而那個 DSM 帳號需要管理員權限，因為 DSM 沒有更窄的選擇。從實際運行中找出大約<strong>三十個</strong>「讀程式碼永遠讀不出來」的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。凡是無法確認的地方，plugin 一律<strong>拒絕該操作</strong>而不是猜；逐項列出「哪些驗證過、哪些沒有」的清單在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#尚未驗證">登記簿</a>裡。</span>
+        <span class="lang-en"><strong>Driven on hardware:</strong> a guest booting from the NAS, backups in all three <code>vzdump</code> modes restored byte-identical, live migration across five nodes, and two-portal multipath through a path failure —<strong>60 reads, 0 failures</strong>. A crashed node's LUN was taken over by a surviving node in <strong>3.6&nbsp;s</strong>. A whole-NAS outage left the nodes untouched: nothing in uninterruptible sleep, every other storage still active.</span>
+        <span class="lang-zh"><strong>已在實機上跑過：</strong>guest 從 NAS 開機、三種 <code>vzdump</code> 模式備份還原後位元組完全相同、跨五個節點即時遷移，以及雙 portal multipath 撐過一次路徑故障——<strong>60 次讀取，0 次失敗</strong>。節點當掉時，存活節點在 <strong>3.6&nbsp;秒</strong>內接手它的 LUN。整台 NAS 中斷時，節點毫髮無傷：沒有行程卡在不可中斷睡眠，其他 storage 全部照常。</span>
+        <span class="lang-en"><strong>Two models, three DSM versions:</strong> a DS918+ carried from 7.1.1 across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> end to end.</span>
+        <span class="lang-zh"><strong>兩個機型、三個 DSM 版本：</strong>DS918+ 從 7.1.1 升到 <strong>7.4.1</strong>，全部 LUN uuid 完好；DS925+ 在 <strong>7.3.2</strong> 上完整跑過一輪。</span>
+        <span class="lang-en"><strong>Still honest to say:</strong> no Synology HA or dual-controller chassis has been near it, and the DSM account must be an administrator because DSM offers nothing narrower. Running it found about <strong>thirty</strong> defects that reading never would —two releases could not even add a storage —so assume there are more. Where something cannot be established the plugin <strong>refuses</strong> rather than guesses. What is and is not verified is listed in the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#not-verified">test record</a>.</span>
+        <span class="lang-zh"><strong>還是要老實說：</strong>沒有任何 Synology HA 或雙控制器機箱測過，而 DSM 帳號必須是管理員，因為 DSM 沒有更小的選項。實際跑起來找到大約<strong>三十個</strong>讀程式碼永遠讀不出來的缺陷——有兩個版本甚至連 storage 都加不進去——所以請假設還有。凡是無法確認的，plugin 一律<strong>拒絕</strong>，不猜。哪些驗證過、哪些沒有，列在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#尚未驗證">驗證紀錄</a>。</span>
     </div>
 
     <p>
-        <span class="lang-en">It is public at this stage for two reasons. The discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers. And the register of what is and is not known about that API is worth reading <em>before</em> anyone trusts a plugin built on top of it —including this one.</span>
-        <span class="lang-zh">在這個階段就公開有兩個理由。探索工具本身對任何想知道自己的 DSM 的 SAN API 提供什麼的人都有用；而那份「哪些知道、哪些不知道」的登記簿，值得在任何人信任一個建立在它上面的 plugin <strong>之前</strong>先讀——包括信任這一個之前。</span>
+        <span class="lang-en">It is public because the discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers —and because the record of what is and is not known about that API is worth reading before trusting any plugin built on it, including this one.</span>
+        <span class="lang-zh">會公開，是因為探索工具本身就對想知道自己的 DSM 的 SAN API 提供什麼的人有用；也因為那份「哪些知道、哪些不知道」的紀錄，值得在信任任何建立在它之上的 plugin 之前先讀——包括這一個。</span>
     </p>
 </section>
 
@@ -191,7 +191,7 @@
     <h2 class="section-title"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></h2>
     <p class="section-subtitle">
         <span class="lang-en">Against a <strong>DS918+</strong> —read-only discovery first, then writes, then a guest, then a five-node cluster with node failures, and finally that NAS carried across a <strong>DSM 7.1.1 &rarr; 7.4.1 upgrade with every LUN uuid intact</strong>. Then a second model and a second DSM version: a <strong>DS925+ on DSM 7.3.2</strong>, driven end to end over a VPN —storage added, LUN and target created, guest booted, snapshot, rollback, and the storage removed leaving nothing behind on either side. Full detail in the register.</span>
-        <span class="lang-zh">對一台 <strong>DS918+</strong>——先唯讀探索，然後寫入，然後一台 guest，然後一個五節點叢集加上節點故障，最後那台 NAS 還帶著<strong>全部 LUN uuid 完好地跨過 DSM 7.1.1 → 7.4.1 升級</strong>。接著是第二個機型與第二個 DSM 版本：一台 <strong>DS925+，DSM 7.3.2</strong>，透過 VPN 完整跑過一輪——加入 storage、建立 LUN 與 target、guest 開機、快照、倒回，以及移除 storage 之後兩邊都沒有留下東西。完整細節在登記簿裡。</span>
+        <span class="lang-zh">對一台 <strong>DS918+</strong>——先唯讀探索，然後寫入，然後一台 guest，然後一個五節點叢集加上節點故障，最後那台 NAS 還帶著<strong>全部 LUN uuid 完好地跨過 DSM 7.1.1 → 7.4.1 升級</strong>。接著是第二個機型與第二個 DSM 版本：一台 <strong>DS925+，DSM 7.3.2</strong>，透過 VPN 完整跑過一輪——加入 storage、建立 LUN 與 target、guest 開機、快照、倒回，以及移除 storage 之後兩邊都沒有留下東西。完整細節在驗證紀錄裡。</span>
     </p>
 
     <p class="muted">
@@ -203,22 +203,23 @@
     <h3 class="subsection-title"><span class="lang-en">The operational checklist, driven from the web interface</span><span class="lang-zh">操作清單，從網頁介面驅動</span></h3>
 
     <p>
-        <span class="lang-en">Every row below was run on a production five-node cluster on 2026-08-07. The interface matters: <code>pvedaemon</code>, <code>pveproxy</code>, <code>vzdump</code> and <code>pct</code> run under <code>-T</code> with no <code>PATH</code>, and <code>qm</code>, <code>pvesm</code>, <code>pvesh</code> and <code>qmrestore</code> do not —so an operation verified from a shell is not verified. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
-        <span class="lang-zh">下面每一列都在 2026-08-07 於一個五節點的正式叢集上跑過。介面很重要：<code>pvedaemon</code>、<code>pveproxy</code>、<code>vzdump</code> 與 <code>pct</code> 在 <code>-T</code> 底下執行而且沒有 <code>PATH</code>，<code>qm</code>、<code>pvesm</code>、<code>pvesh</code>、<code>qmrestore</code> 不是——所以「在 shell 上驗證過」不等於驗證過。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
+        <span class="lang-en"><strong>Every row was run on a production five-node cluster, and B through D were run twice —once from the web interface and once from the CLI.</strong> Doing both is not belt and braces: <code>pvedaemon</code>, <code>pveproxy</code>, <code>vzdump</code> and <code>pct</code> run under <code>-T</code> with no <code>PATH</code>; <code>qm</code>, <code>pvesm</code>, <code>pvesh</code> and <code>qmrestore</code> do not. Five defects in this project lived in code that worked perfectly from a shell and failed the moment someone clicked the button. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
+        <span class="lang-zh"><strong>每一列都在一個五節點的正式叢集上跑過，而且 B 到 D 是從網頁介面和指令列各跑一次。</strong>兩邊都跑不是多此一舉：<code>pvedaemon</code>、<code>pveproxy</code>、<code>vzdump</code> 與 <code>pct</code> 在 <code>-T</code> 底下執行而且沒有 <code>PATH</code>，<code>qm</code>、<code>pvesm</code>、<code>pvesh</code>、<code>qmrestore</code> 不是。這個專案有五個缺陷藏在「從 shell 跑完全正常」的程式碼裡，是有人從網頁介面按下去才現形的。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
     </p>
 
     <table>
         <thead><tr>
             <th></th>
             <th><span class="lang-en">Operation</span><span class="lang-zh">操作</span></th>
+            <th><span class="lang-en">Driven from</span><span class="lang-zh">從哪裡驅動</span></th>
             <th><span class="lang-en">Result</span><span class="lang-zh">結果</span></th>
         </tr></thead>
         <tbody>
-        <tr><td><strong>A1–A4</strong></td><td><span class="lang-en">Add · edit · CHAP · remove a storage — <em>not reachable from the GUI</em>, so <code>pvesm</code> plus a <code>perl -T</code> run on the node</span><span class="lang-zh">新增 · 編輯 · CHAP · 移除 storage ——<strong>GUI 到不了</strong>，所以是 <code>pvesm</code> 加上在節點上跑一次 <code>perl -T</code></span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
-        <tr><td><strong>B1–B4</strong></td><td><span class="lang-en">Add a disk · resize · move to another storage and back · detach and remove</span><span class="lang-zh">新增磁碟 · 擴充 · 移動到別的 storage 再移回 · 卸離並移除</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
-        <tr><td><strong>C1–C5</strong></td><td><span class="lang-en">Snapshot running and stopped · <strong>roll back</strong> · delete · the name visible in SAN Manager</span><span class="lang-zh">執行中與關機拍快照 · <strong>倒回</strong> · 刪除 · 名稱在 SAN Manager 看得到</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
-        <tr><td><strong>D1–D5</strong></td><td><span class="lang-en">Stop and start · migrate away and back, offline and online · full clone · clone from a snapshot · template, then linked and full clone from it</span><span class="lang-zh">關機與啟動 · 遷移離開再遷回（離線與線上）· 完整複製 · 從快照複製 · 轉範本再做連結與完整複製</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
-        <tr><td><strong>E1–E5</strong></td><td><span class="lang-en">Backup in all three <code>vzdump</code> modes · restore to a new VM ID · restore overwriting the original</span><span class="lang-zh"><code>vzdump</code> 三種模式的備份 · 還原到新的 VM ID · 覆蓋原本的 VM</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>A1–A4</strong></td><td><span class="lang-en">Add · edit · CHAP · remove a storage — <em>not reachable from the GUI</em>, so <code>pvesm</code> plus a <code>perl -T</code> run on the node</span><span class="lang-zh">新增 · 編輯 · CHAP · 移除 storage ——<strong>GUI 到不了</strong>，所以是 <code>pvesm</code> 加上在節點上跑一次 <code>perl -T</code></span></td><td><span class="lang-en">CLI<br><small>the GUI has no such page</small></span><span class="lang-zh">指令列<br><small>網頁介面沒有這些操作</small></span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>B1–B4</strong></td><td><span class="lang-en">Add a disk · resize · move to another storage and back · detach and remove</span><span class="lang-zh">新增磁碟 · 擴充 · 移動到別的 storage 再移回 · 卸離並移除</span></td><td><strong><span class="lang-en">Web UI + CLI</span><span class="lang-zh">網頁介面 + 指令列</span></strong></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>C1–C5</strong></td><td><span class="lang-en">Snapshot running and stopped · <strong>roll back</strong> · delete · the name visible in SAN Manager</span><span class="lang-zh">執行中與關機拍快照 · <strong>倒回</strong> · 刪除 · 名稱在 SAN Manager 看得到</span></td><td><strong><span class="lang-en">Web UI + CLI</span><span class="lang-zh">網頁介面 + 指令列</span></strong></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>D1–D5</strong></td><td><span class="lang-en">Stop and start · migrate away and back, offline and online · full clone · clone from a snapshot · template, then linked and full clone from it</span><span class="lang-zh">關機與啟動 · 遷移離開再遷回（離線與線上）· 完整複製 · 從快照複製 · 轉範本再做連結與完整複製</span></td><td><strong><span class="lang-en">Web UI + CLI</span><span class="lang-zh">網頁介面 + 指令列</span></strong></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>E1–E5</strong></td><td><span class="lang-en">Backup in all three <code>vzdump</code> modes · restore to a new VM ID · restore overwriting the original</span><span class="lang-zh"><code>vzdump</code> 三種模式的備份 · 還原到新的 VM ID · 覆蓋原本的 VM</span></td><td><span class="lang-en">CLI</span><span class="lang-zh">指令列</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
             </tbody>
     </table>
 
@@ -705,7 +706,7 @@
     </p>
 
     <ul>
-        <li><span class="lang-en"><strong>Migration used to be a second reason, and is not any more.</strong> A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 once left pve1 and pve2 each holding a map for a LUN that no longer existed. Re-measured on 2026-08-07 across two nodes, offline and online, in both directions: the node a VM leaves holds <strong>no maps, no devices and an empty tracking file</strong>. <code>vm_stop_cleanup</code> calls <code>deactivate_volumes</code> when the VM stops on the source after the switch. The original measurement predates a fix to <code>_detach_local</code>, which used to stop at the first flush.</span><span class="lang-zh"><strong>遷移本來是第二個理由，現在不是了。</strong>一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。2026-08-07 在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點<strong>沒有 map、沒有裝置、追蹤檔是空的</strong>。切換之後 VM 在來源節點停止時，<code>vm_stop_cleanup</code> 會呼叫 <code>deactivate_volumes</code>。原本那次量測早於 <code>_detach_local</code> 的修正——舊版停在第一次 flush。</span></li>
+        <li><span class="lang-en"><strong>Migration used to be a second reason, and is not any more.</strong> A VM migrated pve1 → pve2 → pve3 and destroyed on pve3 once left pve1 and pve2 each holding a map for a LUN that no longer existed. Re-measured on  across two nodes, offline and online, in both directions: the node a VM leaves holds <strong>no maps, no devices and an empty tracking file</strong>. <code>vm_stop_cleanup</code> calls <code>deactivate_volumes</code> when the VM stops on the source after the switch. The original measurement predates a fix to <code>_detach_local</code>, which used to stop at the first flush.</span><span class="lang-zh"><strong>遷移本來是第二個理由，現在不是了。</strong>一台 VM 從 pve1 → pve2 → pve3 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。 在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點<strong>沒有 map、沒有裝置、追蹤檔是空的</strong>。切換之後 VM 在來源節點停止時，<code>vm_stop_cleanup</code> 會呼叫 <code>deactivate_volumes</code>。原本那次量測早於 <code>_detach_local</code> 的修正——舊版停在第一次 flush。</span></li>
         <li><span class="lang-en">A hard-reset node never runs <code>deactivate_volume</code> at all, so its tracking file keeps an entry for a LUN it is no longer attached to.</span><span class="lang-zh">被硬重置的節點根本不會執行 <code>deactivate_volume</code>，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。</span></li>
     </ul>
 
@@ -732,7 +733,7 @@
 
     <p>
         <span class="lang-en">It reports the API set and every version range the NAS accepts, whether anti-CSRF is on, the DSM volumes and their filesystems, the LUNs and targets as they are now, the <code>dev_attribs</code> of an existing LUN, and a closing register of what the run settled and what still needs a write to answer.</span>
-        <span class="lang-zh">它會回報 NAS 接受的 API 範圍與每一個版本區間、防 CSRF 是否開啟、DSM 儲存空間及其檔案系統、目前的 LUN 與 target、一顆既有 LUN 的 <code>dev_attribs</code>，最後給出一份登記簿：這次跑完解決了什麼、還有什麼需要寫入才能回答。</span>
+        <span class="lang-zh">它會回報 NAS 接受的 API 範圍與每一個版本區間、防 CSRF 是否開啟、DSM 儲存空間及其檔案系統、目前的 LUN 與 target、一顆既有 LUN 的 <code>dev_attribs</code>，最後給出一份驗證紀錄：這次跑完解決了什麼、還有什麼需要寫入才能回答。</span>
     </p>
 
     <div class="table-wrap">
@@ -758,8 +759,8 @@
     </p>
 
     <div class="alert alert--info">
-        <span class="lang-en">This is how R-1 gets answered, and it is the single most useful thing an owner of a Synology NAS can contribute to this project.</span>
-        <span class="lang-zh">R-1 就是這樣回答的，而它是一位 Synology NAS 的擁有者能為這個專案做的最有價值的一件事。</span>
+        <span class="lang-en">The rollback method itself is already known and has been driven on hardware, so this is no longer a question that needs answering —but running it on a DSM version this project has not seen is still the quickest way to find out whether Synology has changed something.</span>
+        <span class="lang-zh">倒回用的那個方法本身已經知道，也已經在實機上跑過，所以這已經不是待解的問題——但在本專案沒看過的 DSM 版本上跑一次，仍然是最快能發現「Synology 是不是改了什麼」的方式。</span>
     </div>
 </section>
 
@@ -776,12 +777,16 @@
             <div class="module-item__desc"><span class="lang-en">The plugin itself: the volume lifecycle, snapshots, rollback, clones and resize, all driven through <code>pvesm</code> against the NAS. Then two nodes, live migration, and real two-portal multipath with a path failed under load</span><span class="lang-zh">plugin 本體：磁碟生命週期、快照、倒回、複本與擴充，全部透過 <code>pvesm</code> 對 NAS 實際跑過。然後是兩個節點、即時遷移，以及在負載下斷掉一條路徑的真正雙 portal multipath</span></div>
         </div>
         <div class="module-item">
-            <div class="module-item__name">0.6.x <span class="status-badge status-badge--supported"><span class="lang-en">current</span><span class="lang-zh">目前</span></span></div>
+            <div class="module-item__name">0.6.x <span class="status-badge status-badge--supported"><span class="lang-en">done</span><span class="lang-zh">已完成</span></span></div>
             <div class="module-item__desc"><span class="lang-en">Credentials out of <code>storage.cfg</code> and into <code>/etc/pve/priv</code>; backup, restore and a guest booting from the NAS; five nodes at once; node crash, HA fencing and takeover; the orphan reaper; the ceilings enforced before the NAS refuses. Then a run from the web interface found what a shell never could: <strong>a PVE daemon has no <code>PATH</code></strong> and <strong>runs under <code>-T</code></strong>, so five defects lived in code that worked perfectly from <code>qm</code>. And a second NAS, a whole-NAS outage and a DSM 7.1 → 7.4 upgrade were each driven through</span><span class="lang-zh">憑證從 <code>storage.cfg</code> 搬進 <code>/etc/pve/priv</code>；備份、還原，以及一台從 NAS 開機的 guest；五個節點同時運作；節點當機、HA 圍籬與接手；孤兒回收工具；在 NAS 拒絕之前就先擋下的各項上限。然後一輪從網頁介面的實測找出了 shell 永遠找不到的東西：<strong>PVE 的 daemon 沒有 <code>PATH</code></strong>，而且<strong>在 <code>-T</code> 底下執行</strong>，所以有五個缺陷藏在「從 <code>qm</code> 跑完全正常」的程式碼裡。此外還跑過了第二台 NAS、一次整台 NAS 中斷，以及一次 DSM 7.1 → 7.4 升級</span></div>
         </div>
         <div class="module-item">
+            <div class="module-item__name">0.9.x <span class="status-badge status-badge--supported"><span class="lang-en">current</span><span class="lang-zh">目前</span></span></div>
+            <div class="module-item__desc"><span class="lang-en">Every check driven from <strong>both</strong> interfaces rather than one, which is what the checklist now records per row. Two defects came out of that pass: the snapshot ceiling was counting the array DSM handed over instead of the total DSM reported, and a deleted LUN whose mapping index the NAS reused left multipathd holding a stale view of the path —so <code>qm move_disk</code> back onto the storage and <code>qmrestore</code> failed until the kernel was asked to rediscover the device. Both fixed and re-driven</span><span class="lang-zh">每一項檢查都從<strong>兩種</strong>介面驅動，而不是一種，而清單現在逐列記下了這件事。那一輪跑出兩個缺陷：快照上限數的是 DSM 交出來的陣列，而不是 DSM 自己回報的總數；以及一顆被刪除的 LUN，其 mapping index 被 NAS 重用之後，multipathd 還握著那條路徑的過期認知——於是 <code>qm move_disk</code> 搬回這個 storage 與 <code>qmrestore</code> 都會失敗，直到請核心重新探索那個裝置為止。兩個都修好並重跑過</span></div>
+        </div>
+        <div class="module-item">
             <div class="module-item__name">1.0.0</div>
-            <div class="module-item__desc"><span class="lang-en"><strong>A second model and a second DSM version are done</strong> — a DS925+ on DSM 7.3.2 driven end to end, and the DS918+ carried across a 7.1 → 7.4 upgrade with every LUN uuid intact. What is left: <strong>the minimum DSM privileges settled</strong>, the remaining operations repeated on a second model, and everything else on the list either answered or documented as unanswerable. Every 0.x before it is a prerelease</span><span class="lang-zh"><strong>第二個機型與第二個 DSM 版本已經完成</strong>——一台 DS925+（DSM 7.3.2）完整跑過一輪，而 DS918+ 帶著全部 LUN uuid 完好地跨過了 7.1 → 7.4 升級。還剩下的是：<strong>確定最小的 DSM 權限</strong>、剩下那些操作也在第二個機型上重複一次，以及清單上的其他每一項不是有答案就是被記載為無法回答。在它之前的每一個 0.x 都是預發行版</span></div>
+            <div class="module-item__desc"><span class="lang-en"><strong>A second model and a second DSM version are done</strong> — a DS925+ on DSM 7.3.2 driven end to end, and the DS918+ carried across a 7.1 → 7.4 upgrade with every LUN uuid intact. What is left: <strong>a Synology HA pair and a dual-controller chassis</strong>, neither of which anyone here has. The minimum DSM privileges question is closed —DSM has no SAN Manager privilege to grant, so the account is an administrator and the documentation says so. Every 0.x before it is a prerelease</span><span class="lang-zh"><strong>第二個機型與第二個 DSM 版本已經完成</strong>——一台 DS925+（DSM 7.3.2）完整跑過一輪，而 DS918+ 帶著全部 LUN uuid 完好地跨過了 7.1 → 7.4 升級。還剩下的是：<strong>一組 Synology HA 與一台雙控制器機箱</strong>，而這裡沒有人有這兩種硬體。「最小 DSM 權限」那一項已經結案——DSM 根本沒有 SAN Manager 權限可以給，所以帳號就是管理員，文件也照實寫。在它之前的每一個 0.x 都是預發行版</span></div>
         </div>
     </div>
 
@@ -790,21 +795,16 @@
 <section class="doc-section doc-section--accent" id="contribute">
     <h2 class="section-title"><span class="lang-en">How to help</span><span class="lang-zh">如何協助</span></h2>
 
-    <p>
-        <span class="lang-en">The most valuable contribution is a run of the probe against <strong>a model or DSM version other than a DS918+ on 7.1.1</strong>. Synology's API is not a stable published contract, so a second data point is worth more than any amount of reasoning about the first.</span>
-        <span class="lang-zh">最有價值的貢獻是在<strong>不是 DS918+、不是 7.1.1</strong> 的機型或 DSM 版本上跑一次探索工具。Synology 的 API 不是一份穩定公開的契約，所以第二個資料點比對第一個做任何推論都有價值。</span>
-    </p>
-
-    <p>
-        <span class="lang-en">Particularly wanted:</span>
-        <span class="lang-zh">特別想要的：</span>
+    <p class="section-subtitle">
+        <span class="lang-en">Everything below is something a second machine can answer and this one cannot.</span>
+        <span class="lang-zh">下面每一項，都是「另一台機器答得出來、而我們這台答不出來」的東西。</span>
     </p>
 
     <ul>
-        <li><span class="lang-en"><strong>R-1</strong> —the output of <code>--probe-methods</code> on any DSM</span><span class="lang-zh"><strong>R-1</strong>——任何 DSM 上 <code>--probe-methods</code> 的輸出</span></li>
-        <li><span class="lang-en">A LUN's uuid together with its WWID from a host that has it attached, to test the derivation rule against a second sample</span><span class="lang-zh">一顆 LUN 的 uuid，加上在掛著它的主機上讀到的 WWID，用第二個樣本檢驗那條衍生規則</span></li>
-        <li><span class="lang-en">Whether granting a non-administrator only the <strong>DSM application privilege</strong> in Control Panel lets it authenticate —and if so, which iSCSI calls then answer <strong>105</strong>. Probed here with a temporary account: with no groups, and as a member of <code>users</code>, it was refused at <em>login</em> with <strong>402</strong>, so it never reached the storage calls</span><span class="lang-zh">在控制台只給非管理員<strong>DSM 應用程式權限</strong>，它能不能通過認證——如果可以，接著哪些 iSCSI 呼叫會回 <strong>105</strong>。這裡用一個臨時帳號探測過：完全沒有群組時、以及加入 <code>users</code> 之後，都在「登入」這一步就被拒絕，錯誤 <strong>402</strong>，所以它根本沒有走到儲存呼叫</span></li>
-        <li><span class="lang-en">Anything the probe reports that contradicts this page</span><span class="lang-zh">探索工具回報的任何與本頁矛盾的內容</span></li>
+        <li><span class="lang-en"><strong>Run the discovery tool on a Synology this page has not seen.</strong> It only reads —it creates nothing and deletes nothing— and it prints what your DSM's SAN API actually offers. Two models have been tested; there are a lot more, and Synology publishes different limits for almost every one.</span><span class="lang-zh"><strong>在本頁沒測過的 Synology 上跑一次探索工具。</strong>它只讀取——不建立也不刪除任何東西——而且會印出你的 DSM 的 SAN API 實際提供什麼。目前測過兩個機型，而機型還有很多，Synology 幾乎為每一台公布不同的上限。</span></li>
+        <li><span class="lang-en"><strong>Tell us what broke if you run it for real.</strong> About thirty defects in this project were found by using it, not by reading it, and every one of them looked fine in the code.</span><span class="lang-zh"><strong>如果你真的拿它上線，告訴我們哪裡壞了。</strong>這個專案大約三十個缺陷是「用出來的」，不是「讀出來的」，而它們在程式碼裡每一個看起來都沒問題。</span></li>
+        <li><span class="lang-en"><strong>A Synology HA pair, or a dual-controller chassis.</strong> Both are supported by design and <em>neither has ever been tested</em> —no such hardware has been near this. If you have one, even a report that it simply worked is new information.</span><span class="lang-zh"><strong>一組 Synology HA，或一台雙控制器機箱。</strong>兩種在設計上都支援，而且<strong>兩種都沒有被測試過</strong>——從來沒有這樣的硬體接近過它。如果你手上有，就算只是回報「它就這樣正常運作」，那也是新的資訊。</span></li>
+        <li><span class="lang-en"><strong>Anything the tool reports that contradicts this page.</strong> That is the most useful bug report there is, because it means something written here is wrong.</span><span class="lang-zh"><strong>探索工具回報的任何與本頁矛盾的內容。</strong>那是最有價值的一種回報，因為它代表這裡寫的某句話是錯的。</span></li>
     </ul>
 </section>
 

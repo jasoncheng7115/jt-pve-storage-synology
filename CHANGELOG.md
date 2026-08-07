@@ -6,6 +6,33 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.9.0] - 2026-08-07
+
+The jump from 0.6.x is deliberate. Every storage operation has now been driven on
+real hardware from both interfaces, on two models and three DSM versions, on a
+five-node production cluster —including a node crash, a path failure and a
+whole-NAS outage. What is left before 1.0.0 is hardware nobody here has: a Synology
+HA pair and a dual-controller chassis.
+
+### Changed
+
+- **The documentation says plainly which interface each check was driven from.** The
+  operational checklist now carries a *Driven from* column: B through D were run
+  **twice**, once from the web interface and once from the CLI, and A is CLI-only
+  because the GUI has no page for it. That distinction is not pedantry — five
+  defects in this project lived in code that worked perfectly from a shell and
+  failed the moment someone clicked the button.
+- **"How to help" was written for the author, not the reader.** It asked for
+  register item numbers, a WWID derivation sample and an error code, one of which
+  had already been answered. It now asks for four things anyone can act on, the
+  first being: run the read-only discovery tool on a Synology this page has not
+  seen.
+- **The status summary was too long and read badly in Chinese.** Cut by about a
+  third, with every measured figure kept.
+- `登記簿` reads as mainland usage; the Chinese documents now say `驗證紀錄`.
+- Dates were dropped from the page. That a thing was measured is the claim; the day
+  it happened is not what a reader needs.
+
 ## [0.6.26] - 2026-08-07
 
 ### Changed
