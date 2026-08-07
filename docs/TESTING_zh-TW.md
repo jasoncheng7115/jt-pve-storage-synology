@@ -415,6 +415,28 @@ Target 的 IQN 裡嵌的是**建立當時**的 NAS 主機名稱——測試機�
 
 ---
 
+### R-25 已有答案，由別人叢集上的一個快照解決
+
+`create_time` 是 **epoch 秒**。2026-08-07 在 Jason 透過 Proxmox VE 介面拍的一個快照上量到：
+
+| | |
+|---|---|
+| `create_time` | `1786070747` |
+| 換算成 epoch 秒 | `2026-08-07 02:45:47 UTC` |
+| PVE 顯示的時間 | `2026-08-07 10:45:46` 本地，UTC+8 = `02:45:46 UTC` |
+
+一秒之內吻合。這件事之所以無法用唯讀方式確定，是因為 **LUN 根本沒有 `create_time` 這個欄位**——只有快照有，而測試用的 NAS 上沒有任何快照。它需要硬體上真的存在一個快照，而這正是登記簿存在的意義。
+
+同一次讀取也確定了欄位名稱，那些名稱先前是從參考實作推斷的，不是觀察到的。`list_snapshot` 回傳的是 **`name`** 和 **`uuid`**——不是 `snapshot_name` 和 `snapshot_uuid`，那是第一次探測所假設的，結果拿到 `None`。plugin 本來就是用 `name` 和 `uuid` 比對的，所以 plugin 是對的；錯的是那次探測。完整欄位：
+
+```
+create_time  snapshot_time  name   uuid   parent_uuid  parent_lun_id
+snapshot_id  taken_by       type   status  total_size  mapped_size
+root_path    description    version  is_app_consistent  is_user_locked
+```
+
+`taken_by` 一字不差地回傳 `jt-pve-storage-synology`，而且是在一個這個專案從來沒有碰過的叢集上——這是所有權閘門在真正重要的地方運作，不是在測試裡。
+
 ### R-14 實機探測：一個普通帳號連認證都過不了
 
 在擁有者同意下，在 NAS 上建立一個臨時帳號、探測、然後刪除。兩個群組在前後完全逐字相同。

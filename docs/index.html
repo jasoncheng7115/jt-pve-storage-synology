@@ -273,15 +273,11 @@
             <div class="module-item__name">R-15 / R-16</div>
             <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> — no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a failover decides whether pinning a storage to it protects or breaks it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換後是否存活，決定了把 storage 釘在它上面是保護還是破壞</span></div>
         </div>
-        <div class="module-item">
-            <div class="module-item__name">R-25</div>
-            <div class="module-item__desc"><span class="lang-en">The unit of a snapshot's <code>create_time</code>. Believed to be epoch seconds; a code comment asserted it had been measured and no such measurement existed. It cannot be settled read-only — <strong>a LUN carries no <code>create_time</code> field at all</strong>. Nothing in Proxmox VE 9 reads the value, and the plugin yields no timestamp rather than an implausible one</span><span class="lang-zh">快照 <code>create_time</code> 的單位。相信是 epoch 秒；一段程式碼註解曾聲稱量測過，而那個量測並不存在。它無法用唯讀方式確定——<strong>LUN 根本沒有 <code>create_time</code> 這個欄位</strong>。Proxmox VE 9 裡沒有任何東西會讀這個值，而 plugin 對不合理的值會回傳「沒有時間戳」</span></div>
         </div>
-    </div>
 
     <div class="note">
-        <span class="lang-en"><strong>R-2, R-5, R-12 and R-13 used to be on this list and are now answered.</strong> Unmapping is surgical and mapping adds, so per-node mapping is safe. The uuid-to-WWID rule is confirmed on two independent samples against the kernel's own <code>scsi_id</code>. Sixteen simultaneous creates all succeeded, and fifteen concurrent allocations from three nodes produced no duplicate names. And a second login does not evict the first, so a cluster sharing one account is fine.</span>
-        <span class="lang-zh"><strong>R-2、R-5、R-12、R-13 曾經在這份清單上，現在都已經有答案。</strong>解除對應是精準的、對應是累加的，所以逐節點對應是安全的。uuid 到 WWID 的規則在兩個獨立樣本上、對照核心自己的 <code>scsi_id</code> 確認過。十六個同時建立全部成功，而三個節點同時發出十五個配置沒有產生重複名稱。而第二次登入不會踢掉第一次，所以一個叢集共用一個帳號是沒問題的。</span>
+        <span class="lang-en"><strong>R-2, R-5, R-12, R-13 and R-25 used to be on this list and are now answered.</strong> Unmapping is surgical and mapping adds, so per-node mapping is safe. The uuid-to-WWID rule is confirmed on two independent samples against the kernel's own <code>scsi_id</code>. Sixteen simultaneous creates all succeeded, and fifteen concurrent allocations from three nodes produced no duplicate names. A second login does not evict the first, so a cluster sharing one account is fine. And a snapshot's <code>create_time</code> is epoch seconds, measured against PVE's own displayed time on a real snapshot.</span>
+        <span class="lang-zh"><strong>R-2、R-5、R-12、R-13、R-25 曾經在這份清單上，現在都已經有答案。</strong>解除對應是精準的、對應是累加的，所以逐節點對應是安全的。uuid 到 WWID 的規則在兩個獨立樣本上、對照核心自己的 <code>scsi_id</code> 確認過。十六個同時建立全部成功，而三個節點同時發出十五個配置沒有產生重複名稱。第二次登入不會踢掉第一次，所以一個叢集共用一個帳號是沒問題的。而快照的 <code>create_time</code> 是 epoch 秒，這是拿一個真實快照對照 PVE 自己顯示的時間量到的。</span>
     </div>
 
     <p class="mt-3">
@@ -547,6 +543,23 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
     <div class="note">
         <span class="lang-en"><strong>The password never lands in <code>/etc/pve/storage.cfg</code>.</strong> It is declared to Proxmox VE as a sensitive property, so PVE strips it out and hands it to the plugin, which writes it to <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> — mode <code>0600</code>, root only, and replicated to every node by the cluster filesystem. <strong>If you installed a version before 0.5.3~beta1, run <code>pvesm set &lt;storage&gt; --syno-password '&lt;password&gt;'</code> once to move it, and treat the old value as disclosed.</strong></span>
         <span class="lang-zh"><strong>密碼不會進到 <code>/etc/pve/storage.cfg</code>。</strong>它對 Proxmox VE 宣告為機密屬性，所以 PVE 會把它拿掉並交給 plugin，由 plugin 寫入 <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code>——權限 <code>0600</code>、只有 root、並由叢集檔案系統複寫到每個節點。<strong>如果你裝過 0.5.3~beta1 之前的版本，請執行一次 <code>pvesm set &lt;storage&gt; --syno-password '&lt;密碼&gt;'</code> 把它搬過去，並且把舊的值視為已經洩漏。</strong></span>
+    </div>
+
+    <h3 class="subsection-title"><span class="lang-en">Finding the snapshots in SAN Manager</span><span class="lang-zh">在 SAN Manager 裡找到快照</span></h3>
+
+    <p>
+        <span class="lang-en">SAN Manager's <strong>Snapshot</strong> page manages <em>schedules</em>. Expanding a LUN there shows its schedule, when the last snapshot was taken and a <strong>restore-point count</strong> — but not the snapshot names. To see the names, go to <strong>LUN → select the LUN → Snapshot</strong>.</span>
+        <span class="lang-zh">SAN Manager 的<strong>快照</strong>頁面管理的是「排程」。在那裡展開一個 LUN 會看到它的排程、最近一次快照的時間，以及一個<strong>還原點數量</strong>——但不會列出快照名稱。要看名稱，請到 <strong>LUN → 選擇該 LUN → 快照</strong>。</span>
+    </p>
+
+    <p>
+        <span class="lang-en">A snapshot this plugin took carries Proxmox VE's own snapshot name verbatim — <code>install1</code> in PVE is <code>install1</code> on the NAS — with <code>taken_by</code> set to <code>jt-pve-storage-synology</code> and a description naming the storage. That marker is the ownership gate: the plugin lists, deletes and rolls back only snapshots carrying it, so a schedule you set up in SAN Manager is never touched by a VM operation.</span>
+        <span class="lang-zh">這個 plugin 拍的快照會一字不差地帶著 Proxmox VE 自己的快照名稱——PVE 裡叫 <code>install1</code>，NAS 上就是 <code>install1</code>——並且 <code>taken_by</code> 設為 <code>jt-pve-storage-synology</code>，描述裡帶著 storage 名稱。那個標記就是所有權閘門：plugin 只會列出、刪除、倒回帶有它的快照，所以你在 SAN Manager 設的排程永遠不會被某個 VM 操作動到。</span>
+    </p>
+
+    <div class="note">
+        <span class="lang-en">The same page is a quick way to confirm the storage is doing what it should: a LUN this plugin created reads <strong>Btrfs, second-level snapshot</strong> and offers snapshots, while a thick-provisioned LUN shows <em>&ldquo;Thick Provisioning LUN does not support snapshots&rdquo;</em>. That is the difference <code>pvesm add</code> refuses an ext4 volume over.</span>
+        <span class="lang-zh">同一個頁面也是確認 storage 運作正常的快方法：這個 plugin 建立的 LUN 會顯示<strong>Btrfs、秒級快照</strong>並且支援快照，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。這正是 <code>pvesm add</code> 之所以會拒絕 ext4 儲存空間的那個差別。</span>
     </div>
 
     <h3 class="subsection-title"><span class="lang-en">Restricting it to some nodes</span><span class="lang-zh">只讓某幾個節點可以用</span></h3>

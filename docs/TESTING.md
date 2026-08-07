@@ -609,6 +609,38 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### R-25 answered, by a snapshot on someone else's cluster
+
+`create_time` is **epoch seconds**. Measured 2026-08-07 on a snapshot Jason took
+through the Proxmox VE interface:
+
+| | |
+|---|---|
+| `create_time` | `1786070747` |
+| as epoch seconds | `2026-08-07 02:45:47 UTC` |
+| what PVE displayed | `2026-08-07 10:45:46` local, UTC+8 = `02:45:46 UTC` |
+
+Within one second. This could not be settled read-only because **a LUN carries no
+`create_time` field at all** — only a snapshot does, and the test NAS had none.
+It took a snapshot existing on hardware, which is exactly the kind of thing the
+register is for.
+
+The same read settled the field names, which had been asserted from the reference
+clients rather than observed. `list_snapshot` returns **`name`** and **`uuid`** —
+not `snapshot_name` and `snapshot_uuid`, which is what a first probe assumed and
+got `None` for. The plugin already matched on `name` and `uuid`, so it was right;
+the probe was wrong. Full set:
+
+```
+create_time  snapshot_time  name   uuid   parent_uuid  parent_lun_id
+snapshot_id  taken_by       type   status  total_size  mapped_size
+root_path    description    version  is_app_consistent  is_user_locked
+```
+
+`taken_by` came back as `jt-pve-storage-synology` verbatim, on a cluster this
+project has never touched — which is the ownership gate working where it matters,
+rather than in a test.
+
 ### R-14, probed on hardware: a plain account cannot even authenticate
 
 A temporary account was created on the NAS with the owner's permission, probed, and
@@ -1045,7 +1077,7 @@ one, the plugin refuses rather than assumes.
 
 | # | Question |
 |---|---|
-| R-25 | **The unit of a snapshot's `create_time`.** Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until 2026-08-06, when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
+| R-25 | ~~The unit of a snapshot's `create_time`~~ **ANSWERED: epoch seconds**, measured against PVE's own displayed time on a real snapshot — see above. Originally: Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until 2026-08-06, when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
 | R-14 | **NARROWED, see above.** Probed with a temporary account on hardware: DSM 7.1.1 has only three groups and none is iSCSI-specific; an account with no groups is refused at login with **402**, and so is one in `users`. `SYNO.Core.User get` exposes no privilege fields, and `Group.Member add` to `administrators` reports success without acting — so the minimum set cannot be isolated through the API. What remains is a UI check: whether granting the DSM application privilege to a non-administrator is enough to authenticate, and if so which iSCSI calls then return 105. See `DSM-ACCOUNT.md` |
 
 ### Supported by design, unverified — needs hardware this project does not have
