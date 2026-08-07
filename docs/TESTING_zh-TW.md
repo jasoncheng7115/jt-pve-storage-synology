@@ -142,7 +142,7 @@ type 295，VDISK_BLUN，120 GiB —— 一個 Virtual Machine Manager 的虛擬�
 
 `restore_snapshot` 收 **`src_lun_uuid` 與 `snapshot_uuid`**。只送快照會被 **18990508** 拒絕，所以 LUN 也必須指名。
 
-量了三件事，而且這三件事全都必須是這個答案，倒回才可能出貨：
+量測了三件事，而且這三件事全都必須是這個答案，倒回才可能出貨：
 
 | 問題 | 答案 |
 |---|---|
@@ -187,7 +187,7 @@ type 295，VDISK_BLUN，120 GiB —— 一個 Virtual Machine Manager 的虛擬�
 | 對一顆已對應到別處的 LUN 送 `map_target` 一個 target | **加入**。既有的對應仍然存在 |
 | `unmap_target` 一個 target | **只**移除那一個 |
 
-這和 Unity 的 `hostAccess` 正好相反——那邊清單是被取代的，送一個 host 就會把叢集裡其他每個節點解除對應。這裡的逐節點對應照原樣寫就是安全的。plugin 仍然會讀出現有清單並送出聯集，因為一個在一版韌體上量過一次的行為不是承諾。
+這和 Unity 的 `hostAccess` 正好相反——那邊清單是被取代的，送一個 host 就會把叢集裡其他每個節點解除對應。這裡的逐節點對應照原樣寫就是安全的。plugin 仍然會讀出現有清單並送出聯集，因為一個只在一版韌體上量測過一次的行為不是承諾。
 
 ### 並行與工作階段
 
@@ -442,7 +442,7 @@ SAN Manager 的快照清單顯示的是**時間、一致性狀態、描述、狀
 
 ### R-25 已有答案，由別人叢集上的一個快照解決
 
-`create_time` 是 **epoch 秒**。在一個透過 Proxmox VE 介面拍的快照上量到：
+`create_time` 是 **epoch 秒**。在一個透過 Proxmox VE 介面拍的快照上量測到：
 
 | | |
 |---|---|
@@ -643,7 +643,7 @@ missing value for required option 'syno-password'
 
 這些殘留是無害的，而且理由是可以檢查的、不是靠期望：WWID 是從 LUN 的 uuid 推導出來的，所以一筆過期的項目只可能對應到它原本那顆 LUN，而那顆已經被刪掉了。它不是通往錯誤磁碟的路徑。
 
-### 稽核的第三輪：一個修正弄壞了 CHAP，以及一個沒有人量過的斷言
+### 稽核的第三輪：一個修正弄壞了 CHAP，以及一個沒有人驗證過的斷言
 
 這裡三個發現有兩個是關於**上一輪**的。這正是改完東西之後要再跑一次稽核的理由。
 
@@ -701,7 +701,7 @@ Perl 把類別名稱綁到了 `$path`，把剩下那個參數綁到 `%opts`。�
 | `SYNO.Core.TaskScheduler list` | 4 個作業，其中 2 個與快照相關且已啟用——兩個都是**共用資料夾**快照（`Share [photo] Snapshot`、`Share [homes] Snapshot`）|
 | 對 NAS 上原有四個 LUN 各做一次 `list_snapshot` | **四個都是 0 個快照**，所以拿不到外來 `taken_by` 的樣本 |
 
-共用資料夾快照和 LUN 快照是不同的物件，不可能出現在某個 LUN 的快照清單裡，所以在這台 NAS 上這個危險根本走不到。仍然沒有量到的是透過 Snapshot Replication 針對某個 LUN 建立的快照排程，那需要把該套件設定在這個 plugin 擁有的 LUN 上。
+共用資料夾快照和 LUN 快照是不同的物件，不可能出現在某個 LUN 的快照清單裡，所以在這台 NAS 上這個危險根本走不到。仍然沒有量測到的是透過 Snapshot Replication 針對某個 LUN 建立的快照排程，那需要把該套件設定在這個 plugin 擁有的 LUN 上。
 
 **它不會擋住任何事，因為那個過濾是白名單。**`snapshot_list` 只保留 `taken_by` 等於這個 plugin 自己標記的快照——所以來源不明的一律被排除，而不是需要先被認出來。黑名單會需要事先知道 DSM 能產生的每一種快照；白名單不需要。
 
@@ -740,7 +740,7 @@ Perl 把類別名稱綁到了 `$path`，把剩下那個參數綁到 `%opts`。�
 |---|---|
 | R-14 | ~~最小的 DSM 權限~~ **已解答：沒有更細的權限可以給，所以這個帳號必須是管理員**。分兩半。透過 API，在 DSM 7.1.1 上：只有三個群組，沒有一個是 iSCSI 專用的；沒有群組的帳號登入被拒絕（**402**），放進 `users` 也一樣；`SYNO.Core.User get` 不揭露任何權限欄位；`Group.Member add` 加到 `administrators` 回報成功卻沒有生效。然後在 DSM 介面裡，在 **7.4.1-90080（DS918+）** 上，直接讀了那個帳號的**應用程式**分頁：它列出二十個應用程式——AFP、Active Backup for Business（三項）、Audio Station、Central Management System、Cloud Sync、DSM、Download Station、FTP、File Station、Notification Center、Note Station、SFTP、SMB、Synology Photos、Surveillance Station、Synology Drive、Universal Search、rsync 與文字編輯器——而其中**沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI**。所以這個 plugin 需要的存取權根本不能以「應用程式」的形式給或不給；它是隨 `administrators` 一起來的 | 問題從來不是「管理員能不能用」，是「有沒有更小的能用」。沒有，而現在這是讀 DSM 自己的介面得到的，不是從 API 的沉默推論出來的。這個發現**能**帶來的行動值得照做：那二十個應用程式**每一個都可以**對這個帳號拒絕，所以「一個專用的管理員帳號、其他應用程式全部拒絕、開 2FA、並以 IP 限制」就是現存最小的組態。`DSM-ACCOUNT_zh-TW.md` 已照此寫 |
 | R-26 | **新增，未解答**。`SYNO.Core.System info type=define` 回報的快照上限是**兩個**，不是一個：`max_snapshot_per_lun` **256** 與 `max_snapshot_per_lun_v2` **128**。share 那一對是同樣的形狀——`max_snapshots_per_share` 1024 對 `_v2` 512。plugin 讀的是前者。在第二台機器上確認過：**DS925+／DSM 7.3.2 回報一模一樣的一對**——256 對 128，share 是 1024 對 512——所以這是系統性的，不是某一個機型或某一版固件的怪癖。DSM 實際**執行**的是哪一個並不知道，而這件事唯讀問不出來：要在同一顆 LUN 上拍到第 129 張才能確定 | 如果被執行的是 `_v2`，那 `assert_room_for_snapshot` 守在真實上限的兩倍，而 NAS 會先拒絕——一道存在意義就是「比儲存伺服器更早拒絕」的守門。Synology 的 key 上的 `_v2` 後綴通常標示新一代，而這個 plugin 強制要求 **Btrfs** LUN，所以「`_v2` 才是我們的數字」正是要擔心的那個情況。兩個方向都不會有資料風險：守太高是 NAS 回錯誤，守太低是 plugin 回錯誤。保守的修法是取兩者較小值、並在拒絕訊息裡把兩個數字都寫出來；**目前還沒有套用**，因為那會改變每一個 storage 的行為，而專案負責人還沒有裁決 |
-| R-27 | ~~LUN 被刪除之後，`qm move_disk` 搬回本 storage 與 `qmrestore` 會失敗~~ **0.6.25 已修正**；這是 對一個「已經發出去的版本」重跑發版清單時找到的。一顆 LUN 被刪除後 NAS 重用它的 mapping index，節點也跟著重用同一個 sd 節點：核心在 rescan 時重讀 VPD，把 `/sys/block/<sd>/device/wwid` 更新成**新的** LUN，而 **multipathd 從來沒有重讀那條路徑**，還為那顆已刪除的 LUN 守著一個 map。兩邊並排量過——核心 `naa.60014052e46494ed5667d4a29dbe0dd9`、multipathd `36001405bbc484c9dc23cd4accd8f7fd1`，同一個 `sde`。`ensure_map` 於是在等一個永遠建不起來的 map。現在 `activate_volume` 會偵測到它，並請**核心**重新探索那個裝置——移除 sd 節點、重掃工作階段、重新確認 WWID、再要一次 map——那是唯一量測有效的做法 | 它**連續失敗四次**，每次都是全新的 WWID，而且踩在兩個發版清單項目上（B3、E4）。**從來不是資料風險**：plugin 是拒絕，不是拿那個裝置去用，那正是規則 48 在發揮作用。另外三個修法試過之後回復、沒有送出：在 WWID 不符時清掉 sd 節點（核心在這裡從來不會回報不符）、去問 multipathd 它的看法（命令執行器正確地拒絕了參數 `'%d %w'`，因為 untaint 允許清單沒有空白，而外層 `eval` 吞掉了 die，所以那個分支靜默地從沒執行）、以及 drop-path／flush 屍體 map／再加回 path（屍體照樣活著）。已在 節點 A、PVE 9.2.5、`find_multipaths no`、DS918+／DSM 7.4.1 上驗證：條件成立時 recovery 會觸發且啟用成功；在乾淨的節點上它**不會**觸發，而 B3 與 E4 照常通過 |
+| R-27 | ~~LUN 被刪除之後，`qm move_disk` 搬回本 storage 與 `qmrestore` 會失敗~~ **0.6.25 已修正**；這是 對一個「已經發出去的版本」重跑發版清單時找到的。一顆 LUN 被刪除後 NAS 重用它的 mapping index，節點也跟著重用同一個 sd 節點：核心在 rescan 時重讀 VPD，把 `/sys/block/<sd>/device/wwid` 更新成**新的** LUN，而 **multipathd 從來沒有重讀那條路徑**，還為那顆已刪除的 LUN 守著一個 map。兩邊並排量測過——核心 `naa.60014052e46494ed5667d4a29dbe0dd9`、multipathd `36001405bbc484c9dc23cd4accd8f7fd1`，同一個 `sde`。`ensure_map` 於是在等一個永遠建不起來的 map。現在 `activate_volume` 會偵測到它，並請**核心**重新探索那個裝置——移除 sd 節點、重掃工作階段、重新確認 WWID、再要一次 map——那是唯一量測有效的做法 | 它**連續失敗四次**，每次都是全新的 WWID，而且踩在兩個發版清單項目上（B3、E4）。**從來不是資料風險**：plugin 是拒絕，不是拿那個裝置去用，那正是規則 48 在發揮作用。另外三個修法試過之後回復、沒有送出：在 WWID 不符時清掉 sd 節點（核心在這裡從來不會回報不符）、去問 multipathd 它的看法（命令執行器正確地拒絕了參數 `'%d %w'`，因為 untaint 允許清單沒有空白，而外層 `eval` 吞掉了 die，所以那個分支靜默地從沒執行）、以及 drop-path／flush 屍體 map／再加回 path（屍體照樣活著）。已在 節點 A、PVE 9.2.5、`find_multipaths no`、DS918+／DSM 7.4.1 上驗證：條件成立時 recovery 會觸發且啟用成功；在乾淨的節點上它**不會**觸發，而 B3 與 E4 照常通過 |
 
 ### 設計上已支援，但未驗證——需要本專案手上沒有的硬體
 

@@ -36,6 +36,11 @@ my @RULES = (
     [ 'mainland wording',
       qr{登记|登記簿|软件|默认|服务器|回显|回顯|缺省|寻址|优化},
       'Taiwan terminology — see the glossary', 1 ],
+    # 量測 is the term; 量過／量到／量了 is the verb used bare, which reads as speech
+    # rather than as writing. 「兩半都量過」 shipped on the site.
+    [ 'a bare 量 where 量測 is meant',
+      qr{量[過到了](?!測)},
+      'write 量測過 / 量測到, or say 驗證過', 1 ],
 );
 
 # A documentation address is fine, and so is an example in a command block.
