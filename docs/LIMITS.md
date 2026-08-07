@@ -47,7 +47,7 @@ NAS's numbers unless your NAS's own datasheet says so.
 ### A second model and a second DSM version report the same way
 
 `SYNO.Core.System info type=define` was read from a **DS925+ on DSM 7.3.2-86009
-Update 4** on 2026-08-07 — a different model and a different DSM major version
+Update 4** — a different model and a different DSM major version
 from the DS918+/7.1.1 the rest of this project was measured on:
 
 | | DS918+ · DSM 7.1.1 | DS925+ · DSM 7.3.2 |

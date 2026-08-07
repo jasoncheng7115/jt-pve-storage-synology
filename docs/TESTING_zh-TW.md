@@ -25,18 +25,19 @@
 
 | | |
 |---|---|
-| 型號 | DS918+ |
-| DSM | 7.1.1-42962 Update 9 |
-| 儲存空間 | `/volume1`，**Btrfs**，總量 14301.5 GiB |
-| 機器自報的上限 | **`max_iscsiluns` 256、`max_iscsitrgs` 128**、`max_snapshot_per_lun` 256——這是機型自己的數字，不是技術規格表上的 512／256 |
+| 機型 | **DS918+** 與 **DS925+** |
+| DSM 版本 | **7.1.1**、**7.3.2** 與 **7.4.1**——DS918+ 帶著全部 LUN uuid 完好地跨過了一次 7.1 → 7.4 升級 |
+| 儲存空間 | `/volume1`，**Btrfs** |
+| 機器自報的上限 | 從每一台 NAS 讀取，絕不寫死。兩個機型都回報 `max_iscsiluns` **256** 與 `max_iscsitrgs` **128**——這是機型自己的數字，不是產品線技術規格表上的 512／256 |
 | Target 實作 | `iscsi_target_type` = `lio4x` |
-| 註 | 這是一台**正式機**，同時也在跑 Virtual Machine Manager。寫入測試已在專用的 `pvetest-` 名稱前置字串下、取得擁有者同意後執行，建立的每個物件都已刪除，並確認 NAS 回到原本的內容 |
+| 叢集 | 五個 Proxmox VE 節點，正式環境，同時也跑著其他廠商的 storage plugin |
+| 註 | 主要那台 NAS 是**正式機**。每一項寫入測試都在專用的名稱前置字串下、取得擁有者同意後執行，建立的每個物件都已刪除，並確認 NAS 回到原本的內容 |
 
-**已經做過的事**：唯讀探索、在專用名稱前置字串下的寫入測試，以及一次把 LUN 掛到 Proxmox VE 節點——下面的 WWID 推導與 multipath 行為就是從那裡來的。模組層（`Synology::API`、`::LUN`、`::Target`、`::Naming`、`::Multipath`、`::Command`、`::ISCSI`）已對這台硬體完整跑過。**PVE plugin 本身還沒有寫**，所以這裡沒有任何東西是透過 `pvesm` 驗證的。
+**已經跑過的**：整個 plugin，不只是模組層。每一個 storage 操作都已對這套硬體、從**兩種**介面各完整驅動過一次——網頁介面與指令列——包含備份與還原、即時遷移、節點當機與 HA 接手、負載下的路徑故障，以及一次整台 NAS 中斷。每一項各涵蓋什麼，見下面的操作清單。
 
 ---
 
-## 實機已驗證（2026-08-06）
+## 實機已驗證
 
 到 `dev_attribs` 表格為止的每一項都是唯讀取得的。下面標為寫入測試的部分是在專用的 `pvetest-` 名稱前置字串下、取得擁有者同意後執行，建立的每個物件事後都已刪除，並確認陣列回到原本的內容。
 
@@ -258,7 +259,7 @@ scsi_id -g -u       3600140513a3cd1edf296d4d4bdb712da     <- 完全相同
 
 ### 兩個節點，以及一個屬於 PVE 架構而非缺陷的限制
 
-在一個兩節點叢集上驗證（`pc-pve1` 核心 7.0.2、`pc-pve2` 核心 7.0.14，所以不是彼此的複製品）：
+在一個兩節點叢集上驗證（節點 A 核心 7.0.2、節點 B 核心 7.0.14，所以不是彼此的複製品）：
 
 | | |
 |---|---|
@@ -274,7 +275,7 @@ scsi_id -g -u       3600140513a3cd1edf296d4d4bdb712da     <- 完全相同
 
 #### `find_multipaths` 是逐節點的政策，而它決定 map 存不存在
 
-這是只有第二個節點才能產生的發現。`pc-pve1` 是 `find_multipaths no`，所以 multipath 為每個裝置都建 map，一切正常。`pc-pve2` 是 `find_multipaths yes`，那**只**會為「有兩條以上路徑」或「WWID 已經在 `/etc/multipath/wwids` 裡」的裝置建 map。單一 portal 的情況下因此**完全沒有 map**——工作階段是通的、by-path 裝置在那裡，而這個 plugin 交出去的路徑指向不存在的東西。
+這是只有第二個節點才能產生的發現。節點 A 是 `find_multipaths no`，所以 multipath 為每個裝置都建 map，一切正常。節點 B 是 `find_multipaths yes`，那**只**會為「有兩條以上路徑」或「WWID 已經在 `/etc/multipath/wwids` 裡」的裝置建 map。單一 portal 的情況下因此**完全沒有 map**——工作階段是通的、by-path 裝置在那裡，而這個 plugin 交出去的路徑指向不存在的東西。
 
 所以 plugin 不再期望 map 會自己出現。它會執行 `multipath -a <wwid>`，那會在那個檔案裡剛好附加一個 WWID，然後按 WWID 要求建立 map，而如果它仍然沒有出現就**讓啟用失敗**，而不是讓一台 VM 對著一個不存在的路徑開機。絕不用 `multipath -A`，也絕不用 `-w`／`-W`——那會重寫整個檔案，把其他廠商的條目一起丟掉。
 
@@ -419,7 +420,7 @@ Target 的 IQN 裡嵌的是**建立當時**的 NAS 主機名稱——測試機�
 
 ### 快照名稱：NAS 什麼都不拒絕，而 PVE 才是比較嚴的那一端
 
-「快照名稱是自由的」這句話被斷言了很久。2026-08-07 實測，而它自由的程度讓驗證變得沒有必要：
+「快照名稱是自由的」這句話被斷言了很久。實測，而它自由的程度讓驗證變得沒有必要：
 
 | 試了什麼 | 結果 |
 |---|---|
@@ -437,17 +438,17 @@ SAN Manager 的快照清單顯示的是**時間、一致性狀態、描述、狀
 
 描述原本是 `Proxmox VE <storage>`，所以同一個 storage 上每一顆磁碟的每一個快照，在介面上看起來都一模一樣，而管理者真正會有的那個問題——**這一列是哪一個 PVE 快照？**——在不回到 PVE 比對時間戳的情況下沒有答案。
 
-它是以這類事情被發現的方式被發現的：Jason 拍了一個叫 `install1` 的快照，打開快照清單，在任何地方都找不到那個名稱。它在那裡。只是 DSM 不顯示它。描述現在是 `install1 (Proxmox VE syno-nas2)`，並且用四種不同形狀的名稱從 NAS 讀回來驗證過。
+它是以這類事情被發現的方式被發現的：作者拍了一個叫 `install1` 的快照，打開快照清單，在任何地方都找不到那個名稱。它在那裡。只是 DSM 不顯示它。描述現在是 `install1 (Proxmox VE <storeid>)`，並且用四種不同形狀的名稱從 NAS 讀回來驗證過。
 
 ### R-25 已有答案，由別人叢集上的一個快照解決
 
-`create_time` 是 **epoch 秒**。2026-08-07 在 Jason 透過 Proxmox VE 介面拍的一個快照上量到：
+`create_time` 是 **epoch 秒**。在一個透過 Proxmox VE 介面拍的快照上量到：
 
 | | |
 |---|---|
 | `create_time` | `1786070747` |
-| 換算成 epoch 秒 | `2026-08-07 02:45:47 UTC` |
-| PVE 顯示的時間 | `2026-08-07 10:45:46` 本地，UTC+8 = `02:45:46 UTC` |
+| 換算成 epoch 秒 | `02:45:47 UTC` |
+| PVE 顯示的時間 | `10:45:46` 本地，UTC+8 = `02:45:46 UTC` |
 
 一秒之內吻合。這件事之所以無法用唯讀方式確定，是因為 **LUN 根本沒有 `create_time` 這個欄位**——只有快照有，而測試用的 NAS 上沒有任何快照。它需要硬體上真的存在一個快照，而這正是驗證紀錄存在的意義。
 
@@ -494,7 +495,7 @@ root_path    description    version  is_app_consistent  is_user_locked
 
 ### 節點故障、圍籬與接手——需要讓一個節點失效才能做的測試
 
-在 pc-pve2 上執行，Jason 同意可以中斷它。整個過程叢集維持法定人數（3 之中的 2），而他自己在 pve3 上的 HA 資源完全沒有被動到。
+在節點 B 上執行，並取得擁有者同意可以中斷它。整個過程叢集維持法定人數（3 之中的 2），而擁有者自己在第三個節點上的 HA 資源完全沒有被動到。
 
 | 測試 | 結果 |
 |---|---|
@@ -591,7 +592,7 @@ node after logging in to iqn.2000-01.com.synology:pve-pvesyno-tgt
 
 ##### 遷移不再留下 map
 
-**2026-08-07 重新量測，沒有重現**。一台 VM 在 host-108 與 host-109 之間來回遷移，離線與線上、兩個方向都做。直接檢查 VM 離開的那個節點：**0 個 multipath map、0 個 by-path 裝置、追蹤檔是空的**——比原本那次量測預期的還乾淨。切換之後 VM 在來源節點停止時，`vm_stop_cleanup` 會呼叫 `deactivate_volumes`，所以來源節點「是」有被通知的。
+**重新量測，沒有重現**。一台 VM 在 節點 A 與節點 B 之間來回遷移，離線與線上、兩個方向都做。直接檢查 VM 離開的那個節點：**0 個 multipath map、0 個 by-path 裝置、追蹤檔是空的**——比原本那次量測預期的還乾淨。切換之後 VM 在來源節點停止時，`vm_stop_cleanup` 會呼叫 `deactivate_volumes`，所以來源節點「是」有被通知的。
 
 原本那次量測早於下面描述的 `_detach_local` 修正：舊版停在第一次 flush，會留下一個正確的卸離不會留下的 map。
 
@@ -727,8 +728,8 @@ Perl 把類別名稱綁到了 `$path`，把剩下那個參數綁到 `%opts`。�
 | R-6 | ~~有快照的 LUN 能否刪除、有複本的快照能否刪除~~ **已解答：兩者都不拒絕，已對應的 LUN 也不拒絕**。快照跟著它的 LUN 走，不會變成孤兒 | 不需要清依賴——但「刪除前先解除對應」完全變成 plugin 的責任 |
 | R-7 | ~~複本是精簡的還是完整複製~~ **已解答：精簡。**`clone_snapshot` 給出 `allocated_size: 0` 的 `BLUN` | 連結複本與範本是真的便宜 |
 | R-8 | ~~`is_action_locked` 會維持多久~~ **已解答**：1 GiB 建立後 1.2 秒、複製空 LUN 0.0 秒、**複製內含 512 MiB 的 LUN 3.5 秒**、任何大小的快照 0.20 秒。建立後立刻刪除仍然成功 | 大型複製會超過天真的等待——CSI 自己的上限只有 20 秒，而幾百 GiB 的複製可能超過 |
-| R-9 | ~~那些清單有沒有伺服器端上限~~ **依清單分別解答，2026-08-07 在 DSM 7.4.1 上以唯讀方式重新量測**。`LUN list` 與 `Target list` **完全忽略 `offset`／`limit`**——`limit=1` 回來的和不帶參數回來的是同一份完整清單——而且兩者都不回報總數。`LUN list_snapshot` 是例外：它**會**在陣列旁邊回報一個 `count`，而那個數字在全部九顆 LUN 上都與列數一致，包括其中一顆真的有快照的。量測時是 9 顆 LUN、4 個 target、1 張快照；從這次量測無法排除在更高的數量上存在門檻 | **被靜默截斷的清單讀起來就是「全部就這些」**，而讀它的程式碼決定什麼可以刪。參數被忽略是最強的證據：會分頁的 API 一定會遵守 `limit`。而在**有**回報總數的地方，現在會去對照——`assert_room_for_snapshot` 在 `count` 與列數不一致時拒絕，因為它數的是陣列，而在那裡少算會往「把快照拍下去」的方向失敗 |
-| R-10 | ~~DSM 自己的排程快照會不會出現在 `list_snapshot` 裡~~ **2026-08-07 完整解答，而且過濾是站得住的**。在 SAN Manager 裡對 `pve-syno-nas2-vm-146-disk-0`（DS918+、DSM 7.4.1-90080）啟用了每日的 LUN 快照排程，並以唯讀方式量測 18:00 那一次。排程快照**確實**出現在該 LUN 的 `list_snapshot` 裡——所以那個顧慮是真的——而它是**可以分辨的**：`taken_by` 是 **`scheduler`**，而這個 plugin 的是 `jt-pve-storage-synology`，`name` 為 `SnapShot-1`，`description` 為 `Scheduled snapshot taken by [nas2]`。並且透過 plugin 本身端到端驗證過：NAS 上那顆 LUN 有**兩**張快照，而 `volume_snapshot_info` 對 Proxmox VE 只報**一**張——只有它自己的。在這個混合的集合上，`count` 也與列數一致，那是 0.6.22 新增的那道檢查的第二個資料點 | 這一條原本可能讓 PVE 把使用者的排程快照當成自己的、然後刪掉它。不會：`taken_by` 的過濾是量測出來的，不是假設的。另一半也站得住——`assert_room_for_snapshot` 用的是 `all => 1`，所以它數到的是**兩**張，而那正是「與使用者共用的每顆 LUN 256 張」這個上限所需要的。有一個後果值得知道：DSM 把它的排程快照命名為 `SnapShot-N`，而這個 plugin 是把 PVE 的快照名稱原封不動送到 NAS，所以一張刻意取名為 `SnapShot-1` 的 PVE 快照會被當成重複而拒絕（18990513），不會被靜默地混在一起 |
+| R-9 | ~~那些清單有沒有伺服器端上限~~ **依清單分別解答，在 DSM 7.4.1 上以唯讀方式重新量測**。`LUN list` 與 `Target list` **完全忽略 `offset`／`limit`**——`limit=1` 回來的和不帶參數回來的是同一份完整清單——而且兩者都不回報總數。`LUN list_snapshot` 是例外：它**會**在陣列旁邊回報一個 `count`，而那個數字在全部九顆 LUN 上都與列數一致，包括其中一顆真的有快照的。量測時是 9 顆 LUN、4 個 target、1 張快照；從這次量測無法排除在更高的數量上存在門檻 | **被靜默截斷的清單讀起來就是「全部就這些」**，而讀它的程式碼決定什麼可以刪。參數被忽略是最強的證據：會分頁的 API 一定會遵守 `limit`。而在**有**回報總數的地方，現在會去對照——`assert_room_for_snapshot` 在 `count` 與列數不一致時拒絕，因為它數的是陣列，而在那裡少算會往「把快照拍下去」的方向失敗 |
+| R-10 | ~~DSM 自己的排程快照會不會出現在 `list_snapshot` 裡~~ **完整解答，而且過濾是站得住的**。在 SAN Manager 裡對 `pve-<storeid>-vm-146-disk-0`（DS918+、DSM 7.4.1-90080）啟用了每日的 LUN 快照排程，並以唯讀方式量測 18:00 那一次。排程快照**確實**出現在該 LUN 的 `list_snapshot` 裡——所以那個顧慮是真的——而它是**可以分辨的**：`taken_by` 是 **`scheduler`**，而這個 plugin 的是 `jt-pve-storage-synology`，`name` 為 `SnapShot-1`，`description` 為 `Scheduled snapshot taken by [nas2]`。並且透過 plugin 本身端到端驗證過：NAS 上那顆 LUN 有**兩**張快照，而 `volume_snapshot_info` 對 Proxmox VE 只報**一**張——只有它自己的。在這個混合的集合上，`count` 也與列數一致，那是 0.6.22 新增的那道檢查的第二個資料點 | 這一條原本可能讓 PVE 把使用者的排程快照當成自己的、然後刪掉它。不會：`taken_by` 的過濾是量測出來的，不是假設的。另一半也站得住——`assert_room_for_snapshot` 用的是 `all => 1`，所以它數到的是**兩**張，而那正是「與使用者共用的每顆 LUN 256 張」這個上限所需要的。有一個後果值得知道：DSM 把它的排程快照命名為 `SnapShot-N`，而這個 plugin 是把 PVE 的快照名稱原封不動送到 NAS，所以一張刻意取名為 `SnapShot-1` 的 PVE 快照會被當成重複而拒絕（18990513），不會被靜默地混在一起 |
 | R-11 | ~~每個 target 的 `mapping_index` 上限，以及會不會重用~~ **已解答：會重用**。被釋放的編號會給下一顆被對應的 LUN | 這就是「寫到別人的磁碟」那種錯誤，而卸離一顆磁碟再掛上另一顆就到得了。這也是為什麼裝置身分來自核心的 WWID，絕不來自路徑。上限本身仍未測 |
 | R-12 | ~~DSM 能不能承受並行請求~~ **已解答：十六個同時發出的建立全部成功**，而陣列的內容與 API 回報的一致。每個約 1 秒，看起來 DSM 內部是序列化的 | Cinder 把每一個請求都包在行程級的鎖裡；這裡沒有任何東西為了正確性需要它 |
 | R-13 | ~~同一帳號第二次登入會不會擠掉第一次~~ **已解答：不會**。兩個工作階段同時有效 | 錯誤碼 107 讓共用一個帳號的叢集本來很值得擔心 |
@@ -737,9 +738,9 @@ Perl 把類別名稱綁到了 `$path`，把剩下那個參數綁到 `%opts`。�
 
 | # | 問題 |
 |---|---|
-| R-14 | ~~最小的 DSM 權限~~ **2026-08-07 已解答：沒有更細的權限可以給，所以這個帳號必須是管理員**。分兩半。透過 API，在 DSM 7.1.1 上：只有三個群組，沒有一個是 iSCSI 專用的；沒有群組的帳號登入被拒絕（**402**），放進 `users` 也一樣；`SYNO.Core.User get` 不揭露任何權限欄位；`Group.Member add` 加到 `administrators` 回報成功卻沒有生效。然後在 DSM 介面裡，在 **7.4.1-90080（DS918+）** 上，直接讀了那個帳號的**應用程式**分頁：它列出二十個應用程式——AFP、Active Backup for Business（三項）、Audio Station、Central Management System、Cloud Sync、DSM、Download Station、FTP、File Station、Notification Center、Note Station、SFTP、SMB、Synology Photos、Surveillance Station、Synology Drive、Universal Search、rsync 與文字編輯器——而其中**沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI**。所以這個 plugin 需要的存取權根本不能以「應用程式」的形式給或不給；它是隨 `administrators` 一起來的 | 問題從來不是「管理員能不能用」，是「有沒有更小的能用」。沒有，而現在這是讀 DSM 自己的介面得到的，不是從 API 的沉默推論出來的。這個發現**能**帶來的行動值得照做：那二十個應用程式**每一個都可以**對這個帳號拒絕，所以「一個專用的管理員帳號、其他應用程式全部拒絕、開 2FA、並以 IP 限制」就是現存最小的組態。`DSM-ACCOUNT_zh-TW.md` 已照此寫 |
-| R-26 | **2026-08-07 新增，未解答**。`SYNO.Core.System info type=define` 回報的快照上限是**兩個**，不是一個：`max_snapshot_per_lun` **256** 與 `max_snapshot_per_lun_v2` **128**。share 那一對是同樣的形狀——`max_snapshots_per_share` 1024 對 `_v2` 512。plugin 讀的是前者。在第二台機器上確認過：**DS925+／DSM 7.3.2 回報一模一樣的一對**——256 對 128，share 是 1024 對 512——所以這是系統性的，不是某一個機型或某一版固件的怪癖。DSM 實際**執行**的是哪一個並不知道，而這件事唯讀問不出來：要在同一顆 LUN 上拍到第 129 張才能確定 | 如果被執行的是 `_v2`，那 `assert_room_for_snapshot` 守在真實上限的兩倍，而 NAS 會先拒絕——一道存在意義就是「比陣列更早拒絕」的守門。Synology 的 key 上的 `_v2` 後綴通常標示新一代，而這個 plugin 強制要求 **Btrfs** LUN，所以「`_v2` 才是我們的數字」正是要擔心的那個情況。兩個方向都不會有資料風險：守太高是 NAS 回錯誤，守太低是 plugin 回錯誤。保守的修法是取兩者較小值、並在拒絕訊息裡把兩個數字都寫出來；**目前還沒有套用**，因為那會改變每一個 storage 的行為，而專案負責人還沒有裁決 |
-| R-27 | ~~LUN 被刪除之後，`qm move_disk` 搬回本 storage 與 `qmrestore` 會失敗~~ **0.6.25 已修正**；這是 2026-08-07 對一個「已經發出去的版本」重跑發版清單時找到的。一顆 LUN 被刪除後 NAS 重用它的 mapping index，節點也跟著重用同一個 sd 節點：核心在 rescan 時重讀 VPD，把 `/sys/block/<sd>/device/wwid` 更新成**新的** LUN，而 **multipathd 從來沒有重讀那條路徑**，還為那顆已刪除的 LUN 守著一個 map。兩邊並排量過——核心 `naa.60014052e46494ed5667d4a29dbe0dd9`、multipathd `36001405bbc484c9dc23cd4accd8f7fd1`，同一個 `sde`。`ensure_map` 於是在等一個永遠建不起來的 map。現在 `activate_volume` 會偵測到它，並請**核心**重新探索那個裝置——移除 sd 節點、重掃工作階段、重新確認 WWID、再要一次 map——那是唯一量測有效的做法 | 它**連續失敗四次**，每次都是全新的 WWID，而且踩在兩個發版清單項目上（B3、E4）。**從來不是資料風險**：plugin 是拒絕，不是拿那個裝置去用，那正是規則 48 在發揮作用。另外三個修法試過之後回復、沒有送出：在 WWID 不符時清掉 sd 節點（核心在這裡從來不會回報不符）、去問 multipathd 它的看法（命令執行器正確地拒絕了參數 `'%d %w'`，因為 untaint 允許清單沒有空白，而外層 `eval` 吞掉了 die，所以那個分支靜默地從沒執行）、以及 drop-path／flush 屍體 map／再加回 path（屍體照樣活著）。已在 pc-pve1、PVE 9.2.5、`find_multipaths no`、DS918+／DSM 7.4.1 上驗證：條件成立時 recovery 會觸發且啟用成功；在乾淨的節點上它**不會**觸發，而 B3 與 E4 照常通過 |
+| R-14 | ~~最小的 DSM 權限~~ **已解答：沒有更細的權限可以給，所以這個帳號必須是管理員**。分兩半。透過 API，在 DSM 7.1.1 上：只有三個群組，沒有一個是 iSCSI 專用的；沒有群組的帳號登入被拒絕（**402**），放進 `users` 也一樣；`SYNO.Core.User get` 不揭露任何權限欄位；`Group.Member add` 加到 `administrators` 回報成功卻沒有生效。然後在 DSM 介面裡，在 **7.4.1-90080（DS918+）** 上，直接讀了那個帳號的**應用程式**分頁：它列出二十個應用程式——AFP、Active Backup for Business（三項）、Audio Station、Central Management System、Cloud Sync、DSM、Download Station、FTP、File Station、Notification Center、Note Station、SFTP、SMB、Synology Photos、Surveillance Station、Synology Drive、Universal Search、rsync 與文字編輯器——而其中**沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI**。所以這個 plugin 需要的存取權根本不能以「應用程式」的形式給或不給；它是隨 `administrators` 一起來的 | 問題從來不是「管理員能不能用」，是「有沒有更小的能用」。沒有，而現在這是讀 DSM 自己的介面得到的，不是從 API 的沉默推論出來的。這個發現**能**帶來的行動值得照做：那二十個應用程式**每一個都可以**對這個帳號拒絕，所以「一個專用的管理員帳號、其他應用程式全部拒絕、開 2FA、並以 IP 限制」就是現存最小的組態。`DSM-ACCOUNT_zh-TW.md` 已照此寫 |
+| R-26 | **新增，未解答**。`SYNO.Core.System info type=define` 回報的快照上限是**兩個**，不是一個：`max_snapshot_per_lun` **256** 與 `max_snapshot_per_lun_v2` **128**。share 那一對是同樣的形狀——`max_snapshots_per_share` 1024 對 `_v2` 512。plugin 讀的是前者。在第二台機器上確認過：**DS925+／DSM 7.3.2 回報一模一樣的一對**——256 對 128，share 是 1024 對 512——所以這是系統性的，不是某一個機型或某一版固件的怪癖。DSM 實際**執行**的是哪一個並不知道，而這件事唯讀問不出來：要在同一顆 LUN 上拍到第 129 張才能確定 | 如果被執行的是 `_v2`，那 `assert_room_for_snapshot` 守在真實上限的兩倍，而 NAS 會先拒絕——一道存在意義就是「比陣列更早拒絕」的守門。Synology 的 key 上的 `_v2` 後綴通常標示新一代，而這個 plugin 強制要求 **Btrfs** LUN，所以「`_v2` 才是我們的數字」正是要擔心的那個情況。兩個方向都不會有資料風險：守太高是 NAS 回錯誤，守太低是 plugin 回錯誤。保守的修法是取兩者較小值、並在拒絕訊息裡把兩個數字都寫出來；**目前還沒有套用**，因為那會改變每一個 storage 的行為，而專案負責人還沒有裁決 |
+| R-27 | ~~LUN 被刪除之後，`qm move_disk` 搬回本 storage 與 `qmrestore` 會失敗~~ **0.6.25 已修正**；這是 對一個「已經發出去的版本」重跑發版清單時找到的。一顆 LUN 被刪除後 NAS 重用它的 mapping index，節點也跟著重用同一個 sd 節點：核心在 rescan 時重讀 VPD，把 `/sys/block/<sd>/device/wwid` 更新成**新的** LUN，而 **multipathd 從來沒有重讀那條路徑**，還為那顆已刪除的 LUN 守著一個 map。兩邊並排量過——核心 `naa.60014052e46494ed5667d4a29dbe0dd9`、multipathd `36001405bbc484c9dc23cd4accd8f7fd1`，同一個 `sde`。`ensure_map` 於是在等一個永遠建不起來的 map。現在 `activate_volume` 會偵測到它，並請**核心**重新探索那個裝置——移除 sd 節點、重掃工作階段、重新確認 WWID、再要一次 map——那是唯一量測有效的做法 | 它**連續失敗四次**，每次都是全新的 WWID，而且踩在兩個發版清單項目上（B3、E4）。**從來不是資料風險**：plugin 是拒絕，不是拿那個裝置去用，那正是規則 48 在發揮作用。另外三個修法試過之後回復、沒有送出：在 WWID 不符時清掉 sd 節點（核心在這裡從來不會回報不符）、去問 multipathd 它的看法（命令執行器正確地拒絕了參數 `'%d %w'`，因為 untaint 允許清單沒有空白，而外層 `eval` 吞掉了 die，所以那個分支靜默地從沒執行）、以及 drop-path／flush 屍體 map／再加回 path（屍體照樣活著）。已在 節點 A、PVE 9.2.5、`find_multipaths no`、DS918+／DSM 7.4.1 上驗證：條件成立時 recovery 會觸發且啟用成功；在乾淨的節點上它**不會**觸發，而 B3 與 E4 照常通過 |
 
 ### 設計上已支援，但未驗證——需要本專案手上沒有的硬體
 
@@ -749,124 +750,6 @@ Synology 兩種高可用性架構都已實作。兩種都沒有實際跑過。pl
 |---|---|
 | R-15 | **Synology HA（SHA）**：HA 叢集 IP 在故障切換後是否仍表現為單一管理位址；以及本 plugin 拿來當 storage 身分的 `SYNO.Core.ISCSI.Node` uuid，切換後會不會變。如果會變，把 storage 釘在它上面就不是保護而是破壞 |
 | R-16 | **UC／SA 雙控制器機型**（`firmware_ver` 含 `DSM UC`）：兩個控制器各有自己的管理位址，沒有浮動位址。`SYNO.Core.Network.Interface` 接受 `relay_node=node0`／`node1` 列舉對側——在單控制器的測試機上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的。**依 Synology 自己 CSI 的邏輯實作，但未驗證**。未解的問題正是只有機箱能回答的：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同——這兩件合起來決定故障切換後節點還找不找得到自己的磁碟 |
-
----
-
-## 測試計畫
-
-### 階段 1——靜態，不需要 NAS
-
-```bash
-make release-check
-```
-
-語法、單元測試、與 CI 相同條件的整套測試、版本一致性、節點層級 multipath 守衛、以及「憑證不得出現在 URL」守衛。
-
-### 階段 2——逆境與惡意輸入，不需要 NAS
-
-從相關專案移植，因為那裡的每一個案例都是曾經進到release 的缺陷：
-
-- 一個會接受連線但永不回應、中途斷開主體、用 HTML 回 200、不回應就關閉、登入成功但不回 sid 的伺服器。每一種情況都必須**快速**失敗、指名是哪個 storage、而且絕不卡住。
-- 一個以 5xx 失敗的 create 只被送出**一次**。
-- 惡意輸入：帶路徑穿越與 shell 特殊字元的 storage id、每個邊界上的容量對齊、十六路並行配置。
-- 對每個解析器餵入缺少的、改名的、型別錯誤的欄位——每個欄位名稱都必須安全地失敗，而不是被拿去行動。
-
-### 階段 3——對真實 DSM 唯讀
-
-```bash
-bin/pve-syno-api-probe --host <nas> --user <帳號>
-```
-
-不建立、不刪除任何東西，跑完會自己登出。對正式機是安全的。確認：API 範圍、有可用空間的 Btrfs 儲存空間、LUN 與 target 列表、`dev_attribs`，以及這台 DSM 是否開了防 CSRF。
-
-以下這一項可選，而且**只在取得擁有者同意後**執行：
-
-```bash
-bin/pve-syno-api-probe --host <nas> --user <帳號> --probe-methods
-```
-
-它會探測哪些快照還原方法名稱存在，做法是指名一個 NAS 從未發出過的 LUN 與快照 uuid——所以存在的方法只能拒絕，而拒絕的錯誤碼證明它在那裡。之所以要明確開啟，是因為送出的畢竟是破壞性方法的名稱，即使它們能動到的東西並不存在。**R-1 就是這樣回答的。**
-
-### 階段 4——寫入，在沒有人在意的儲存空間上
-
-**前置條件**。一個專用的 DSM 儲存空間，或至少一個專用名稱前置字串；擁有者的明確同意；以及一份「絕對不可以碰」的 LUN 清單。每一步都可逆。
-
-1. 建立一顆帶 `can_snapshot=1`、`emulate_tpu=1` 的精簡 LUN。讀回 `type`、`size`、`dev_attribs`——回答 R-3、R-4。
-2. 建一顆刻意超長名稱的，和一顆奇數容量的。
-3. 對應到一個 `max_sessions=0` 的 target；從一個節點登入；讀 `/dev/disk/by-id`、`/sys/block/sdX/device/wwid`——**回答 R-5**。
-4. 把第二、第三顆 LUN 對應到同一個 target；解除中間那顆；再對應第四顆——回答 R-2 與 R-11。
-5. 拍快照、列出、從快照複製、讀 `allocated_size`——R-7、R-10。
-6. 試著刪除一顆有快照的 LUN；試著刪除一個有複本的快照——R-6。
-7. 擴充容量；全程觀察 `is_action_locked`——R-8。
-8. 從一個節點十六路並行建立，再從兩個節點——R-12。
-9. 刪掉所有建立的東西，確認 NAS 回到原本的樣子。
-
-### 階段 5——叢集
-
-- 兩個節點同時登入同一個共用 target。
-- 同一個帳號上兩個節點的工作階段同時存活——**R-13**。
-- 一台磁碟在此 storage 上的 VM 在節點之間遷移。
-- 其中一個節點正在做複製時，量測每個節點 `pvesm status` 的時間。
-
-### 階段 5b——只有一台 NAS 要怎麼測 multipath
-
-**Synology 的 multipath 和雙控制器無關**。單控制器機型是靠**多個網路 portal** 提供多重路徑的，而一台有兩張網路卡的 NAS 就足以做出真正的雙路徑 map。
-
-測試機上從 `SYNO.Core.Network.Interface` 讀到的：
-
-| 介面 | 位址 | 速度 | 狀態 |
-|---|---|---|---|
-| `ovs_eth0` | 192.0.2.10（靜態）| 1000 | connected |
-| `ovs_eth1` | 192.0.2.11（**DHCP**）| 1000 | connected |
-
-這已經是兩條可用的路徑了。但有三件事必須先弄對：
-
-1. **target 的 `max_sessions` 要設成 0**。預設是 1，而一個工作階段就是一條路徑——所以停在預設值的 target 根本做不出 multipath，更不用說讓多節點共用。
-2. **第二張介面要給靜態位址**。走 DHCP 的資料 portal 位址會變，而位址會變的路徑就是會消失的路徑。給它靜態位址，或在 DHCP 上做永久保留。
-3. **這裡兩個位址在同一個子網路，而這是最麻煩的一點**。Linux 會很自然地把兩個工作階段都從路由表偏好的那張介面送出去，於是你得到的是「兩個工作階段走同一條物理線路」，一個看起來有備援但其實沒有的 map。要明確把每個工作階段綁到各自的介面上：
-
-   ```bash
-   iscsiadm -m iface -I path0 --op=new
-   iscsiadm -m iface -I path0 --op=update -n iface.net_ifacename -v <網路卡0>
-   iscsiadm -m iface -I path1 --op=new
-   iscsiadm -m iface -I path1 --op=update -n iface.net_ifacename -v <網路卡1>
-
-   iscsiadm -m discovery -t st -p 192.0.2.10 -I path0
-   iscsiadm -m discovery -t st -p 192.0.2.11 -I path1
-   iscsiadm -m node -T <target-iqn> -I path0 --login
-   iscsiadm -m node -T <target-iqn> -I path1 --login
-
-   multipath -ll        # 應該看到一個 map、兩條路徑，都是 active ready running
-   ```
-
-   分成兩個子網路或兩個 VLAN 是更乾淨的做法，交換器允許的話值得這樣做。DSM 也可以在同一個物理連接埠上建 VLAN 子介面，那會在一條線上產生兩個 portal 位址——足以把每一條程式路徑都跑過，但顯然不是真正的備援。
-
-**不動 NAS 就能測故障切換**。從節點端把其中一個 portal 擋掉，然後觀察 map，不要拔線也不要去停用 NAS 的介面：
-
-```bash
-nft add table inet mptest
-nft add chain inet mptest out '{ type filter hook output priority 0; }'
-nft add rule inet mptest out ip daddr 192.0.2.11 tcp dport 3260 drop
-
-multipath -ll        # 那條路徑必須變成 failed，而 I/O 必須繼續
-nft delete table inet mptest      # 然後它必須恢復
-```
-
-要確認的是：全程 I/O 沒有中斷；規則移除後 map 會恢復；`no_path_retry` 是一個數字，所以**所有**路徑都斷掉時是失敗而不是無限排隊；以及 plugin 在中斷期間所做的任何事都沒有動到其他 storage 的 map。
-
-**如果第二條路徑真的做不到**——單網路卡機型——那就直說，不要假裝。單路徑的 map 仍然會跑到 map 建立、WWID 釘定、擴充與 flush，但故障切換的路徑就是沒有測過，而這件事應該寫在這份文件裡，不是寫在發行說明裡。
-
-### 階段 6——故障注入
-
-- 一個指向不可路由位址的 storage：其他 storage 保持 `active`，`pvesm status` 只增加大約一個逾時的時間，不能更多。
-- 操作進行中拔掉 NAS 的管理介面。
-- 刻意設錯密碼：**只嘗試登入一次**，storage 回報需要人介入。自動封鎖不可以被觸發。
-- 把 DSM 儲存空間填到剩餘不足 1 GB：配置被拒絕，訊息說得出原因。
-- 停掉 multipathd；寫入過程中拔掉一條路徑。
-
-### 階段 7——在節點上實地測試
-
-安裝建置好的套件，並比對安裝前後的 `pvesm status`。除此之外不可以有任何狀態改變。確認節點上其他 storage 未受影響——這個 plugin 是在一台同時跑 NetApp 與 Pure Storage plugin 的節點上開發的——並確認沒有動到任何其他廠商的 multipath map。
 
 ---
 

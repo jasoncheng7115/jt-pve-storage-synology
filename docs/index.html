@@ -71,11 +71,11 @@
         </div>
         <a href="#hero" class="sidebar__link"><span class="lang-en">Overview</span><span class="lang-zh">概覽</span></a>
         <a href="#status" class="sidebar__link"><span class="lang-en">Status &amp; risk</span><span class="lang-zh">狀態與風險</span></a>
-        <a href="#why" class="sidebar__link"><span class="lang-en">Why this is awkward</span><span class="lang-zh">麻煩在哪裡</span></a>
+        <a href="#why" class="sidebar__link"><span class="lang-en">Why this is awkward</span><span class="lang-zh">技術上的難處</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
-            <span class="lang-en">What has been measured</span><span class="lang-zh">已經量測過的</span>
+            <span class="lang-en">What has been measured</span><span class="lang-zh">已量測的事實</span>
         </div>
         <a href="#verified" class="sidebar__link"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></a>
         <a href="#rollback" class="sidebar__link"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></a>
@@ -86,7 +86,7 @@
         </div>
         <a href="#requirements" class="sidebar__link"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></a>
         <a href="#account" class="sidebar__link"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></a>
-        <a href="#limits" class="sidebar__link"><span class="lang-en">How many LUNs</span><span class="lang-zh">最多幾個 LUN</span></a>
+        <a href="#limits" class="sidebar__link"><span class="lang-en">The LUN ceiling</span><span class="lang-zh">LUN 數量上限</span></a>
         <a href="#ha" class="sidebar__link"><span class="lang-en">HA &amp; dual controllers</span><span class="lang-zh">HA 與雙控制器</span></a>
     </div>
     <div class="sidebar__section">
@@ -118,7 +118,7 @@
         <!-- The version sits on this line, immediately after the class, because
              <code>make release-check</code> reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.9.0 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.9.1 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -143,7 +143,7 @@
     <h2 class="section-title"><span class="lang-en">Status and risk</span><span class="lang-zh">狀態與風險</span></h2>
 
     <div class="alert alert--warning">
-        <strong><span class="lang-en">It works on a cluster, and it has been run hard.</span><span class="lang-zh">它在叢集上可以用，而且被操得很兇。</span></strong>
+        <strong><span class="lang-en">It works on a cluster, and it has been run hard.</span><span class="lang-zh">它在叢集上可以運作，而且已經被大量操作驗證過。</span></strong>
         <span class="lang-en"><strong>Driven on hardware:</strong> a guest booting from the NAS, backups in all three <code>vzdump</code> modes restored byte-identical, live migration across five nodes, and two-portal multipath through a path failure —<strong>60 reads, 0 failures</strong>. A crashed node's LUN was taken over by a surviving node in <strong>3.6&nbsp;s</strong>. A whole-NAS outage left the nodes untouched: nothing in uninterruptible sleep, every other storage still active.</span>
         <span class="lang-zh"><strong>已在實機上跑過：</strong>guest 從 NAS 開機、三種 <code>vzdump</code> 模式備份還原後位元組完全相同、跨五個節點即時遷移，以及雙 portal multipath 撐過一次路徑故障——<strong>60 次讀取，0 次失敗</strong>。節點當掉時，存活節點在 <strong>3.6&nbsp;秒</strong>內接手它的 LUN。整台 NAS 中斷時，節點毫髮無傷：沒有行程卡在不可中斷睡眠，其他 storage 全部照常。</span>
         <span class="lang-en"><strong>Two models, three DSM versions:</strong> a DS918+ carried from 7.1.1 across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> end to end.</span>
@@ -159,7 +159,7 @@
 </section>
 
 <section class="doc-section doc-section--accent" id="why">
-    <h2 class="section-title"><span class="lang-en">Why this is awkward</span><span class="lang-zh">麻煩在哪裡</span></h2>
+    <h2 class="section-title"><span class="lang-en">Why this is awkward</span><span class="lang-zh">技術上的難處</span></h2>
 
     <p>
         <span class="lang-en">Synology publishes no specification for the SAN Manager Web API. The only official document, the DSM Login Web API Guide, covers logging in and discovering APIs —and documents no LUN, target, mapping or snapshot call at all.</span>
@@ -200,7 +200,7 @@
     </p>
 
 
-    <h3 class="subsection-title"><span class="lang-en">The operational checklist, driven from the web interface</span><span class="lang-zh">操作清單，從網頁介面驅動</span></h3>
+    <h3 class="subsection-title"><span class="lang-en">The release checklist</span><span class="lang-zh">發版前的操作清單</span></h3>
 
     <p>
         <span class="lang-en"><strong>Every row was run on a production five-node cluster, and B through D were run twice —once from the web interface and once from the CLI.</strong> Doing both is not belt and braces: <code>pvedaemon</code>, <code>pveproxy</code>, <code>vzdump</code> and <code>pct</code> run under <code>-T</code> with no <code>PATH</code>; <code>qm</code>, <code>pvesm</code>, <code>pvesh</code> and <code>qmrestore</code> do not. Five defects in this project lived in code that worked perfectly from a shell and failed the moment someone clicked the button. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
@@ -304,7 +304,7 @@
 </section>
 
 <section class="doc-section" id="limits">
-    <h2 class="section-title"><span class="lang-en">How many LUNs, and what happens at the ceiling</span><span class="lang-zh">最多可以切幾個 LUN，以及開到上限會怎樣</span></h2>
+    <h2 class="section-title"><span class="lang-en">The LUN ceiling, and what happens when you reach it</span><span class="lang-zh">LUN 數量上限，以及達到上限時的行為</span></h2>
     <p class="section-subtitle">
         <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit —and on some models it is very small.</span>
         <span class="lang-zh">一顆 VM 磁碟就是一個 LUN，所以這是實實在在的容量限制——而在某些機型上它非常小。</span>
@@ -376,7 +376,7 @@
 
     <p>
         <span class="lang-en">The three ceilings in the order they bite: <strong>LUNs</strong>, one per VM disk; <strong>snapshots per LUN</strong>, 256 and <em>shared with the user's own SAN Manager schedule</em>; and <strong>targets</strong>, irrelevant in the default <code>shared</code> mode which uses one —and the reason <code>per-volume</code> is not the default, since 128 targets would cap the storage <em>below</em> the LUN ceiling.</span>
-        <span class="lang-zh">三個上限按會先咬到你的順序：<strong>LUN</strong>，每顆 VM 磁碟一個；<strong>每顆 LUN 的快照</strong>，256 個，而且<strong>和使用者自己的 SAN Manager 排程共用額度</strong>；以及 <strong>target</strong>，在預設的 <code>shared</code> 模式下無關緊要，因為只用一個——這也正是 <code>per-volume</code> 不是預設的原因，因為 128 個 target 會把 storage 卡在<strong>低於</strong> LUN 上限的地方。</span>
+        <span class="lang-zh">三個上限，依照先後遇到的順序：<strong>LUN</strong>，每顆 VM 磁碟一個；<strong>每顆 LUN 的快照</strong>，256 個，而且<strong>和使用者自己的 SAN Manager 排程共用額度</strong>；以及 <strong>target</strong>，在預設的 <code>shared</code> 模式下無關緊要，因為只用一個——這也正是 <code>per-volume</code> 不是預設的原因，因為 128 個 target 會把 storage 卡在<strong>低於</strong> LUN 上限的地方。</span>
     </p>
 
     <div class="alert alert--info">
@@ -579,7 +579,7 @@
         <span class="lang-zh">同一個頁面也是確認 storage 運作正常的快方法：這個 plugin 建立的 LUN 會顯示<strong>Btrfs、秒級快照</strong>並且支援快照，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。這正是 <code>pvesm add</code> 之所以會拒絕 ext4 儲存空間的那個差別。</span>
     </div>
 
-    <h3 class="subsection-title"><span class="lang-en">Why the size in Proxmox VE does not match the size in DSM</span><span class="lang-zh">為什麼 Proxmox VE 顯示的容量和 DSM 對不起來</span></h3>
+    <h3 class="subsection-title"><span class="lang-en">Why the size in Proxmox VE does not match the size in DSM</span><span class="lang-zh">為什麼 Proxmox VE 與 DSM 顯示的容量不一致</span></h3>
 
     <p>
         <span class="lang-en">It does —the two count in different units and both call them TB. The plugin reports the DSM volume's <code>size_total_byte</code> and <code>size_free_byte</code> <strong>verbatim, in bytes</strong>, and does no arithmetic on either. Everything after that is display: Proxmox VE's storage summary divides by 1000 and writes TB, DSM's Storage Manager divides by 1024 and also writes TB.</span>
@@ -619,7 +619,7 @@
     </div>
 
 
-    <h3 class="subsection-title"><span class="lang-en">Restricting it to some nodes</span><span class="lang-zh">只讓某幾個節點可以用</span></h3>
+    <h3 class="subsection-title"><span class="lang-en">Restricting it to certain nodes</span><span class="lang-zh">限定可用節點</span></h3>
 
     <p>
         <span class="lang-en"><code>nodes</code> is Proxmox VE's own property, not a <code>syno-</code> one, and it works on this storage like any other. Set it at <code>pvesm add</code> time or later:</span>

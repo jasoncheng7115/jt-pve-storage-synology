@@ -6,7 +6,7 @@
 
 ---
 
-> ### 狀態：**它在叢集上可以用，而且被操得很兇。**
+> ### 狀態：**它在叢集上可以運作，而且已經被大量操作驗證過。**
 >
 > 以下每一項都對一台 DS918+（DSM 7.1.1）實際跑過：完整的磁碟生命週期、一台**從 NAS 開機**的 guest、三種 `vzdump` 模式的備份都還原成完全相同的位元組、**跨三個節點的即時遷移**（中斷 5 毫秒與 87 毫秒），以及一個當掉節點的 LUN**由存活節點在 3.6 秒內接手**，而當時死掉節點的工作階段仍然登記在 NAS 上。兩個 portal 的 multipath 在路徑故障期間**60 次讀取失敗 0 次**，而一次 DSM 管理連線中斷讓 guest 出現**零個 I/O 錯誤**。
 >
@@ -22,7 +22,7 @@
 
 ## 已在正式環境的叢集上實際跑過
 
-以下每一項都是 2026-08-07 在一個五節點、正式運行中的 Proxmox VE 9.2.3 叢集上，**從網頁介面**對一台 DS918+（DSM 7.1.1）跑出來的。介面很重要：`pvedaemon`、`pveproxy`、`vzdump` 與 `pct` 是 `#!/usr/bin/perl -T` 而且**沒有 `PATH`**，而 `qm`、`pvesm`、`pvesh`、`qmrestore` 不是——所以「在 shell 上驗證過」不等於驗證過。
+以下每一項都是在一個五節點、正式運行中的 Proxmox VE 叢集上，**從網頁介面與指令列各跑一次**，對一台 DS918+（DSM 7.1.1）跑出來的。介面很重要：`pvedaemon`、`pveproxy`、`vzdump` 與 `pct` 是 `#!/usr/bin/perl -T` 而且**沒有 `PATH`**，而 `qm`、`pvesm`、`pvesh`、`qmrestore` 不是——所以「在 shell 上驗證過」不等於驗證過。
 
 | | 已驗證 |
 |---|---|
@@ -40,7 +40,7 @@
 
 **實際運行找出五個缺陷，五個都修好了**——在 0.6.6 到 0.6.13 之間，每一個都附帶一個「拿掉修正就會失敗」的測試。它們的形狀完全一樣：從 shell 驅動時可以動，從操作者真正使用的介面驅動時就壞掉。哪些驗證過、哪些沒有，驗證紀錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)。
 
-## 為什麼有這個專案，以及麻煩在哪裡
+## 為什麼有這個專案，以及技術上的難處
 
 Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件——DSM Login Web API Guide——只涵蓋登入與 API 探索，完全沒有記載任何 LUN、target、對應或快照的呼叫。
 
@@ -75,12 +75,12 @@ SAN Manager 的快照清單有時間、一致性狀態、描述、狀態與鎖�
 
 在那之前，一個 storage 上每顆磁碟的每個快照，描述都是 `Proxmox VE <storage>`，長得一模一樣，所以操作者站在那份清單前唯一會問的問題——**這一列是哪一個 PVE 快照？**——只能回到 Proxmox VE 比對時間才答得出來。描述是拍快照當下寫進去的，DSM 不會回頭改寫，所以舊版拍的快照會保留舊的文字。
 
-### 從快照複製：用指令列，不是按鈕
+### 從快照複製：範本用網頁介面，其餘用指令列
 
 從快照 `qm clone` 是可以的，而網頁介面不會讓你做。這是 Proxmox VE 的形狀，不是這個 plugin 的問題，但那個錯誤訊息夠讓人困惑，值得直接講清楚：
 
 ```
-Full clone feature is not supported for a snapshot of 'syno-nas2:vm-146-disk-0'
+Full clone feature is not supported for a snapshot of '<storage>:vm-146-disk-0'
 ```
 
 GUI 對任何「不是範本」的東西一律寫死用**完整複製**——`pvemanagerlib.js` 裡的 `isTemplate ? 'clone' : 'copy'`——而「完整」複製的意思是 PVE 自己用 `qemu-img convert` 去讀來源，而且是定址到**快照當下的那顆磁碟**。Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 就在動手之前拒絕。宣告支援反而更糟：PVE 會開始做、做到一半失敗，而訊息講的是路徑，不是你要求的那件事。
@@ -136,7 +136,7 @@ qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 
 所以一台跑 7.2 的入門機仍然可能不能用，而只讀版本號的檢查不會說出原因。plugin 會四項全查，並指出是哪一項不過。
 
-## 最多可以切幾個 LUN，以及開到上限會怎樣
+## LUN 數量上限，以及達到上限時的行為
 
 一顆 VM 磁碟就是一個 LUN，所以 LUN 的上限是實實在在的容量限制——而它不是技術規格表上那個數字。
 
@@ -150,7 +150,7 @@ qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 
 所以 NAS 的 API 和它自己的規格表**是一致的**；512 是整條產品線的上限，而 Synology 註明它依機型而異。更大的機型會回報更大的數字，更小的機型少到只有 **4 個**；重點是這個數字是看機型的，而且 NAS 會告訴你哪一個適用。附出處的完整表格在 [docs/LIMITS_zh-TW.md](docs/LIMITS_zh-TW.md)。
 
-### 開到上限會怎樣
+### 達到上限時會發生什麼
 
 DSM 會乾淨地拒絕——LUN 是 **18990541**、target 是 **18990542**、快照是 **18990543**。什麼都不會壞。但那個拒絕到操作者眼前是「配置失敗」加一個五位數字，而 `pvesm status` 還繼續顯示好幾 TB 可用——因為可用空間不是問題所在，加硬碟也解決不了。
 
@@ -160,7 +160,7 @@ DSM 會乾淨地拒絕——LUN 是 **18990541**、target 是 **18990542**、快
 
 **這個數量包含不屬於這個 storage 的 LUN**——擁有者自己的 LUN、以及任何 Virtual Machine Manager 的虛擬磁碟，全都吃同一個上限。這就是本 plugin 從不送 Synology 自己那份型態過濾條件的第二個理由：那個過濾條件藏起來的正是這些物件，所以任何相信它的用戶端，會在它正在檢查的那個上限上少算。
 
-### 三個上限，按照會先咬到你的順序
+### 三個上限，依照先後遇到的順序
 
 1. **LUN**——每顆 VM 磁碟一個。對一個忙碌的 storage 來說，這是真正的限制。
 2. **每顆 LUN 的快照 256 個，而且和使用者自己的排程共用額度**。一顆設了 SAN Manager 快照排程的 LUN，留給 PVE 的就更少，而「拍不出快照」不會明顯看起來和那件事有關。
@@ -186,7 +186,7 @@ UC 機箱的第二個位址不必手動設定：`SYNO.Core.Network.Interface` �
 
 SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經處理的情況。UC 是真正的未知，而未解的問題正是只有機箱能回答的——一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同。這兩件合起來決定故障切換之後節點還找不找得到自己的磁碟。
 
-所以 plugin 偵測到 `DSM UC` 時**發出警告**而不是拒絕，而這一頁會一直寫著「未驗證」，直到有人回報實際運行結果。兩者在驗證紀錄上是 R-15 與 R-16。
+所以 plugin 偵測到 `DSM UC` 時**發出警告**而不是拒絕，而這一頁會一直寫著「未驗證」，直到有人回報實際運行結果。兩者在驗證紀錄上都列為未驗證。
 
 **如果你手上有其中任何一種，最有價值的回報是一個數字**：`SYNO.Core.ISCSI.Node` 的 uuid 在故障切換之後還是同一個嗎？storage 的身分釘在它上面，所以如果它會變，那道釘子就不再保護 storage，而是開始破壞它。
 
@@ -257,7 +257,7 @@ pvesm add synologysan mysyno \
     --nodes         pve1,pve2,pve3    # 選用：限制在這幾個節點
 ```
 
-### 只讓某幾個節點可以用
+### 限定可用節點
 
 `nodes` 是 Proxmox VE 自己的屬性，不是 `syno-` 開頭的，而它在這裡和在其他 storage 上一樣有效：
 
@@ -275,7 +275,7 @@ pvesm status --storage mysyno          # 確認
 
 **密碼不會進到 `/etc/pve/storage.cfg`**。它會寫到 `/etc/pve/priv/storage/<storage>.syno`，權限 `0600`、只有 root、並複寫到每個節點。完整選項清單與移除程序：[文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh#configure)。
 
-### 為什麼 Proxmox VE 顯示的容量和 DSM 對不起來
+### 為什麼 Proxmox VE 與 DSM 顯示的容量不一致
 
 其實是對的上的——兩邊用不同的單位在算，而且都寫成 TB。
 
@@ -325,7 +325,7 @@ pve-syno-reap --all --remove                 # 本節點上每一個 synologysan
 **節點當機之後請執行它，移除 storage 之前也請在每個節點上執行**。
 
 - **被硬重置的節點根本不會執行 `deactivate_volume`**，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。這是這個工具存在的理由，而且仍然成立。
-- **遷移本來是第二個理由，現在不是了**。一台 VM 從 `pve1 → pve2 → pve3` 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。2026-08-07 在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點**沒有 map、沒有裝置、追蹤檔是空的**。切換之後 VM 在來源節點停止時，`vm_stop_cleanup` 會呼叫 `deactivate_volumes`，所以來源節點「是」有被通知的。原本那次量測早於 `_detach_local` 的修正——舊版停在第一次 flush，會留下一個正確的卸離不會留下的 map。
+- **遷移本來是第二個理由，現在不是了**。一台 VM 從 `pve1 → pve2 → pve3` 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點**沒有 map、沒有裝置、追蹤檔是空的**。切換之後 VM 在來源節點停止時，`vm_stop_cleanup` 會呼叫 `deactivate_volumes`，所以來源節點「是」有被通知的。原本那次量測早於 `_detach_local` 的修正——舊版停在第一次 flush，會留下一個正確的卸離不會留下的 map。
 
 兩者都不危險——每個使用者在動作之前都會重新檢查裝置，而裝置身分一律來自核心的 WWID——但它們會累積。這個工具絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。
 

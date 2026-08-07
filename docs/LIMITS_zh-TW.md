@@ -2,7 +2,7 @@
 
 [English](LIMITS.md) · [繁體中文](LIMITS_zh-TW.md) · [文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh)
 
-**在這個 plugin 裡，一顆 VM 磁碟就是一個 LUN**。所以 LUN 上限不是註腳——它就是這個 storage 能容納的虛擬磁碟數量上限，而在某些機型上，這個數字會在其他任何限制之前先咬到你。
+**在這個 plugin 裡，一顆 VM 磁碟就是一個 LUN**。所以 LUN 上限不是註腳——它就是這個 storage 能容納的虛擬磁碟數量上限，而在某些機型上，這個數字會比其他任何限制更早成為瓶頸。
 
 有三個容易被忽略的後果，而且三個講的都是「數量」而不是「容量」：
 
@@ -33,7 +33,7 @@ Synology 的**SAN Manager 技術規格**頁面寫著：
 
 ### 第二個機型、第二個 DSM 版本，回報方式完全一樣
 
-2026-08-07 從一台 **DS925+**（DSM 7.3.2-86009 Update 4）讀取 `SYNO.Core.System info type=define`——那是與本專案其餘部分所依據的 DS918+／7.1.1 不同的機型，也是不同的 DSM 主版本：
+從一台 **DS925+**（DSM 7.3.2-86009 Update 4）讀取 `SYNO.Core.System info type=define`——那是與本專案其餘部分所依據的 DS918+／7.1.1 不同的機型，也是不同的 DSM 主版本：
 
 | | DS918+ · DSM 7.1.1 | DS925+ · DSM 7.3.2 |
 |---|---|---|

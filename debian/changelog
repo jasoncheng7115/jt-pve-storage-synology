@@ -1,3 +1,22 @@
+jt-pve-storage-synology (0.9.1-1) unstable; urgency=medium
+
+  * Everything published was swept for the development environment, and
+    make check-docs-public keeps it out: it fails on an internal hostname or
+    storage id, a private address, a date, or mainland wording, and it is part of
+    release-check. What it removed was real -- four internal hostnames and
+    storage ids, a private address, and eleven dates.
+  * docs/TESTING.md still said "The PVE plugin itself is not written, so nothing
+    here has been exercised through pvesm" -- false for weeks, in the position a
+    reader trusts most. Rewritten.
+  * The seven-stage test plan, written before the plugin existed and superseded by
+    the operational checklist, is gone: 280 lines across the two languages.
+  * Chinese headings were spoken rather than written, and 登記簿 reads as mainland
+    usage; both corrected throughout.
+  * The README said cloning from a snapshot needs the command line, which stopped
+    being true when the template route was verified from the web interface.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Sat, 08 Aug 2026 00:30:00 +0800
+
 jt-pve-storage-synology (0.9.0-1) unstable; urgency=medium
 
   * The jump from 0.6.x is deliberate. Every storage operation has now been driven

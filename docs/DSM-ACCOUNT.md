@@ -6,7 +6,7 @@ This page is how, and it is honest about the part Synology does not let you
 restrict.
 
 Everything below was read from a **DS918+ running DSM 7.1.1-42962 Update 9**
-on 2026-08-06, read-only. Where a claim could not be established that way, it
+, read-only. Where a claim could not be established that way, it
 says so.
 
 ---
@@ -146,7 +146,7 @@ consideration for a production deployment and it is stated here rather than glos
 
 #### Answered: there is no SAN Manager privilege to grant
 
-On **DSM 7.4.1-90080 (DS918+)**, on 2026-08-07, the account's **Applications** tab was
+On **DSM 7.4.1-90080 (DS918+)** the account's **Applications** tab was
 read directly. It lists twenty applications:
 
 > AFP · Active Backup for Business (three entries) · Audio Station · Central

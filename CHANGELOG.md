@@ -6,6 +6,30 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.9.1] - 2026-08-07
+
+### Documentation
+
+- **Everything published was swept for the development environment, and a new
+  guard keeps it out.** `make check-docs-public` fails on an internal hostname or
+  storage id, a private address, a date, or mainland wording; it is part of
+  `release-check` and has been shown to fail on a line carrying the first three at
+  once. What it removed was real: four internal hostnames and storage
+  ids, a private address, and eleven dates.
+- **`docs/TESTING.md` still said the plugin was not written.** Its "Test hardware"
+  table ended on *"The PVE plugin itself is not written, so nothing here has been
+  exercised through `pvesm`"* — false for weeks, in the position a reader trusts
+  most. Rewritten: two models, three DSM versions, five nodes, both interfaces.
+- **The seven-stage "test plan" is gone.** It was written before the plugin
+  existed, is superseded by the operational checklist, and still read as the
+  current process. 280 lines across the two languages.
+- **Headings were spoken Chinese rather than written.** `最多可以切幾個 LUN，以及開到上限會怎樣`
+  became `LUN 數量上限，以及達到上限時的行為`; likewise `對不起來`, `咬到你`,
+  `麻煩在哪裡`. `登記簿` reads as mainland usage and is now `驗證紀錄` throughout.
+- **The README said cloning from a snapshot needs the command line**, which stopped
+  being true when the template route was verified from the web interface, and it
+  still described the checklist as web-only.
+
 ## [0.9.0] - 2026-08-07
 
 The jump from 0.6.x is deliberate. Every storage operation has now been driven on

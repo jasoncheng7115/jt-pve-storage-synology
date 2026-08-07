@@ -46,8 +46,8 @@ locally.
 
 ## What has been driven on a production cluster
 
-Everything below was run from the **web interface** on a five-node Proxmox VE
-9.2.3 cluster in production, against a DS918+ on DSM 7.1.1, on 2026-08-07. The
+Everything below was run from **both the web interface and the command line** on a
+five-node Proxmox VE cluster in production, against a DS918+ on DSM 7.1.1. The
 interface matters: `pvedaemon`, `pveproxy`, `vzdump` and `pct` run as
 `#!/usr/bin/perl -T` with **no `PATH`**, and `qm`, `pvesm`, `pvesh` and
 `qmrestore` do not — so an operation verified from a shell is not verified.
@@ -136,14 +136,16 @@ Proxmox VE and comparing timestamps. Descriptions are written when the snapshot
 is taken and DSM never rewrites them, so snapshots taken by an older build keep
 the old text.
 
-### Cloning from a snapshot: use the command line, not the button
+### Cloning from a snapshot: the web interface can, if the source is a template
 
-`qm clone` from a snapshot works, and the web interface will not let you do it.
-That is Proxmox VE's shape rather than this plugin's, but the error is confusing
-enough to be worth stating plainly:
+Cloning from a snapshot works. Whether the button is offered depends on what the
+source is, and that is Proxmox VE's shape rather than this plugin's. For a
+**template** the GUI asks for a linked clone, which this storage supports from a
+snapshot, so it works. For anything else the GUI always asks for a *full* clone,
+which is refused — with an error confusing enough to be worth stating plainly:
 
 ```
-Full clone feature is not supported for a snapshot of 'syno-nas2:vm-146-disk-0'
+Full clone feature is not supported for a snapshot of '<storage>:vm-146-disk-0'
 ```
 
 The GUI hardcodes **full clone** for anything that is not a template —
@@ -231,7 +233,7 @@ So an entry-level NAS running 7.2 may still be unusable, and a check that only
 read the version would not say why. The plugin gates on all four and names the
 one that failed.
 
-## How many LUNs, and what happens at the ceiling
+## The LUN ceiling, and what happens when you reach it
 
 One VM disk is one LUN, so the LUN ceiling is a real capacity limit — and it is
 not the number on the specification sheet.
@@ -419,7 +421,7 @@ pvesm add synologysan mysyno \
     --nodes         pve1,pve2,pve3    # optional: restrict to these nodes
 ```
 
-### Restricting it to some nodes
+### Restricting it to certain nodes
 
 `nodes` is Proxmox VE's own property, not a `syno-` one, and it works here like on
 any other storage:
@@ -524,8 +526,8 @@ pve-syno-reap --all --remove                 # every synologysan storage on this
   tool is for, and it is still true.
 - **Migration used to be the second reason, and it is not any more.** A VM
   migrated `pve1 → pve2 → pve3` and destroyed on pve3 once left pve1 and pve2
-  each holding a map for a LUN that no longer existed. Re-measured on
-  2026-08-07 across two nodes, offline and online, in both directions: the node
+  each holding a map for a LUN that no longer existed. Re-measured across two
+  nodes, offline and online, in both directions: the node
   a VM leaves is left with **no maps, no devices and an empty tracking file**.
   `vm_stop_cleanup` calls `deactivate_volumes` when the VM stops on the source
   after the switch, so the source node *is* told. The original measurement

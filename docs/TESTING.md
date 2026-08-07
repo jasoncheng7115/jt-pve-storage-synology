@@ -31,23 +31,24 @@ see "How a session is carried" below.
 
 | | |
 |---|---|
-| Model | DS918+ |
-| DSM | 7.1.1-42962 Update 9 |
-| Volume | `/volume1`, **Btrfs**, 14301.5 GiB total |
-| Reported ceilings | **`max_iscsiluns` 256, `max_iscsitrgs` 128**, `max_snapshot_per_lun` 256 — the model's own numbers, not the 512/256 on the specification sheet |
+| Models | **DS918+** and **DS925+** |
+| DSM versions | **7.1.1**, **7.3.2** and **7.4.1** — the DS918+ was carried across a 7.1 → 7.4 upgrade with every LUN uuid intact |
+| Volume | `/volume1`, **Btrfs** |
+| Reported ceilings | Read from each NAS, never hardcoded. Both models report `max_iscsiluns` **256** and `max_iscsitrgs` **128** — the model's own numbers, not the 512/256 on the product-line specification sheet |
 | Target implementation | `iscsi_target_type` = `lio4x` |
-| Note | A **production** NAS, also running Virtual Machine Manager. Write tests were run on a dedicated `pvetest-` prefix with the owner's agreement; every object created was deleted and the NAS confirmed back to its original contents |
+| Cluster | five Proxmox VE nodes, in production, also running other vendors' storage plugins |
+| Note | The primary NAS is a **production** machine. Every write test ran under a dedicated name prefix with the owner's agreement, and every object created was deleted and the NAS confirmed back to its original contents |
 
-**What has been run:** read-only probing, write tests on a dedicated name
-prefix, and one attach of a LUN to a Proxmox VE node — which is where the WWID
-derivation and the multipath behaviour below come from. The module layer
-(`Synology::API`, `::LUN`, `::Target`, `::Naming`, `::Multipath`, `::Command`,
-`::ISCSI`) has been driven end to end against this hardware. **The PVE plugin
-itself is not written**, so nothing here has been exercised through `pvesm`.
+**What has been run:** the whole plugin, not only the module layer. Every storage
+operation has been driven end to end against this hardware from **both**
+interfaces — the web interface and the command line — including backup and
+restore, live migration, a node crash with HA takeover, a path failure under load,
+and a whole-NAS outage. What each row of that covers is the operational checklist
+below.
 
 ---
 
-## Verified on hardware (2026-08-06)
+## Verified on hardware
 
 Everything down to the `dev_attribs` table was read-only. The sections marked
 as write tests below were run on a dedicated `pvetest-` name prefix, with the
@@ -391,7 +392,7 @@ Two incidental findings from that attempt, both worth keeping:
 
 ### Two nodes, and one limitation that is PVE's shape rather than a bug
 
-Verified on a two-node cluster (`pc-pve1` on kernel 7.0.2, `pc-pve2` on 7.0.14,
+Verified on a two-node cluster (node A on kernel 7.0.2, node B on 7.0.14,
 so not a clone of each other):
 
 | | |
@@ -408,9 +409,9 @@ so not a clone of each other):
 
 #### `find_multipaths` is a per-node policy, and it decides whether a map exists
 
-This is the finding that only a second node could produce. `pc-pve1` had
+This is the finding that only a second node could produce. node A had
 `find_multipaths no`, so multipath built a map for every device and everything
-worked. `pc-pve2` had `find_multipaths yes`, which builds a map **only** for a
+worked. node B had `find_multipaths yes`, which builds a map **only** for a
 device with two or more paths, or one whose WWID is already in
 `/etc/multipath/wwids`. With a single portal there was therefore **no map at
 all** — session up, by-path device present, and the path this plugin hands out
@@ -613,7 +614,7 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ### Snapshot names: the NAS refuses nothing, and PVE is the stricter of the two
 
-Asserted for a long time as "snapshot names are free". Measured 2026-08-07, and it
+Asserted for a long time as "snapshot names are free". Measured , and it
 is true to a degree that makes validation unnecessary:
 
 | Tried | Result |
@@ -643,21 +644,21 @@ on a storage looked identical in the interface, and the one question an operator
 actually has — *which PVE snapshot is this row?* — had no answer without going back
 to PVE and comparing timestamps.
 
-Found the way these things are found: Jason took a snapshot called `install1`,
+Found the way these things are found: the author took a snapshot called `install1`,
 opened the snapshot list, and could not find that name anywhere. It was there. DSM
-just does not display it. The description is now `install1 (Proxmox VE syno-nas2)`,
+just does not display it. The description is now `install1 (Proxmox VE <storeid>)`,
 verified reading back from the NAS for four different name shapes.
 
 ### R-25 answered, by a snapshot on someone else's cluster
 
-`create_time` is **epoch seconds**. Measured 2026-08-07 on a snapshot Jason took
+`create_time` is **epoch seconds**. Measured on a snapshot Jason took
 through the Proxmox VE interface:
 
 | | |
 |---|---|
 | `create_time` | `1786070747` |
-| as epoch seconds | `2026-08-07 02:45:47 UTC` |
-| what PVE displayed | `2026-08-07 10:45:46` local, UTC+8 = `02:45:46 UTC` |
+| as epoch seconds | `02:45:47 UTC` |
+| what PVE displayed | `10:45:46` local, UTC+8 = `02:45:46 UTC` |
 
 Within one second. This could not be settled read-only because **a LUN carries no
 `create_time` field at all** — only a snapshot does, and the test NAS had none.
@@ -725,7 +726,7 @@ account that IS in a group, so the side you ask matters too.
 
 ### Node failure, fencing and takeover — the tests that needed a node to lose
 
-Run on pc-pve2, with Jason's permission to disrupt it. The cluster kept quorum
+Run on node B, with the owner's permission to disrupt it. The cluster kept quorum
 throughout (2 of 3), and his own HA resource on pve3 was untouched.
 
 | Test | Result |
@@ -862,8 +863,8 @@ source node is never told.
 
 ### Migration no longer leaves a map behind
 
-**Re-measured on 2026-08-07, and it did not reproduce.** A VM was migrated
-host-108 → host-109 and back, offline and online, in both directions. The node
+**Measured: and it did not reproduce.** A VM was migrated
+node A → node B and back, offline and online, in both directions. The node
 the VM left was checked directly and held **0 multipath maps, 0 by-path devices
 and an empty tracking file** — cleaner than the original measurement predicted.
 `vm_stop_cleanup` calls `deactivate_volumes` when the VM stops on the source
@@ -1123,8 +1124,8 @@ one, the plugin refuses rather than assumes.
 | R-6 | ~~Whether a LUN with snapshots refuses deletion, and a snapshot with a clone~~ **ANSWERED: neither refuses, and nor does a MAPPED LUN.** Snapshots go with their LUN and are not orphaned | No dependency purging is needed — but unmap-before-delete becomes entirely the plugin's responsibility |
 | R-7 | ~~Whether a clone is thin or a full copy~~ **ANSWERED: thin.** `clone_snapshot` gives a `BLUN` with `allocated_size: 0` | Linked clones and templates are genuinely cheap |
 | R-8 | ~~How long `is_action_locked` stays set~~ **ANSWERED:** 1.2 s after a 1 GiB create, 0.0 s cloning an empty LUN, **3.5 s cloning a LUN holding 512 MiB**, and 0.20 s for a snapshot of any size. An immediate delete after a create succeeds anyway | A large clone can outlast a naive wait — the CSI driver's own bound is 20 s, which a clone of a few hundred GiB could exceed |
-| R-9 | ~~Whether the listings have a server-side cap~~ **ANSWERED PER LISTING, re-measured read-only on DSM 7.4.1 (2026-08-07).** `LUN list` and `Target list` **ignore `offset`/`limit` entirely** — the same full list comes back for `limit=1` as for no parameters — and neither reports a total. `LUN list_snapshot` is the exception: it **does** report a `count` beside the array, and that count agreed with the row count on all nine LUNs, including one holding a snapshot. Measured at 9 LUNs, 4 targets, 1 snapshot; a threshold above those counts cannot be ruled out from this | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. Parameters being ignored is the strong evidence: a paged API honours `limit`. And where a total *is* reported it is now checked — `assert_room_for_snapshot` refuses when `count` disagrees with the rows, because it counted the array, and under-counting there fails in the direction of taking the snapshot |
-| R-10 | ~~Whether DSM's own scheduled snapshots appear in `list_snapshot`~~ **FULLY ANSWERED on 2026-08-07, and the filter holds.** A daily LUN snapshot schedule was enabled in SAN Manager on `pve-syno-nas2-vm-146-disk-0` (DS918+, DSM 7.4.1-90080) and the 18:00 run was measured read-only. The scheduled snapshot **does** appear in the LUN's `list_snapshot` — so the worry was real — and it is **distinguishable**: `taken_by` is **`scheduler`** where this plugin's is `jt-pve-storage-synology`, with `name` `SnapShot-1` and `description` `Scheduled snapshot taken by [nas2]`. Verified end to end through the plugin itself: the NAS held **two** snapshots on that LUN and `volume_snapshot_info` reported **one** to Proxmox VE — only its own. `count` also agreed with the row count on the mixed set, which is a second data point for the check added in 0.6.22 | This was the entry that could have let PVE show a user's scheduled snapshot as its own and then delete it. It cannot: the `taken_by` filter is measured, not assumed. The other half also holds — `assert_room_for_snapshot` uses `all => 1` and therefore counted **two**, which is what the shared 256-per-LUN ceiling requires. One consequence worth knowing: DSM names its scheduled snapshots `SnapShot-N`, and this plugin sends the PVE snapshot name to the NAS verbatim, so a PVE snapshot deliberately named `SnapShot-1` would be refused as a duplicate (18990513) rather than silently merged |
+| R-9 | ~~Whether the listings have a server-side cap~~ **ANSWERED PER LISTING, re-measured read-only on DSM 7.4.1 ().** `LUN list` and `Target list` **ignore `offset`/`limit` entirely** — the same full list comes back for `limit=1` as for no parameters — and neither reports a total. `LUN list_snapshot` is the exception: it **does** report a `count` beside the array, and that count agreed with the row count on all nine LUNs, including one holding a snapshot. Measured at 9 LUNs, 4 targets, 1 snapshot; a threshold above those counts cannot be ruled out from this | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. Parameters being ignored is the strong evidence: a paged API honours `limit`. And where a total *is* reported it is now checked — `assert_room_for_snapshot` refuses when `count` disagrees with the rows, because it counted the array, and under-counting there fails in the direction of taking the snapshot |
+| R-10 | ~~Whether DSM's own scheduled snapshots appear in `list_snapshot`~~ **FULLY ANSWERED, and the filter holds.** A daily LUN snapshot schedule was enabled in SAN Manager on `pve-<storeid>-vm-146-disk-0` (DS918+, DSM 7.4.1-90080) and the 18:00 run was measured read-only. The scheduled snapshot **does** appear in the LUN's `list_snapshot` — so the worry was real — and it is **distinguishable**: `taken_by` is **`scheduler`** where this plugin's is `jt-pve-storage-synology`, with `name` `SnapShot-1` and `description` `Scheduled snapshot taken by [nas2]`. Verified end to end through the plugin itself: the NAS held **two** snapshots on that LUN and `volume_snapshot_info` reported **one** to Proxmox VE — only its own. `count` also agreed with the row count on the mixed set, which is a second data point for the check added in 0.6.22 | This was the entry that could have let PVE show a user's scheduled snapshot as its own and then delete it. It cannot: the `taken_by` filter is measured, not assumed. The other half also holds — `assert_room_for_snapshot` uses `all => 1` and therefore counted **two**, which is what the shared 256-per-LUN ceiling requires. One consequence worth knowing: DSM names its scheduled snapshots `SnapShot-N`, and this plugin sends the PVE snapshot name to the NAS verbatim, so a PVE snapshot deliberately named `SnapShot-1` would be refused as a duplicate (18990513) rather than silently merged |
 | R-11 | ~~`mapping_index` ceiling per target, and whether it is reused~~ **ANSWERED: it IS reused.** A freed index goes to the next LUN mapped | This is the "wrote to the wrong disk" fault, reachable by detaching one disk and attaching another. It is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured |
 | R-12 | ~~Whether DSM tolerates concurrent requests~~ **ANSWERED: sixteen simultaneous creates all succeeded** and the array matched what the API reported. ~1 s each suggests internal serialisation | Cinder wraps every request in a process-wide lock; nothing here needed it for correctness |
 | R-13 | ~~Whether a second login on one account evicts the first~~ **ANSWERED: it does not.** Both sessions work simultaneously | Error 107 had made this a real worry for a cluster sharing one account |
@@ -1133,10 +1134,10 @@ one, the plugin refuses rather than assumes.
 
 | # | Question |
 |---|---|
-| R-25 | ~~The unit of a snapshot's `create_time`~~ **ANSWERED: epoch seconds**, measured against PVE's own displayed time on a real snapshot — see above. Originally: Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until 2026-08-06, when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
-| R-14 | ~~The minimum DSM privileges~~ **ANSWERED on 2026-08-07: there is no finer-grained privilege to grant, so the account must be an administrator.** Two halves. Through the API, on DSM 7.1.1: only three groups exist and none is iSCSI-specific; an account with no groups is refused at login with **402**, and so is one in `users`; `SYNO.Core.User get` exposes no privilege fields; and `Group.Member add` to `administrators` reports success without acting. Then in the DSM interface, on **7.4.1-90080 (DS918+)**, the account's **Applications** tab was read directly: it lists twenty applications — AFP, Active Backup for Business (three entries), Audio Station, Central Management System, Cloud Sync, DSM, Download Station, FTP, File Station, Notification Center, Note Station, SFTP, SMB, Synology Photos, Surveillance Station, Synology Drive, Universal Search, rsync and the text editor — and **not one of them is SAN Manager, Storage Manager or iSCSI.** So the access this plugin needs cannot be granted or denied as an application at all; it comes with `administrators` | The question was never whether an administrator works, it was whether anything smaller does. It does not, and now that is a reading of DSM's own interface rather than an inference from the API's silence. What the finding *does* enable is worth acting on: those twenty applications **can** each be denied to the account, so a dedicated administrator with every other application denied, 2FA, and an IP restriction is the smallest configuration that exists. `DSM-ACCOUNT.md` says so |
-| R-26 | **NEW, 2026-08-07, and open.** `SYNO.Core.System info type=define` reports **two** snapshot ceilings, not one: `max_snapshot_per_lun` **256** and `max_snapshot_per_lun_v2` **128**. The share pair is the same shape — `max_snapshots_per_share` 1024 against `_v2` 512. The plugin reads the first. Confirmed on a second machine: **DS925+ on DSM 7.3.2 reports the identical pair** — 256 against 128, and 1024 against 512 for shares — so it is systematic rather than a quirk of one model or one firmware. Which one DSM actually **enforces** is unknown, and it cannot be settled read-only: it needs a 129th snapshot on one LUN | If `_v2` is the enforced value, `assert_room_for_snapshot` guards at twice the real limit and the NAS refuses first — a guard whose whole purpose is to refuse **before** the array does. A `_v2` suffix on a Synology key usually marks a newer generation, and this plugin requires **Btrfs** LUNs, so `_v2` being *our* number is the case to worry about. Neither direction risks data: guarding too high means the NAS returns an error, guarding too low means the plugin does. The conservative fix is to take the lower of the two and name both numbers in the refusal; it is **not applied yet**, because it changes behaviour on every storage and the project owner has not ruled on it |
-| R-27 | ~~`qm move_disk` back onto this storage and `qmrestore` fail after a LUN has been deleted~~ **FIXED in 0.6.25, found on 2026-08-07 by re-running the release checklist against a release that had already shipped.** After a LUN is deleted the NAS reuses its mapping index, and the node reuses the sd node with it: the kernel re-reads the VPD on rescan and updates `/sys/block/<sd>/device/wwid` to the **new** LUN, while **multipathd never re-reads the path** and goes on holding a map for the LUN that is gone. Measured side by side — kernel `naa.60014052e46494ed5667d4a29dbe0dd9`, multipathd `36001405bbc484c9dc23cd4accd8f7fd1`, the same `sde`. `ensure_map` then waited for a map that could never be built. `activate_volume` now detects it and asks the **kernel** to rediscover the device — remove the sd node, rescan the session, re-confirm the WWID, ask for the map again — which is the only remedy that was measured to work | It failed **four times in a row**, each with a fresh WWID, on two release-checklist rows (B3, E4). **Never a data risk**: the plugin refused rather than using the device, which is rule 48 doing its job. Three other fixes were tried and reverted rather than shipped — clearing the sd node on a WWID mismatch (the kernel never reports one here), asking multipathd for its view (the command runner correctly refused the argument `'%d %w'` because the untaint allowlist has no space, and the `eval` swallowed the die so the branch silently never ran), and drop-path/flush-corpse/re-add-path (the corpse survives). Verified on pc-pve1, PVE 9.2.5, `find_multipaths no`, DS918+/DSM 7.4.1: the recovery fires and the activation succeeds, and it does **not** fire on a clean node, where B3 and E4 pass unchanged |
+| R-25 | ~~The unit of a snapshot's `create_time`~~ **ANSWERED: epoch seconds**, measured against PVE's own displayed time on a real snapshot — see above. Originally: Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until , when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
+| R-14 | ~~The minimum DSM privileges~~ **ANSWERED: there is no finer-grained privilege to grant, so the account must be an administrator.** Two halves. Through the API, on DSM 7.1.1: only three groups exist and none is iSCSI-specific; an account with no groups is refused at login with **402**, and so is one in `users`; `SYNO.Core.User get` exposes no privilege fields; and `Group.Member add` to `administrators` reports success without acting. Then in the DSM interface, on **7.4.1-90080 (DS918+)**, the account's **Applications** tab was read directly: it lists twenty applications — AFP, Active Backup for Business (three entries), Audio Station, Central Management System, Cloud Sync, DSM, Download Station, FTP, File Station, Notification Center, Note Station, SFTP, SMB, Synology Photos, Surveillance Station, Synology Drive, Universal Search, rsync and the text editor — and **not one of them is SAN Manager, Storage Manager or iSCSI.** So the access this plugin needs cannot be granted or denied as an application at all; it comes with `administrators` | The question was never whether an administrator works, it was whether anything smaller does. It does not, and now that is a reading of DSM's own interface rather than an inference from the API's silence. What the finding *does* enable is worth acting on: those twenty applications **can** each be denied to the account, so a dedicated administrator with every other application denied, 2FA, and an IP restriction is the smallest configuration that exists. `DSM-ACCOUNT.md` says so |
+| R-26 | **NEW, , and open.** `SYNO.Core.System info type=define` reports **two** snapshot ceilings, not one: `max_snapshot_per_lun` **256** and `max_snapshot_per_lun_v2` **128**. The share pair is the same shape — `max_snapshots_per_share` 1024 against `_v2` 512. The plugin reads the first. Confirmed on a second machine: **DS925+ on DSM 7.3.2 reports the identical pair** — 256 against 128, and 1024 against 512 for shares — so it is systematic rather than a quirk of one model or one firmware. Which one DSM actually **enforces** is unknown, and it cannot be settled read-only: it needs a 129th snapshot on one LUN | If `_v2` is the enforced value, `assert_room_for_snapshot` guards at twice the real limit and the NAS refuses first — a guard whose whole purpose is to refuse **before** the array does. A `_v2` suffix on a Synology key usually marks a newer generation, and this plugin requires **Btrfs** LUNs, so `_v2` being *our* number is the case to worry about. Neither direction risks data: guarding too high means the NAS returns an error, guarding too low means the plugin does. The conservative fix is to take the lower of the two and name both numbers in the refusal; it is **not applied yet**, because it changes behaviour on every storage and the project owner has not ruled on it |
+| R-27 | ~~`qm move_disk` back onto this storage and `qmrestore` fail after a LUN has been deleted~~ **FIXED in 0.6.25, found by re-running the release checklist against a release that had already shipped.** After a LUN is deleted the NAS reuses its mapping index, and the node reuses the sd node with it: the kernel re-reads the VPD on rescan and updates `/sys/block/<sd>/device/wwid` to the **new** LUN, while **multipathd never re-reads the path** and goes on holding a map for the LUN that is gone. Measured side by side — kernel `naa.60014052e46494ed5667d4a29dbe0dd9`, multipathd `36001405bbc484c9dc23cd4accd8f7fd1`, the same `sde`. `ensure_map` then waited for a map that could never be built. `activate_volume` now detects it and asks the **kernel** to rediscover the device — remove the sd node, rescan the session, re-confirm the WWID, ask for the map again — which is the only remedy that was measured to work | It failed **four times in a row**, each with a fresh WWID, on two release-checklist rows (B3, E4). **Never a data risk**: the plugin refused rather than using the device, which is rule 48 doing its job. Three other fixes were tried and reverted rather than shipped — clearing the sd node on a WWID mismatch (the kernel never reports one here), asking multipathd for its view (the command runner correctly refused the argument `'%d %w'` because the untaint allowlist has no space, and the `eval` swallowed the die so the branch silently never ran), and drop-path/flush-corpse/re-add-path (the corpse survives). Verified on node A, PVE 9.2.5, `find_multipaths no`, DS918+/DSM 7.4.1: the recovery fires and the activation succeeds, and it does **not** fire on a clean node, where B3 and E4 pass unchanged |
 
 ### Supported by design, unverified — needs hardware this project does not have
 
@@ -1148,168 +1149,6 @@ it, and will not claim otherwise until someone reports a run.
 |---|---|
 | R-15 | **Synology HA (SHA)**: does the HA cluster IP behave as a single management address across a failover, and does `SYNO.Core.ISCSI.Node`'s uuid — which this plugin uses as the storage's identity — survive one? If the uuid changes on failover, pinning a storage to it would break the storage rather than protect it |
 | R-16 | **UC / SA dual-controller models** (`firmware_ver` containing `DSM UC`): both controllers have their own management address and there is no floating one. `SYNO.Core.Network.Interface` accepts `relay_node=node0`/`node1` to enumerate the peer — on the single-controller test NAS both answer with the same interfaces, so the mechanism is harmless where it is not needed. **Implemented from Synology's own CSI logic; unverified.** The open questions are the ones a chassis answers: whether a LUN is owned by one controller, and whether a target's portals differ per controller — which together decide whether a node reaches its disk after a failover |
-
----
-
-## The test plan
-
-### Stage 1 — static, no NAS
-
-```bash
-make release-check
-```
-
-Syntax, unit tests, the same suite as CI runs it, version consistency, the
-node-wide multipath guard, and the credential-in-a-URL guard.
-
-### Stage 2 — adverse and hostile, no NAS
-
-Ported from the related projects, because each case there is a defect that
-reached a release:
-
-- A server that accepts and never answers, stops mid-body, replies 200 with
-  HTML, closes without a response, logs in without returning a sid. Every case
-  must fail **quickly**, name the storage, and never hang.
-- A create that fails with 5xx is sent exactly **once**.
-- Hostile input: storage ids with path traversal and shell metacharacters,
-  size alignment at every boundary, sixteen-way concurrent allocation.
-- Parsers fed missing, renamed and wrongly typed fields — every field name
-  must fail safe rather than be acted on.
-
-### Stage 3 — read-only against a real DSM
-
-```bash
-bin/pve-syno-api-probe --host <nas> --user <account>
-```
-
-Creates nothing, deletes nothing, logs out after itself. Safe against a
-production NAS. Confirm: the API set, a Btrfs volume with free space, the LUN
-and target listings, `dev_attribs`, and whether this DSM has anti-CSRF on.
-
-Optionally, and only with the owner's agreement:
-
-```bash
-bin/pve-syno-api-probe --host <nas> --user <account> --probe-methods
-```
-
-This asks which snapshot-restore method names exist, by naming a LUN and
-snapshot uuid the NAS has never issued — so a method that exists can only
-refuse, and the refusal code proves it is there. It is opt-in because the
-names being sent are destructive ones, even though nothing they could act on
-is real. **This is how R-1 gets answered.**
-
-### Stage 4 — writes, on storage nobody minds
-
-**Preconditions.** A dedicated DSM volume, or at minimum a dedicated name
-prefix; the owner's explicit agreement; and a list of the LUNs that must not be
-touched. Every step reversible.
-
-1. Create a thin LUN with `can_snapshot=1`, `emulate_tpu=1`. Read back `type`,
-   `size`, `dev_attribs` — answers R-3, R-4.
-2. Create one with a deliberately over-long name, and one with an odd size.
-3. Map it to a target with `max_sessions=0`; log in from one node; read
-   `/dev/disk/by-id`, `/sys/block/sdX/device/wwid` — **answers R-5**.
-4. Map a second and third LUN to the same target; unmap the middle one; map a
-   fourth — answers R-2 and R-11.
-5. Snapshot, list, clone from snapshot, read `allocated_size` — R-7, R-10.
-6. Try to delete a LUN that has a snapshot; try to delete a snapshot that has
-   a clone — R-6.
-7. Resize; watch `is_action_locked` throughout — R-8.
-8. Sixteen concurrent creates from one node, then from two — R-12.
-9. Delete everything created, and confirm the NAS is as it was.
-
-### Stage 5 — cluster
-
-- Two nodes logged in to one shared target simultaneously.
-- Both nodes' sessions alive at once on one account — **R-13**.
-- A VM migrated between nodes with its disk on the storage.
-- `pvesm status` timing on every node while one is doing a clone.
-
-### Stage 5b — multipath with only one NAS
-
-**Multipath on a Synology has nothing to do with dual controllers.** A
-single-controller model provides multiple paths by having **more than one
-network portal**, and a two-NIC NAS is enough for a genuine two-path map.
-
-On the test NAS, read from `SYNO.Core.Network.Interface`:
-
-| Interface | Address | Speed | Status |
-|---|---|---|---|
-| `ovs_eth0` | 192.0.2.10 (static) | 1000 | connected |
-| `ovs_eth1` | 192.0.2.11 (**DHCP**) | 1000 | connected |
-
-That is two paths available already. Three things have to be right first:
-
-1. **`max_sessions = 0` on the target.** The default is 1, and one session is
-   one path — so a target left at its default cannot be multipathed at all,
-   let alone shared between nodes.
-2. **A static address on the second interface.** A data portal on DHCP will
-   move, and a path whose address changes is a path that disappears. Give it a
-   static address or a permanent reservation.
-3. **Both addresses are on one subnet here, and that is the awkward part.**
-   Linux will happily send both sessions out of whichever interface the route
-   table prefers, so you get two sessions over one physical link and a map that
-   looks redundant and is not. Bind each session to its own interface
-   explicitly:
-
-   ```bash
-   iscsiadm -m iface -I path0 --op=new
-   iscsiadm -m iface -I path0 --op=update -n iface.net_ifacename -v <nic0>
-   iscsiadm -m iface -I path1 --op=new
-   iscsiadm -m iface -I path1 --op=update -n iface.net_ifacename -v <nic1>
-
-   iscsiadm -m discovery -t st -p 192.0.2.10 -I path0
-   iscsiadm -m discovery -t st -p 192.0.2.11 -I path1
-   iscsiadm -m node -T <target-iqn> -I path0 --login
-   iscsiadm -m node -T <target-iqn> -I path1 --login
-
-   multipath -ll        # expect one map, two paths, both active ready running
-   ```
-
-   Two separate subnets or VLANs is the cleaner arrangement and worth doing if
-   the switch allows it. DSM can also put VLAN sub-interfaces on a single
-   physical port, which yields two portal addresses over one cable — enough to
-   exercise every code path, though obviously not real redundancy.
-
-**Testing failover without touching the NAS.** Drop one portal from the node
-and watch the map, rather than pulling a cable or disabling a NAS interface:
-
-```bash
-nft add table inet mptest
-nft add chain inet mptest out '{ type filter hook output priority 0; }'
-nft add rule inet mptest out ip daddr 192.0.2.11 tcp dport 3260 drop
-
-multipath -ll        # that path must go failed, I/O must continue
-nft delete table inet mptest      # and it must come back
-```
-
-What to confirm: I/O continues throughout; the map recovers when the rule is
-removed; `no_path_retry` is a number so that losing **every** path fails
-instead of queueing forever; and nothing the plugin does during the outage
-touches another storage's maps.
-
-**If a second path is genuinely impossible** — a one-NIC model — say so rather
-than pretending. A single-path map still exercises map creation, WWID pinning,
-resize and flush, but the failover paths remain untested, and that belongs in
-this document rather than in a release note.
-
-### Stage 6 — failure injection
-
-- A storage pointed at an unroutable address: the other storages stay
-  `active`, `pvesm status` grows by about the timeout and no more.
-- The NAS's management interface pulled mid-operation.
-- A deliberately wrong password: **exactly one login attempt**, and the storage
-  reports that it needs a human. Auto Block must not trip.
-- The DSM volume filled to under 1 GB free: allocation refused with a message
-  that says why.
-- multipathd stopped; a path dropped mid-write.
-
-### Stage 7 — live, on the node
-
-Install the built package, and diff `pvesm status` across the install. Nothing
-else may change state. Confirm the other storages on the node — this plugin is
-developed on a node that also runs the NetApp and Pure Storage plugins — are
-undisturbed, and that no other vendor's multipath maps were touched.
 
 ---
 

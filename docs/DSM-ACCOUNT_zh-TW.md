@@ -2,7 +2,7 @@
 
 **不要把 `admin` 帳號給這個 plugin**。建一個專用帳號、把它不需要的東西全部關掉、再限制它能從哪裡登入。這份文件說明怎麼做，也誠實說明 Synology 不讓你限制的那一部分。
 
-以下內容於 2026-08-06 在一台 **DS918+** 上（DSM 7.1.1-42962 Update 9）以唯讀方式實測取得。無法用這種方式確認的地方，文中會明說。
+以下內容於  在一台 **DS918+** 上（DSM 7.1.1-42962 Update 9）以唯讀方式實測取得。無法用這種方式確認的地方，文中會明說。
 
 ---
 
@@ -106,7 +106,7 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 
 #### 已解答：沒有「SAN Manager 權限」可以給
 
-2026-08-07，在 DSM **7.4.1-90080**（DS918+）上直接讀了那個帳號的**應用程式**分頁。它列出二十個應用程式：
+在 DSM **7.4.1-90080**（DS918+）上直接讀了那個帳號的**應用程式**分頁。它列出二十個應用程式：
 
 > AFP · Active Backup for Business（三項）· Audio Station · Central Management System · Cloud Sync · DSM · Download Station · FTP · File Station · Notification Center · Note Station · SFTP · SMB · Synology Photos · Surveillance Station · Synology Drive · Universal Search · rsync · 文字編輯器
 

@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.9.0
+VERSION = 0.9.1
 
 DESTDIR =
 PREFIX   = /usr
@@ -21,7 +21,7 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets check-tool-paths check-zh zh-normalise critic check-doc-urls \
+        check-multipath-flush check-secrets check-tool-paths check-zh zh-normalise critic check-doc-urls check-docs-public \
         og-image check-og-image \
         check-release-archive \
         release-check deb deb-clean clean
@@ -246,6 +246,16 @@ check-secrets:
 # the closing tag into the URL and then reported a 404 for it — while the same URL
 # passed on the line above. A guard that reads markup as content fails in the
 # direction of a false alarm, which is the direction that gets guards ignored.
+# What is published must not carry the development environment: the author's own
+# hostnames and storage ids, private addresses, the day a measurement happened, or
+# mainland wording. All four were real on the site and in the README until they
+# were swept out; this is what stops them drifting back. Shown to fail on a line
+# carrying all three of the first kind.
+check-docs-public:
+	@echo "Checking the published documents..."
+	@perl tools/check-docs-public.pl docs/*.md docs/index.html README.md README_zh-TW.md \
+	                                 CHANGELOG.md CHANGELOG_zh-TW.md
+
 check-doc-urls:
 	@echo "Checking the documentation's download URLs..."
 	@bad=0; \
@@ -342,7 +352,7 @@ check-zh:
 # as satisfied and the drift was invisible. It was invisible on the worst possible
 # script: the reaper is the documented step after a node crash, so `--version` was
 # lying on the one output an operator reads during an incident.
-release-check: check-multipath-flush check-secrets check-tool-paths check-zh check-og-image syntax unit unit-nopve critic \
+release-check: check-multipath-flush check-secrets check-tool-paths check-zh check-og-image check-docs-public syntax unit unit-nopve critic \
                check-doc-urls \
                check-release-archive
 	@echo "Checking version consistency..."
