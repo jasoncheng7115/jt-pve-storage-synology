@@ -78,7 +78,6 @@
             <span class="lang-en">What we know</span><span class="lang-zh">已知的事實</span>
         </div>
         <a href="#verified" class="sidebar__link"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></a>
-        <a href="#open" class="sidebar__link"><span class="lang-en">Still open</span><span class="lang-zh">尚未確認</span></a>
         <a href="#rollback" class="sidebar__link"><span class="lang-en">Rollback</span><span class="lang-zh">倒回</span></a>
     </div>
     <div class="sidebar__section">
@@ -112,9 +111,9 @@
     <div class="hero__glow-left"></div>
     <div class="hero__content">
         <!-- The version sits on this line, immediately after the class, because
-             `make release-check` reads it from here to prove the site has not
+             <code>make release-check</code> reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.20 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.21 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -144,8 +143,8 @@
         <span class="lang-zh"><strong>已在實機上跑過：</strong>一台 guest 從 NAS 開機；三種 <code>vzdump</code> 模式的備份，還原成完全相同的位元組；跨五個節點的即時遷移；一個當掉節點的 LUN 由存活節點在 <strong>3.6&nbsp;秒</strong>內接手，而當時死掉節點的工作階段仍然登記在 NAS 上；兩個 portal 的 multipath 撐過一次路徑故障——<strong>60 次讀取，0 次失敗</strong>；以及一次整台 NAS 中斷，而節點本身毫髮無傷——沒有任何行程進入不可中斷睡眠，其他每一個 storage 都還是 active。</span>
         <span class="lang-en"><strong>Two models and three DSM versions:</strong> a DS918+ on 7.1.1, carried across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> driven end to end.</span>
         <span class="lang-zh"><strong>兩個機型、三個 DSM 版本：</strong>一台 DS918+（7.1.1），並帶著全部 LUN uuid 完好地跨過升級到 <strong>7.4.1</strong>；以及一台 DS925+（<strong>7.3.2</strong>）完整跑過一輪。</span>
-        <span class="lang-en"><strong>What is still honest to say:</strong> no Synology HA or dual-controller chassis has ever been near it, and the DSM account needs administrator rights because DSM offers no narrower one. Around <strong>thirty</strong> defects were found by running it that no amount of reading had shown —two releases could not add a storage at all —so assume there are more.</span>
-        <span class="lang-zh"><strong>仍然該誠實說的是：</strong>從來沒有任何 Synology HA 或雙控制器機箱接近過它，而那個 DSM 帳號需要管理員權限，因為 DSM 沒有更窄的選擇。從實際運行中找出大約<strong>三十個</strong>「讀程式碼永遠讀不出來」的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。</span>
+        <span class="lang-en"><strong>What is still honest to say:</strong> no Synology HA or dual-controller chassis has ever been near it, and the DSM account needs administrator rights because DSM offers no narrower one. Around <strong>thirty</strong> defects were found by running it that no amount of reading had shown —two releases could not add a storage at all —so assume there are more. Where something could not be established, the plugin <strong>refuses the operation</strong> rather than guessing; the itemised list of what is and is not verified is <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#not-verified">the register</a>.</span>
+        <span class="lang-zh"><strong>仍然該誠實說的是：</strong>從來沒有任何 Synology HA 或雙控制器機箱接近過它，而那個 DSM 帳號需要管理員權限，因為 DSM 沒有更窄的選擇。從實際運行中找出大約<strong>三十個</strong>「讀程式碼永遠讀不出來」的缺陷——其中兩個版本根本無法加入 storage——所以請假設還有更多。凡是無法確認的地方，plugin 一律<strong>拒絕該操作</strong>而不是猜；逐項列出「哪些驗證過、哪些沒有」的清單在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#尚未驗證">登記簿</a>裡。</span>
     </div>
 
     <p>
@@ -200,7 +199,7 @@
 
     <p>
         <span class="lang-en">Every row below was run on a production five-node cluster on 2026-08-07. The interface matters: <code>pvedaemon</code>, <code>pveproxy</code>, <code>vzdump</code> and <code>pct</code> run under <code>-T</code> with no <code>PATH</code>, and <code>qm</code>, <code>pvesm</code>, <code>pvesh</code> and <code>qmrestore</code> do not —so an operation verified from a shell is not verified. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
-        <span class="lang-zh">下面每一列都在 2026-08-07 於一個五節點的正式叢集上跑過。介面很重要：<code>pvedaemon</code>、<code>pveproxy</code>、<code>vzdump</code> 與 <code>pct</code> 在 <code>-T</code> 底下執行而且沒有 <code>PATH</code>，`qm`、`pvesm`、`pvesh`、`qmrestore` 不是——所以「在 shell 上驗證過」不等於驗證過。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
+        <span class="lang-zh">下面每一列都在 2026-08-07 於一個五節點的正式叢集上跑過。介面很重要：<code>pvedaemon</code>、<code>pveproxy</code>、<code>vzdump</code> 與 <code>pct</code> 在 <code>-T</code> 底下執行而且沒有 <code>PATH</code>，<code>qm</code>、<code>pvesm</code>、<code>pvesh</code>、<code>qmrestore</code> 不是——所以「在 shell 上驗證過」不等於驗證過。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
     </p>
 
     <table>
@@ -222,42 +221,6 @@
         <span class="lang-en"><strong>And then the audit, which is the part that catches what an operation reported as successful.</strong> After all of the above: the NAS held exactly the LUNs and target mappings its VM configurations referenced, and the node exactly the maps and tracking entries — no orphan, no stale mapping, <code>pve-syno-reap</code> reporting nothing left behind on every node. <strong>Five defects were found by this run</strong>, all in code that worked from a shell, and all fixed.</span>
         <span class="lang-zh"><strong>然後是盤點，那才是抓「操作回報成功但其實沒做到」的部分。</strong>以上全部做完之後：NAS 上剩下的 LUN 與 target 對應，正好就是 VM 設定所引用的那些；節點上的 map 與追蹤紀錄也正好對得上——沒有孤兒、沒有失效對應，每個節點的 <code>pve-syno-reap</code> 都回報沒有殘留。<strong>這一輪找出五個缺陷</strong>，全部都在「從 shell 跑正常」的程式碼裡，而且全部修好了。</span>
     </div>
-</section>
-
-<section class="doc-section" id="open">
-    <h2 class="section-title"><span class="lang-en">Still open</span><span class="lang-zh">尚未確認</span></h2>
-    <p class="section-subtitle">
-        <span class="lang-en">Nothing in this list is acted on by code. Where a decision depends on one, the plugin refuses.</span>
-        <span class="lang-zh">這份清單裡沒有任何一項會被程式碼拿去行動。凡是決策依賴其中一項的，plugin 一律拒絕。</span>
-    </p>
-
-    <div class="module-list">
-        <div class="module-item">
-            <div class="module-item__name">R-9 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分已答</span></span></div>
-            <div class="module-item__desc"><span class="lang-en"><code>offset</code> and <code>limit</code> are ignored and no total is reported, so the listing returns everything it has —and nothing in the answer proves that. Only a second read can catch a short one, and the code that reads this list decides what may be deleted</span><span class="lang-zh"><code>offset</code> 和 <code>limit</code> 被忽略，也不回報總數，所以清單回傳的是它有的全部——而答案裡沒有任何東西可以證明這件事。只有第二次讀取才能抓到短少，而讀這份清單的正是決定什麼可以刪的程式碼</span></div>
-        </div>
-        <div class="module-item">
-            <div class="module-item__name">R-11 <span class="status-badge status-badge--partial"><span class="lang-en">partly answered</span><span class="lang-zh">部分已答</span></span></div>
-            <div class="module-item__desc"><span class="lang-en"><code>mapping_index</code> <strong>is</strong> reused —measured —which is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured: it needs hundreds of LUNs on one target</span><span class="lang-zh"><code>mapping_index</code> <strong>確實</strong>會重用——已量測——這正是裝置身分來自核心 WWID 而非路徑的原因。上限本身仍未量測：那需要在一個 target 上放上百顆 LUN</span></div>
-        </div>
-        <div class="module-item">
-            <div class="module-item__name">R-14 <span class="status-badge status-badge--partial"><span class="lang-en">narrowed</span><span class="lang-zh">已縮小</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">The minimum DSM privileges. Probed on hardware: DSM 7.1.1 has three groups and none is iSCSI-specific, and a non-administrator is refused at <strong>login</strong> with <strong>402</strong> —so it never reaches the storage calls. What remains is a Control Panel check that only the DSM interface can answer</span><span class="lang-zh">最小的 DSM 權限。已在硬體上探測：DSM 7.1.1 只有三個群組，沒有一個是 iSCSI 專用的，而非管理員在「登入」就被拒絕，錯誤 <strong>402</strong>——所以它根本走不到儲存呼叫。剩下的是一個只有 DSM 介面能回答的控制台檢查</span></div>
-        </div>
-        <div class="module-item">
-            <div class="module-item__name">R-15 / R-16 <span class="status-badge status-badge--partial"><span class="lang-en">narrowed</span><span class="lang-zh">已縮小</span></span></div>
-            <div class="module-item__desc"><span class="lang-en">Synology HA (SHA) and dual-controller UC. Both are implemented and <strong>neither has ever been run</strong> —no such chassis has been near this project. Whether <code>SYNO.Core.ISCSI.Node</code>'s uuid survives a <em>failover</em> decides whether pinning a storage to it protects or breaks it.<br><br><strong>Narrowed on 2026-08-07:</strong> a DSM <strong>7.1.1 &rarr; 7.4.1 upgrade</strong> —a reboot of the whole NAS, which is the closest thing to a failover this project can reach —left <strong>every LUN uuid unchanged</strong>, so every WWID survived. That does not answer R-15, which is about a failover; it does mean the identity is not fragile in the way a major version change might have made it</span><span class="lang-zh">Synology HA（SHA）與雙控制器 UC。兩者都已實作，而且<strong>都從來沒有跑過</strong>——這個專案從來沒有接觸過那種機箱。<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在<strong>故障切換</strong>後是否存活，決定了把 storage 釘在它上面是保護還是破壞。<br><br><strong>2026-08-07 已縮小：</strong>一次 DSM <strong>7.1.1 &rarr; 7.4.1 升級</strong>——整台 NAS 重開機，是這個專案能碰到的、最接近故障切換的事件——之後<strong>每一顆 LUN 的 uuid 都沒有變</strong>，所以每一個 WWID 都存活。那沒有回答 R-15，因為 R-15 問的是故障切換；但它確實表示這個身分沒有「會被大版本變更弄壞」那種脆弱</span></div>
-        </div>
-        </div>
-
-    <div class="note">
-        <span class="lang-en"><strong>R-2, R-5, R-12, R-13 and R-25 used to be on this list and are now answered.</strong> Unmapping is surgical and mapping adds, so per-node mapping is safe. The uuid-to-WWID rule is confirmed on two independent samples against the kernel's own <code>scsi_id</code>. Sixteen simultaneous creates all succeeded, and fifteen concurrent allocations from three nodes produced no duplicate names. A second login does not evict the first, so a cluster sharing one account is fine. And a snapshot's <code>create_time</code> is epoch seconds, measured against PVE's own displayed time on a real snapshot.</span>
-        <span class="lang-zh"><strong>R-2、R-5、R-12、R-13、R-25 曾經在這份清單上，現在都已經有答案。</strong>解除對應是精準的、對應是累加的，所以逐節點對應是安全的。uuid 到 WWID 的規則在兩個獨立樣本上、對照核心自己的 <code>scsi_id</code> 確認過。十六個同時建立全部成功，而三個節點同時發出十五個配置沒有產生重複名稱。第二次登入不會踢掉第一次，所以一個叢集共用一個帳號是沒問題的。而快照的 <code>create_time</code> 是 epoch 秒，這是拿一個真實快照對照 PVE 自己顯示的時間量到的。</span>
-    </div>
-
-    <p class="mt-3">
-        <a href="TESTING.md" class="btn btn--outline"><span class="lang-en">The full register and test plan</span><span class="lang-zh">完整登記簿與測試計畫</span></a>
-    </p>
 </section>
 
 <section class="doc-section doc-section--accent" id="rollback">
@@ -419,100 +382,85 @@
 <section class="doc-section" id="install">
     <h2 class="section-title"><span class="lang-en">Installing</span><span class="lang-zh">安裝</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">On every node of the cluster. The first install changes one node-wide thing — read the second warning before doing it in production.</span>
-        <span class="lang-zh">叢集的每一個節點都要裝。第一次安裝會動到一個節點層級的東西——在正式環境做之前請先讀第二個警告。</span>
+        <span class="lang-en">On every node. Nothing needs restarting afterwards.</span>
+        <span class="lang-zh">每個節點都要裝。裝完不需要重啟任何東西。</span>
     </p>
 
-    <pre><code><span class="c"># on each node —the two packages PVE does not install for you</span>
-apt update
-apt install -y open-iscsi multipath-tools
+    <pre><code><span class="comment"># open-iscsi and multipath-tools are the two PVE does not install for you</span>
+<span class="cmd">apt</span> update
+<span class="cmd">apt</span> install <span class="flag">-y</span> open-iscsi multipath-tools
 
-cd /tmp
-wget -O jt-pve-storage-synology_all.deb \
-  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
-apt install -y ./jt-pve-storage-synology_all.deb
+<span class="cmd">cd</span> /tmp
+<span class="cmd">wget</span> <span class="flag">-O</span> jt-pve-storage-synology_all.deb \
+  <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
+<span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
 
-dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   <span class="c"># check what you got</span></code></pre>
+<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{{print $3}}'</span>   <span class="comment"># check what you got</span></code></pre>
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">The <code>-O</code> is not decoration</span><span class="lang-zh">那個 <code>-O</code> 不是裝飾</span></strong>
-        <span class="lang-en">Without it, <code>wget</code> will not overwrite a file that is already there — it saves the download as <code>jt-pve-storage-synology_all.deb.1</code> instead, and <code>apt install ./jt-pve-storage-synology_all.deb</code> then installs the <strong>old</strong> file left in <code>/tmp</code> from last time.<br><br>Reported on a real node, where it silently <strong>downgraded 0.6.7 to 0.6.5</strong>. <code>apt</code> does print a <code>DOWNGRADING:</code> line, and with <code>-y</code> it does not stop to ask. That is why the version check is the last line of the block.</span>
-        <span class="lang-zh">少了它，<code>wget</code> 不會覆蓋已經存在的檔案——它會把下載的東西存成 <code>jt-pve-storage-synology_all.deb.1</code>，接著 <code>apt install ./jt-pve-storage-synology_all.deb</code> 裝的就是上次留在 <code>/tmp</code> 裡的<strong>舊檔案</strong>。<br><br>這在實機上發生過，把 <strong>0.6.7 靜靜降級成 0.6.5</strong>。<code>apt</code> 確實會印一行 <code>DOWNGRADING:</code>，而加了 <code>-y</code> 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。</span>
+        <span class="lang-en">Without it <code>wget</code> will not overwrite, so it saves the download as <code>…_all.deb.1</code> and the next line installs the <strong>old</strong> file still sitting in <code>/tmp</code>. It silently downgraded a real node from 0.6.7 to 0.6.5 —which is why the last line checks the version.</span>
+        <span class="lang-zh">少了它 <code>wget</code> 不會覆蓋，於是把下載的東西存成 <code>…_all.deb.1</code>，而下一行裝的是還留在 <code>/tmp</code> 裡的<strong>舊檔案</strong>。它曾把一台實機從 0.6.7 靜靜降級成 0.6.5——這就是最後一行要確認版本的原因。</span>
     </div>
-
 
     <p>
-        <span class="lang-en"><strong>Every node, including the one you browse from</strong>, and keep them on the same version. A storage operation runs on the node that owns the guest, not the node serving the interface — so a mixed-version cluster behaves differently depending on where a VM happens to be, and a node without the plugin makes the storage <em>invisible</em> in the web interface rather than reporting an error. No service restart is needed: the package's own trigger reloads the daemons. Check with <code>dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code>.</span>
-        <span class="lang-zh"><strong>每個節點都要裝，包含你正在瀏覽的那一台</strong>，而且版本要一致。storage 操作是在擁有那個 guest 的節點上執行的，不是提供介面的那一台——所以版本混雜的叢集，行為會隨著 VM 剛好在哪裡而不同；而沒有裝 plugin 的節點會讓這個 storage 在網頁介面上<strong>看不到</strong>，而不是回報錯誤。不需要重啟服務：套件自己的 trigger 會重新載入 daemon。用 <code>dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code> 確認。</span>
+        <span class="lang-en"><strong>Every node, including the one you browse from</strong>, on the same version. A node without the plugin makes the storage <strong>invisible</strong> in the web interface rather than reporting an error. The first activation runs <code>multipathd reconfigure</code>, which is node-wide —measured not to disturb another vendor's maps, but give a production node a window.</span>
+        <span class="lang-zh"><strong>每個節點都要裝，包含你正在瀏覽的那一台</strong>，版本要一致。沒有裝的節點會讓這個 storage 在網頁介面上<strong>看不到</strong>，而不是回報錯誤。第一次啟用會執行 <code>multipathd reconfigure</code>，那是節點層級的命令——實測不會動到別的廠商的 map，但正式節點請排個時段。</span>
     </p>
 
     <p class="muted">
-        <span class="lang-en">The reasoning behind each line of that block —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
-        <span class="lang-zh">那一段每一行背後的理由——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
-    </p>
-
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Schedule the first install</span><span class="lang-zh">第一次安裝請排維護時段</span></strong>
-        <span class="lang-en">The first activation writes a multipath drop-in and runs <code>multipathd reconfigure</code>, which is <strong>node-wide</strong>. Measured not to disturb another vendor's maps —1776 reads, 0 failures, event counter unmoved —but it is a node-wide command on a production node, so give it a window. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why the drop-in is mandatory</a>.</span>
-        <span class="lang-zh">第一次啟用會寫一個 multipath drop-in，並執行 <code>multipathd reconfigure</code>，那是一個<strong>節點層級</strong>的命令。實測不會動到別的廠商的 map——1776 次讀取、0 次失敗、事件計數器沒有動——但它畢竟是在正式節點上執行節點層級的命令，所以請排個時段。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">drop-in 為什麼是必要的</a>。</span>
-    </div>
-
-    <p class="muted">
-        <span class="lang-en">Why each of those is true, the mixed-version symptom that is hard to read, why the line is <code>apt install ./…</code> and not <code>dpkg -i</code>, and what to do if an older version of this page already led you into that —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
-        <span class="lang-zh">以上每一項為什麼成立、版本混雜時那個很難判讀的症狀、為什麼那一行是 <code>apt install ./…</code> 而不是 <code>dpkg -i</code>，以及本頁舊版本已經把你帶進那個坑時怎麼補救——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
+        <span class="lang-en">Why each of those is true, and what to do if an older version of this page told you to use <code>dpkg -i</code> —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">以上每一項為什麼成立，以及本頁舊版本叫你用 <code>dpkg -i</code> 時怎麼補救——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
     </p>
 
     <h3 class="subsection-title" id="upgrade"><span class="lang-en">Upgrading</span><span class="lang-zh">更新</span></h3>
 
     <p>
-        <span class="lang-en">The same commands. <code>apt install</code> on a newer <code>.deb</code> upgrades in place, the same trigger reloads the daemons, and <strong>no restart is needed</strong>.</span>
-        <span class="lang-zh">指令和安裝一樣。<code>apt install</code> 遇到比較新的 <code>.deb</code> 就是就地升級，同一個 trigger 會重新載入 daemon，<strong>不需要重啟</strong>。</span>
+        <span class="lang-en">The same commands, plus one. <code>apt install</code> on a newer <code>.deb</code> upgrades in place and nothing needs restarting.</span>
+        <span class="lang-zh">指令和安裝一樣，多一行。<code>apt install</code> 遇到比較新的 <code>.deb</code> 就是就地升級，不需要重啟任何東西。</span>
     </p>
 
-    <pre><code>cd /tmp
-rm -f jt-pve-storage-synology_all.deb*
-wget -O jt-pve-storage-synology_all.deb \
-  https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
-apt install -y ./jt-pve-storage-synology_all.deb
+    <pre><code><span class="cmd">cd</span> /tmp
+<span class="cmd">rm</span> <span class="flag">-f</span> jt-pve-storage-synology_all.deb*   <span class="comment"># the line that matters — see above</span>
+<span class="cmd">wget</span> <span class="flag">-O</span> jt-pve-storage-synology_all.deb \
+  <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
+<span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
 
-dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
+<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{{print $3}}'</span></code></pre>
 
     <p>
-        <span class="lang-en">Three things that are only true of an upgrade:</span>
-        <span class="lang-zh">有三件事只有升級時才成立：</span>
+        <span class="lang-en"><strong>Do every node before you trust the result</strong> —a storage operation runs where the guest is, so a half-upgraded cluster behaves differently depending on which node a VM happens to be on. Running guests keep their devices: the package replaces Perl modules and does not touch iSCSI sessions, multipath maps or the drop-in.</span>
+        <span class="lang-zh"><strong>每個節點都做完，才能相信結果</strong>——storage 操作是在 guest 所在的節點上跑的，所以升級到一半的叢集，行為會隨著 VM 剛好在哪一台而不同。執行中的 guest 會保有它們的裝置：這個套件換掉的是 Perl 模組，不會動到 iSCSI 工作階段、multipath 對應，或那個 drop-in。</span>
     </p>
-
-    <ul>
-        <li><span class="lang-en"><strong>The <code>rm -f</code> is the important line</strong>, for the reason in the box above. An upgrade is exactly when a stale <code>.deb</code> from the previous upgrade is sitting there.</span><span class="lang-zh"><strong><code>rm -f</code> 那一行才是重點</strong>，理由就是上面那個框。升級正好就是「上一次升級留下的 <code>.deb</code> 還躺在那裡」的時候。</span></li>
-        <li><span class="lang-en"><strong>Do every node before you trust the result.</strong> A storage operation runs where the guest is, so a half-upgraded cluster behaves differently depending on which node a VM happens to be on. There is nothing to migrate: the plugin keeps no on-disk state beyond <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> and the per-node WWID list under <code>/var/lib</code>, and every version reads both.</span><span class="lang-zh"><strong>每個節點都做完，才能相信結果。</strong>storage 操作是在 guest 所在的節點上跑的，所以升級到一半的叢集，行為會隨著 VM 剛好在哪一台而不同。沒有東西需要搬移：這個 plugin 除了 <code>/etc/pve/priv/storage/&lt;storage&gt;.syno</code> 和 <code>/var/lib</code> 底下的逐節點 WWID 清單之外不保存任何磁碟狀態，而每一版都讀得懂這兩者。</span></li>
-        <li><span class="lang-en"><strong>Nothing needs to be stopped.</strong> Running guests keep their devices: the package replaces Perl modules, and does not touch iSCSI sessions, multipath maps or the drop-in in <code>/etc/multipath/conf.d</code>.</span><span class="lang-zh"><strong>不需要停掉任何東西。</strong>執行中的 guest 會保有它們的裝置：這個套件換掉的是 Perl 模組，它不會動到 iSCSI 工作階段、multipath 對應，或 <code>/etc/multipath/conf.d</code> 裡的 drop-in。</span></li>
-    </ul>
 
     <p class="muted">
-        <span class="lang-en">How the method was found, since Synology documents none of it —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
-        <span class="lang-zh">這個方法是怎麼找到的——因為 Synology 完全沒有記載——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
+        <span class="lang-en">The reasoning behind each line —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">每一行背後的理由——<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
     </p>
 
-    <div class="note">
-        <span class="lang-en"><strong>Four of these plugins can share a node</strong> —this one and the DellEMC, NetApp and PureStorage siblings are developed together on a node that has all of them. But <code>PVE::SectionConfig::init</code> <strong>dies on a duplicate property name</strong>, and the failure is not scoped to the offending plugin: every storage on the node stops working. The <code>syno-</code> prefix exists for that reason.</span>
-        <span class="lang-zh"><strong>四支 plugin 可以共存於同一個節點</strong>——這一支和 DellEMC、NetApp、PureStorage 三支相關專案就是在一台同時裝了全部的節點上開發的。但 <code>PVE::SectionConfig::init</code> <strong>遇到重複的屬性名稱會直接 die</strong>，而且失敗範圍不限於出問題的那一支：節點上每一個 storage 都會停止運作。<code>syno-</code> 這個前置字串就是為此存在的。</span>
-    </div>
 </section>
 
 <section class="doc-section" id="configure">
+
     <h2 class="section-title"><span class="lang-en">Configuring a storage</span><span class="lang-zh">設定 storage</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">Run this once, on one node. The storage is shared by construction, so every node picks it up.</span>
-        <span class="lang-zh">在其中一個節點上執行一次就好。這個 storage 依其本質就是共用的，每個節點都會接手。</span>
+        <span class="lang-en"><strong>Run this once, on one node</strong> —unlike the install, which is every node. The storage is shared by construction, so the others pick it up.</span>
+        <span class="lang-zh"><strong>在其中一個節點上執行一次就好</strong>——和安裝相反，安裝是每個節點都要。這個 storage 依其本質就是共用的，其他節點會自己接手。</span>
     </p>
 
-    <pre><code>pvesm add synologysan mysyno \
-    --syno-portal   192.0.2.10 \
-    --syno-username pve-storage \
-    --syno-password '&lt;the password&gt;' \
-    --syno-location /volume1 \
-    --content       images \
-    --nodes         pve1,pve2,pve3    <span class="c"># optional: restrict to these nodes</span></code></pre>
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">The DSM volume must be Btrfs</span><span class="lang-zh">DSM 儲存空間必須是 Btrfs</span></strong>
+        <span class="lang-en">Not a preference —a requirement. On Synology, a thin LUN gets snapshot and restore <em>only</em> on a Btrfs volume, and this storage is built on those two operations. Check it in <strong>Storage Manager → Storage</strong> before you start; <code>pvesm add</code> reads <code>fs_type</code> and refuses an ext4 volume outright.</span>
+        <span class="lang-zh">這不是偏好，是要求。在 Synology 上，thin LUN <strong>只有</strong>在 Btrfs 儲存空間上才有快照與還原，而這個 storage 就是建立在那兩個操作上。開始之前先在<strong>儲存空間管理員 → 儲存空間</strong>確認；<code>pvesm add</code> 會去讀 <code>fs_type</code>，遇到 ext4 儲存空間會直接拒絕。</span>
+    </div>
+
+    <pre><code><span class="cmd">pvesm</span> add synologysan mysyno \
+    <span class="flag">--syno-portal</span>   192.0.2.10 \
+    <span class="flag">--syno-username</span> pve-storage \
+    <span class="flag">--syno-password</span> <span class="string">'&lt;the password&gt;'</span> \
+    <span class="flag">--syno-location</span> /volume1 \
+    <span class="flag">--content</span>       images \
+    <span class="flag">--nodes</span>         pve1,pve2,pve3    <span class="comment"># optional: restrict to these nodes</span></code></pre>
 
     <p>
         <span class="lang-en"><code>pvesm add</code> refuses immediately if the volume is not Btrfs, if the model does not support iSCSI targets or snapshots, or if the storage id would fold onto an existing storage's LUN prefix. It is meant to fail there rather than at your first snapshot.</span>
@@ -590,9 +538,11 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
     </p>
 
     <div class="alert alert--warning">
-        <strong><span class="lang-en">Cloning from a snapshot needs the command line</span><span class="lang-zh">從快照複製要用指令列</span></strong>
-        <span class="lang-en">The web interface refuses it, and that refusal is correct. The <strong>linked</strong> clone works, and <code>--full 0</code> is required:<br><br><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this array the result is an independent reflink, not a dependent clone. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
-        <span class="lang-zh">網頁介面會拒絕，而那個拒絕是對的。<strong>連結</strong>複製可以用，而且必須加 <code>--full 0</code>：<br><br><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這個陣列上做出來的是獨立的 reflink，不是相依的複本。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
+        <strong><span class="lang-en">Cloning from a snapshot: the web interface can, if the source is a template</span><span class="lang-zh">從快照複製：網頁介面可以，前提是來源是範本</span></strong>
+        <span class="lang-en">Proxmox VE decides which kind of clone to ask for with <code>isTemplate ? 'clone' : 'copy'</code>. For a <strong>template</strong> it asks for a linked clone, this storage supports that from a snapshot, and the GUI works. For anything else it always asks for a <strong>full</strong> clone —which means reading the disk <em>at</em> the snapshot, and a Synology LUN has no device there, so the plugin declares it unsupported and PVE refuses before it starts.<br><br>So: convert the source to a template, or use the command line, where <code>--full 0</code> is required —omitting it defaults to <em>true</em> for a non-template:</span>
+        <span class="lang-zh">Proxmox VE 用 <code>isTemplate ? 'clone' : 'copy'</code> 決定要求哪一種複製。對<strong>範本</strong>它要求連結複製，而這個 storage 從快照支援它，所以 GUI 可以做。對其他任何東西它一律要求<strong>完整</strong>複製——那意思是去讀「快照當下的那顆磁碟」，而 Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 在動手之前就拒絕。<br><br>所以：把來源轉成範本，或者用指令列，而指令列必須加 <code>--full 0</code>——不加的話對非範本會預設為「真」：</span>
+        <span class="lang-en"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this array the result is an independent <strong>reflink</strong>, not a dependent clone —measured: a template's LUN was deleted while a clone of it was running, and the clone kept running. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
+        <span class="lang-zh"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這個陣列上做出來的是獨立的 <strong>reflink</strong>，不是相依的複本——已量測：在複本執行中把範本的 LUN 刪除，複本照樣跑。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
     </div>
 
 
@@ -603,14 +553,14 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'</code></pre>
         <span class="lang-zh"><code>nodes</code> 是 Proxmox VE 自己的屬性，不是 <code>syno-</code> 開頭的，而它在這個 storage 上和在其他 storage 上一樣有效。可以在 <code>pvesm add</code> 時設定，也可以之後再設：</span>
     </p>
 
-    <pre><code><span class="c"># restrict an existing storage</span>
-pvesm set mysyno --nodes pve1,pve2
+    <pre><code><span class="comment"># restrict an existing storage</span>
+<span class="cmd">pvesm</span> set mysyno <span class="flag">--nodes</span> pve1,pve2
 
-<span class="c"># open it to the whole cluster again</span>
-pvesm set mysyno --delete nodes
+<span class="comment"># open it to the whole cluster again</span>
+<span class="cmd">pvesm</span> set mysyno <span class="flag">--delete</span> nodes
 
-<span class="c"># check</span>
-pvesm status --storage mysyno</code></pre>
+<span class="comment"># check</span>
+<span class="cmd">pvesm</span> status <span class="flag">--storage</span> mysyno</code></pre>
 
     <p>
         <span class="lang-en">Two reasons to use it. <strong>A node without the plugin installed</strong> will otherwise log <em>unknown storage type</em> on every <code>pvestatd</code> poll —restricting the storage is the clean way to stage a rollout. And <strong>a node with no route to the NAS's data portals</strong> has no business trying: it will fail to activate volumes rather than fail politely.</span>
@@ -653,12 +603,12 @@ pvesm status --storage mysyno</code></pre>
 
     <h3 class="subsection-title"><span class="lang-en">Removing a storage</span><span class="lang-zh">移除 storage</span></h3>
 
-    <pre><code><span class="c"># 1. on EVERY node, while the storage still exists</span>
-pve-syno-reap --storage mysyno
-pve-syno-reap --storage mysyno --remove
+    <pre><code><span class="comment"># 1. on EVERY node, while the storage still exists</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> mysyno
+<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> mysyno <span class="flag">--remove</span>
 
-<span class="c"># 2. then, on one node</span>
-pvesm remove mysyno</code></pre>
+<span class="comment"># 2. then, on one node</span>
+<span class="cmd">pvesm</span> remove mysyno</code></pre>
 
     <p>
         <span class="lang-en"><code>on_delete_hook</code> runs on <strong>one</strong> node —the one where <code>pvesm remove</code> was typed. The others are never told, and <strong>nothing in Proxmox VE calls <code>deactivate_storage</code></strong> to clean them up. So the per-node step above is the procedure, not a formality.</span>
@@ -673,9 +623,9 @@ pvesm remove mysyno</code></pre>
         <span class="lang-zh">節點當機之後執行它，移除 storage 之前也在每個節點上執行。預設是試跑。</span>
     </p>
 
-    <pre><code>pve-syno-reap --storage &lt;storage&gt;            <span class="c"># show what is left behind</span>
-pve-syno-reap --storage &lt;storage&gt; --remove   <span class="c"># then act</span>
-pve-syno-reap --all --remove                 <span class="c"># every synologysan storage on this node</span></code></pre>
+    <pre><code><span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> &lt;storage&gt;            <span class="comment"># show what is left behind</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> &lt;storage&gt; <span class="flag">--remove</span>   <span class="comment"># then act</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span> <span class="flag">--remove</span>                 <span class="comment"># every synologysan storage on this node</span></code></pre>
 
     <p>
         <span class="lang-en"><code>pve-syno-reap</code> clears multipath maps this node holds for LUNs the NAS no longer has, and tracking entries left by a crash. <strong>Two things make it necessary, both measured on a three-node cluster.</strong></span>
@@ -706,7 +656,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
     </p>
 
     <div class="config-block"><pre><code><span class="comment"># from a .deb release, or straight out of the repository</span>
-<span class="cmd">pve-syno-api-probe</span> --host <span class="string">192.0.2.10</span> --user <span class="string">pve-storage</span></code></pre></div>
+<span class="cmd">pve-syno-api-probe</span> <span class="flag">--host</span> <span class="string">192.0.2.10</span> <span class="flag">--user</span> <span class="string">pve-storage</span></code></pre></div>
 
     <p>
         <span class="lang-en">It reports the API set and every version range the NAS accepts, whether anti-CSRF is on, the DSM volumes and their filesystems, the LUNs and targets as they are now, the <code>dev_attribs</code> of an existing LUN, and a closing register of what the run settled and what still needs a write to answer.</span>
@@ -813,7 +763,7 @@ pve-syno-reap --all --remove                 <span class="c"># every synologysan
         </div>
         <div class="module-item">
             <div class="module-item__name">1.0.0</div>
-            <div class="module-item__desc"><span class="lang-en"><strong>A second model and a second DSM version are done</strong> — a DS925+ on DSM 7.3.2 driven end to end, and the DS918+ carried across a 7.1 → 7.4 upgrade with every LUN uuid intact. What is left: <strong>the minimum DSM privileges settled</strong>, the remaining operations repeated on a second model, and everything else on the <a href="#open">still-open</a> list either answered or documented as unanswerable. Every 0.x before it is a prerelease</span><span class="lang-zh"><strong>第二個機型與第二個 DSM 版本已經完成</strong>——一台 DS925+（DSM 7.3.2）完整跑過一輪，而 DS918+ 帶著全部 LUN uuid 完好地跨過了 7.1 → 7.4 升級。還剩下的是：<strong>確定最小的 DSM 權限</strong>、剩下那些操作也在第二個機型上重複一次，以及<a href="#open">尚未確認</a>清單上的其他每一項不是有答案就是被記載為無法回答。在它之前的每一個 0.x 都是預發行版</span></div>
+            <div class="module-item__desc"><span class="lang-en"><strong>A second model and a second DSM version are done</strong> — a DS925+ on DSM 7.3.2 driven end to end, and the DS918+ carried across a 7.1 → 7.4 upgrade with every LUN uuid intact. What is left: <strong>the minimum DSM privileges settled</strong>, the remaining operations repeated on a second model, and everything else on the list either answered or documented as unanswerable. Every 0.x before it is a prerelease</span><span class="lang-zh"><strong>第二個機型與第二個 DSM 版本已經完成</strong>——一台 DS925+（DSM 7.3.2）完整跑過一輪，而 DS918+ 帶著全部 LUN uuid 完好地跨過了 7.1 → 7.4 升級。還剩下的是：<strong>確定最小的 DSM 權限</strong>、剩下那些操作也在第二個機型上重複一次，以及清單上的其他每一項不是有答案就是被記載為無法回答。在它之前的每一個 0.x 都是預發行版</span></div>
         </div>
     </div>
 

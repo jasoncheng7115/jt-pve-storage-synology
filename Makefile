@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.6.20
+VERSION = 0.6.21
 
 DESTDIR =
 PREFIX   = /usr
@@ -239,6 +239,13 @@ check-secrets:
 # explains why not to use it — the sixth time in this project that a guard could
 # not tell a thing from prose about the thing. Strip, scope, or anchor: never just
 # grep the word.
+#
+# `<` is excluded from the URL character class for the same family of reason: the
+# documentation site's command blocks are syntax-coloured, so a URL is followed by
+# `</span>`, and a class that stopped only at a quote, a space or a bracket swept
+# the closing tag into the URL and then reported a 404 for it — while the same URL
+# passed on the line above. A guard that reads markup as content fails in the
+# direction of a false alarm, which is the direction that gets guards ignored.
 check-doc-urls:
 	@echo "Checking the documentation's download URLs..."
 	@bad=0; \
@@ -248,7 +255,7 @@ check-doc-urls:
 		echo "         unconfigured. Document 'apt install ./<file>.deb'."; \
 		bad=1; \
 	fi; \
-	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/latest/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
+	for u in $$(grep -rhoE 'https://github\.com/[^" )<]*/releases/latest/download/[^" )<]*' docs/ README*.md 2>/dev/null | sort -u); do \
 		code=$$(curl -sL -o /dev/null -w '%{http_code}' --max-time 25 "$$u"); \
 		if [ "$$code" != "200" ]; then \
 			echo "  ERROR: $$code for $$u"; \
@@ -258,7 +265,7 @@ check-doc-urls:
 		else echo "  ok $$code  $$u"; fi; \
 	done; \
 	pending=v$$(echo "$(VERSION)" | tr '~' '-'); \
-	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
+	for u in $$(grep -rhoE 'https://github\.com/[^" )<]*/releases/download/[^" )<]*' docs/ README*.md 2>/dev/null | sort -u); do \
 		case "$$u" in \
 			*/releases/download/$$pending/*) \
 				echo "  pending  $$u"; \
@@ -328,24 +335,32 @@ check-zh:
 	@perl tools/check-zh-markdown.pl >/dev/null 2>&1 || { \
 		echo "  (run 'make zh-normalise' — it fixes what it can)"; exit 1; }
 
+# Version consistency: every bin script carrying a `my $VERSION` is ENUMERATED,
+# never named. The version of this check that named `bin/pve-syno-api-probe` on its
+# own left `bin/pve-syno-reap` on 0.6.5 for fifteen releases, while this project's
+# documentation claimed it compared BOTH version-bearing scripts — so the guard read
+# as satisfied and the drift was invisible. It was invisible on the worst possible
+# script: the reaper is the documented step after a node crash, so `--version` was
+# lying on the one output an operator reads during an incident.
 release-check: check-multipath-flush check-secrets check-tool-paths check-zh check-og-image syntax unit unit-nopve critic \
                check-doc-urls \
                check-release-archive
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
 		| sed 's/-[0-9]*$$//'); \
-	tool_version=$$(sed -n "s/^my \$$VERSION = '\(.*\)';/\1/p" \
-		bin/pve-syno-api-probe); \
 	fail=0; \
 	echo "  Makefile:         $(VERSION)"; \
 	echo "  debian/changelog: $$deb_version"; \
-	echo "  probe tool:       $$tool_version"; \
 	if [ -n "$$deb_version" ] && [ "$(VERSION)" != "$$deb_version" ]; then \
 		echo "  ERROR: Makefile and debian/changelog disagree"; fail=1; \
 	fi; \
-	if [ "$(VERSION)" != "$$tool_version" ]; then \
-		echo "  ERROR: Makefile and bin/pve-syno-api-probe disagree"; fail=1; \
-	fi; \
+	for f in $$(grep -l '^my \$$VERSION = ' bin/* | sort); do \
+		v=$$(sed -n "s/^my \$$VERSION = '\(.*\)';/\1/p" $$f); \
+		echo "  $$f:  $$v"; \
+		if [ "$(VERSION)" != "$$v" ]; then \
+			echo "  ERROR: Makefile and $$f disagree"; fail=1; \
+		fi; \
+	done; \
 	for f in CHANGELOG.md CHANGELOG_zh-TW.md; do \
 		if ! grep -q "\[$(VERSION)\]" $$f; then \
 			echo "  ERROR: $$f has no entry for $(VERSION)"; fail=1; \

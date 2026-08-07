@@ -1,3 +1,27 @@
+jt-pve-storage-synology (0.6.21-1) unstable; urgency=medium
+
+  * bin/pve-syno-reap --version had reported 0.6.5 for fifteen releases. The
+    version-consistency check named bin/pve-syno-api-probe on its own while the
+    project's own documentation claimed it compared BOTH version-bearing bin
+    scripts, so the guard read as satisfied and the drift was invisible -- on
+    the one script whose --version an operator reads during an incident, the
+    reaper being the documented step after a node crash. The check now
+    enumerates every bin script carrying a $VERSION instead of naming them.
+  * The documentation site said cloning from a snapshot needs the command line.
+    Proxmox VE decides with isTemplate ? 'clone' : 'copy', so for a template it
+    asks for a linked clone and the web interface works; only a non-template
+    forces the full copy that is refused. Both routes are now stated, with
+    --full 0 marked required rather than optional.
+  * The Btrfs requirement is stated before the pvesm add command rather than in
+    a clause after it, since on_add_hook refuses an ext4 volume outright.
+  * Documented why copy => { snap => 1 } can never be claimed: PVE never pairs
+    the teardown. API2/Qemu.pm deactivates with a snapname only when cloning to
+    another node with the source stopped, and QemuImage::convert activates and
+    never deactivates, so a temporary LUN would leak on an ordinary same-node
+    clone on the success path.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Fri, 07 Aug 2026 12:00:00 +0800
+
 jt-pve-storage-synology (0.6.20-1) unstable; urgency=medium
 
   * docs/og-image.png, the card a shared link shows. The netapp and purestorage

@@ -6,6 +6,49 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.21] - 2026-08-07
+
+### Fixed
+
+- **`bin/pve-syno-reap --version` had reported `0.6.5` for fifteen releases.**
+  The version-consistency check named `bin/pve-syno-api-probe` on its own, while
+  this project's own documentation claimed it compared *both* version-bearing bin
+  scripts. So the guard read as satisfied and the drift was invisible — on the one
+  script whose `--version` an operator reads during an incident, because the
+  reaper is the documented step after a node crash. The check now enumerates every
+  bin script carrying a `$VERSION` instead of naming them, so the next script is
+  covered without anyone remembering. Shown to fail on the stale file before it
+  was fixed.
+
+### Changed
+
+- **The documentation site said cloning from a snapshot needs the command line.**
+  It does not, and the page was more absolute than the truth: Proxmox VE decides
+  which clone to ask for with `isTemplate ? 'clone' : 'copy'`, so for a **template**
+  it asks for a linked clone, this storage supports that from a snapshot, and the
+  web interface works — verified on a real cluster. Only a non-template forces the
+  full copy that is refused. Both routes are now stated, with `--full 0` marked as
+  required rather than optional (`full` defaults to `!is_template`).
+- **The Btrfs requirement is stated before the `pvesm add` command**, not inside a
+  clause after it. `on_add_hook` reads `fs_type` and refuses an ext4 volume, so it
+  is a precondition to check in Storage Manager first, not a detail to discover.
+- **"Run this once, on one node" is emphasised** and set against the install step,
+  which is every node. The two adjacent sections previously read the same way.
+- Command blocks that were still plain text are syntax-coloured, and the last
+  literal Markdown backticks in `docs/index.html` are now `<code>` spans.
+
+### Documented
+
+- **Why `copy => { snap => 1 }` can never be claimed**, rather than only that it
+  is not. The workable-looking fix — reflink the snapshot into a temporary LUN in
+  `activate_volume($snapname)` and tear it down in `deactivate_volume($snapname)` —
+  cannot work, because PVE never pairs the teardown: `API2/Qemu.pm` deactivates
+  with a snapname only when cloning to another node with the source stopped, and
+  `QemuServer/QemuImage.pm::convert` activates and never deactivates at all. The
+  temporary LUN would leak on an ordinary same-node clone **on the success path**,
+  and a leaked reflink grows as the source diverges. The blocker is not producing a
+  readable device at a snapshot; it is that there is nowhere to give it back.
+
 ## [0.6.20] - 2026-08-07
 
 ### Added
