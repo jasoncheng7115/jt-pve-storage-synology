@@ -248,6 +248,13 @@ its PID unchanged throughout. If something blocks `deb-systemd-invoke`,
 `systemctl restart pvedaemon pveproxy pvestatd` is the fallback.
 
 
+> **Keep the version the same on every node.** A storage operation runs on the node
+> that owns the guest, using *that node's* copy of the plugin — not the one on the
+> node you are browsing from. A cluster with mixed versions therefore behaves
+> differently depending on where a VM happens to be, and the symptom is baffling: a
+> fix you installed is simply absent for some guests. Check with
+> `dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'` on each node.
+
 > **Every node, or the storage is invisible in the web interface.** `pvesm add`
 > writes to the cluster configuration, so one node is enough to create the storage —
 > but the web interface is served by *whichever node your browser is connected to*,
