@@ -95,7 +95,7 @@ qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 
 想把按鈕拿回來，就先把來源轉成範本：GUI 對範本會提供連結複製。
 
-### 倒回，以及為什麼繞了一段路才走到這裡
+### 快照倒回，以及為什麼繞了一段路才走到這裡
 
 兩份參考實作都沒有快照倒回：Kubernetes 與 Cinder 都是用「把快照複製成一個**新的** volume」來還原，所以兩者都不需要。這個方法是靠對一台 DSM 詢問九個候選名稱找到的，其中一個回答了——**`restore_snapshot`**，收 `src_lun_uuid` 與 `snapshot_uuid`。
 

@@ -173,7 +173,7 @@ space at the moment it is made.
 To get the button back, convert the source to a template first: the GUI offers
 linked clone for templates.
 
-### Rollback, and why it took a while to get here
+### Snapshot rollback, and why it took a while to get here
 
 Neither reference implementation has a snapshot rollback: Kubernetes and Cinder
 both restore by cloning a snapshot into a **new** volume, so neither needed one.
