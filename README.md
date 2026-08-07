@@ -407,7 +407,7 @@ Four of these plugins can share a node — but `PVE::SectionConfig::init` **dies
 duplicate property name**, and every storage on the node then stops working. The
 `syno-` prefix exists for that reason.
 
-## Configuring a storage
+## Adding a synologysan storage in Proxmox VE
 
 Once, on one node. The storage is shared by construction.
 

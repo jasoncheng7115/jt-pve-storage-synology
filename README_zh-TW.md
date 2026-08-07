@@ -243,7 +243,7 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'
 
 四支這樣的 plugin 可以共存於同一個節點——但 `PVE::SectionConfig::init` **遇到重複的屬性名稱會直接 die**，而節點上每一個 storage 都會停止運作。`syno-` 這個前置字串就是為了這件事而存在。
 
-## 設定 storage
+## 在 Proxmox VE 新增 synologysan storage
 
 在其中一個節點上執行一次就好。這個 storage 依其本質就是共用的。
 
