@@ -1,3 +1,13 @@
+jt-pve-storage-synology (0.6.8-1) unstable; urgency=medium
+
+  * The host cache flush around a snapshot and a rollback now reports when it
+    did not happen. Both dropped the return value, which is the only thing
+    that says whether blockdev ran at all -- so every snapshot taken from the
+    web interface skipped its flush silently. A rollback now refuses if the
+    flush cannot be done; a snapshot warns.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 12:15:00 +0800
+
 jt-pve-storage-synology (0.6.7-1) unstable; urgency=medium
 
   * Resolve every external command to an absolute path. A PVE daemon has NO

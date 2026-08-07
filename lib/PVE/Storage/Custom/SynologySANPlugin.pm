@@ -1710,8 +1710,19 @@ sub volume_snapshot {
 
     # Flush BEFORE the snapshot, or it records what reached the NAS rather than
     # what the guest believes it wrote.
+    #
+    # A warning, not a refusal: the snapshot is still a valid crash-consistent
+    # one without it, only staler than intended, and refusing to take a snapshot
+    # is worse than taking a slightly older one. But it is not silent — for as
+    # long as the return value was dropped, every snapshot taken from the web
+    # interface skipped this and said nothing, because `blockdev` cannot be
+    # executed from a PVE daemon by bare name.
     my $wwid = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($obj->{uuid});
-    PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+    warn "storage '$storeid': could not flush this node's cache for the device"
+       . " before snapshotting '$snap'. The snapshot is still crash-consistent,"
+       . " but it may not contain the guest's most recent writes. Check that"
+       . " blockdev is installed and runnable on this node.\n"
+        if !PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
 
     # THE SNAPSHOT NAME GOES IN THE DESCRIPTION, and that is not redundancy.
     #
@@ -1799,7 +1810,17 @@ sub volume_snapshot_rollback {
     # FLUSH BEFORE. Dirty pages written back after the NAS has restored the
     # snapshot would land pre-rollback content on top of it, and the result looks
     # like a rollback that half worked.
-    PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
+    #
+    # REFUSED if the flush did not happen. This used to be called for its side
+    # effect with the return value dropped, and the return value is the only
+    # thing that says whether `blockdev` ran at all — which, from a PVE daemon
+    # with no PATH, it did not. A rollback that skips this silently is the one
+    # operation here where "it probably worked" is not good enough.
+    die "storage '$storeid': refusing to roll back — the host cache for this"
+      . " device could not be flushed, so dirty pages could be written back on"
+      . " top of the restored snapshot. Check that blockdev is installed and"
+      . " runnable on this node.\n"
+        if !PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
 
     # LUN::snapshot_rollback verifies afterwards that the uuid did not change —
     # if it ever does, the device identity moved underneath every node.
@@ -1808,7 +1829,16 @@ sub volume_snapshot_rollback {
     # INVALIDATE AFTER. Demonstrated on this project: reading the device straight
     # after a successful rollback returned the OLD bytes until the cache was
     # dropped. Without this a guest goes on seeing pre-rollback data from cache.
-    PVE::Storage::Custom::Synology::Multipath::invalidate_device_cache($wwid);
+    #
+    # A warning and not a die: the rollback HAS happened on the NAS by now, so
+    # refusing would report a failure for work that is done. But it must be said
+    # out loud, because the symptom is a disk that looks as though it was never
+    # rolled back at all.
+    warn "storage '$storeid': the rollback succeeded on the NAS, but this node's"
+       . " cache for the device could not be invalidated. Reads may return"
+       . " pre-rollback data until the guest is started fresh. Check that"
+       . " blockdev is installed and runnable on this node.\n"
+        if !PVE::Storage::Custom::Synology::Multipath::invalidate_device_cache($wwid);
 
     eval { $api->logout };
     return 1;

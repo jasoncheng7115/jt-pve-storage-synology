@@ -6,6 +6,21 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.8] - 2026-08-07
+
+### Fixed
+
+- **The host cache flush around a snapshot and a rollback now reports when it
+  did not happen.** Both were called for their side effect with the return
+  value dropped — and that return value is the only thing that says whether
+  `blockdev` ran at all, which from a PVE daemon it did not. So **every
+  snapshot taken from the web interface skipped its flush silently**, and a
+  rollback skipped the invalidation that this project measured as necessary:
+  reads returned pre-rollback bytes until the cache was dropped. A rollback now
+  **refuses** if the flush cannot be done, a snapshot **warns** (it is still
+  crash-consistent, only staler than intended), and the post-rollback
+  invalidation warns because the array-side work is already complete by then.
+
 ## [0.6.7] - 2026-08-07
 
 ### Fixed
