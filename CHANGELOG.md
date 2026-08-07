@@ -6,6 +6,35 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.5] - 2026-08-07
+
+### Fixed
+
+- **The Proxmox VE snapshot name now appears in SAN Manager.** Its snapshot list
+  shows time, consistency state, description, status and lock — and **no name
+  column at all**. The `name` field is in the API and the plugin matches on it, but
+  an operator looking at DSM could not see it: the description was
+  `Proxmox VE <storage>`, so every snapshot of every disk on a storage looked
+  identical, and *which PVE snapshot is this row?* had no answer without going back
+  to PVE and comparing timestamps. It is now
+  `<snapshot name> (Proxmox VE <storage>)`.
+
+### Verified on hardware
+
+- **Snapshot names: the NAS refuses nothing.** 256 characters, spaces, `_` `+` `@`
+  `/` `%` `:`, a leading hyphen and Chinese characters were all accepted — a
+  different rule from LUN names, which refuse `_`, space, `+` and `@` with 18990503.
+  No sanitising is needed, and **PVE is the stricter end**: `pve-snapshot-name` is
+  `pve-configid` capped at 40 characters, so a name reaching the plugin can only be
+  a letter followed by letters, digits, underscores and hyphens. There is no
+  combination PVE can produce that the NAS will refuse.
+- The install command now uses
+  `/releases/latest/download/jt-pve-storage-synology_all.deb`, which does not go
+  stale. `check-doc-urls` verifies it resolves, because the two things it depends on
+  — releases not being flagged as prereleases, and the workflow publishing a
+  version-free copy — live in the release workflow and could silently stop being
+  true.
+
 ## [0.6.4] - 2026-08-07
 
 **The `beta1` suffix is gone from this release onwards.** Versions are now plain

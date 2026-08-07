@@ -1650,10 +1650,23 @@ sub volume_snapshot {
     my $wwid = PVE::Storage::Custom::Synology::LUN::wwid_for_uuid($obj->{uuid});
     PVE::Storage::Custom::Synology::Multipath::flush_device_cache($wwid);
 
+    # THE SNAPSHOT NAME GOES IN THE DESCRIPTION, and that is not redundancy.
+    #
+    # SAN Manager's snapshot list shows time, consistency state, description, status
+    # and lock — and **no name column at all**. The `name` field is in the API and
+    # the plugin matches on it, but an operator looking at DSM cannot see it. With
+    # only "Proxmox VE <storage>" in the description, every snapshot of every disk on
+    # a storage looked identical in the interface, so the one question an operator
+    # actually has — which PVE snapshot is this row? — had no answer without going
+    # back to PVE and comparing timestamps.
+    #
+    # Reported by Jason on 2026-08-07: he took a snapshot called `install1`, opened
+    # the snapshot list, and could not find that name anywhere. It was there; DSM
+    # just does not display it.
     $lun->snapshot_create(
         src_uuid    => $obj->{uuid},
         name        => PVE::Storage::Custom::Synology::Naming::snapshot_name($snap),
-        description => "Proxmox VE $storeid",
+        description => "$snap (Proxmox VE $storeid)",
     );
     eval { $api->logout };
     return 1;

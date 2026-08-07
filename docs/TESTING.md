@@ -609,6 +609,43 @@ There is no `SYNO.San.Nvme.*` on this model, so it has no NVMe-of support.
 
 ---
 
+### Snapshot names: the NAS refuses nothing, and PVE is the stricter of the two
+
+Asserted for a long time as "snapshot names are free". Measured 2026-08-07, and it
+is true to a degree that makes validation unnecessary:
+
+| Tried | Result |
+|---|---|
+| 40 characters (PVE's own maximum) | accepted |
+| 64, 128, **256** characters | accepted |
+| `_` `+` `@` `/` `%` `:` and a **space** | all accepted |
+| a **leading hyphen** | accepted |
+| Chinese characters | accepted |
+
+That is a different rule from LUN names, which refuse `_`, space, `+` and `@` with
+18990503. Nothing here needs sanitising — and more usefully, **PVE is the stricter
+end**: `pve-snapshot-name` is `pve-configid` capped at 40 characters, and
+`CONFIGID_RE` is `[a-z][a-z0-9_-]+/i`. So a snapshot name reaching this plugin can
+only ever be a letter followed by letters, digits, underscores and hyphens, up to
+40 — a strict subset of what the NAS takes. There is no combination PVE can produce
+that the NAS will refuse.
+
+### The snapshot name is invisible in SAN Manager, so it goes in the description
+
+SAN Manager's snapshot list shows **time, consistency state, description, status and
+lock — and no name column at all**. The `name` field exists in the API, and the
+plugin matches on it, but an operator looking at DSM cannot see it.
+
+The description used to be `Proxmox VE <storage>`, so every snapshot of every disk
+on a storage looked identical in the interface, and the one question an operator
+actually has — *which PVE snapshot is this row?* — had no answer without going back
+to PVE and comparing timestamps.
+
+Found the way these things are found: Jason took a snapshot called `install1`,
+opened the snapshot list, and could not find that name anywhere. It was there. DSM
+just does not display it. The description is now `install1 (Proxmox VE syno-nas2)`,
+verified reading back from the NAS for four different name shapes.
+
 ### R-25 answered, by a snapshot on someone else's cluster
 
 `create_time` is **epoch seconds**. Measured 2026-08-07 on a snapshot Jason took

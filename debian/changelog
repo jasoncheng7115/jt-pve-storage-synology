@@ -1,3 +1,13 @@
+jt-pve-storage-synology (0.6.5-1) unstable; urgency=medium
+
+  * Put the Proxmox VE snapshot name in the DSM description. SAN Manager's
+    snapshot list has no name column, so the name was invisible to an operator.
+  * Measured the snapshot-name limits: the NAS refuses nothing, and PVE's own
+    pve-configid rule is the stricter of the two.
+  * The documented install URL is now the version-free /releases/latest/ one.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 11:00:00 +0800
+
 jt-pve-storage-synology (0.6.4-1) unstable; urgency=medium
 
   * Drop the beta1 suffix from this release onwards. The tag is v0.6.4 and the

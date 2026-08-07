@@ -3,7 +3,7 @@ PACKAGE = jt-pve-storage-synology
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.1.0, 0.1.1, ... 0.1.99, then 0.2.0. Keep this in
 # step with debian/changelog; release-check refuses when they disagree.
-VERSION = 0.6.4
+VERSION = 0.6.5
 
 DESTDIR =
 PREFIX   = /usr
@@ -214,10 +214,15 @@ check-secrets:
 #
 # A `wget .../releases/latest/download/jt-pve-storage-synology_all.deb` shipped on
 # the documentation site and answered **404** on the first node someone tried it
-# on. Two reasons, and the second is the one that will not fix itself: the asset
-# name carries the version, and — more importantly — **there is no latest release**
-# because every 0.x here is tagged as a prerelease, which GitHub's `latest`
-# deliberately skips. So that URL will keep 404ing until 1.0.0.
+# on. Two reasons: the asset name carried the version, and there was no latest
+# release at all, because every 0.x was tagged as a prerelease and GitHub's
+# `latest` deliberately skips those.
+#
+# **Both were fixed rather than worked around**, in 0.6.5: the `beta1` suffix is
+# gone so releases are normal ones, and the workflow publishes the package a second
+# time under a version-free name. So that URL is now the documented one — and this
+# target verifies it actually resolves, because the two things it depends on live in
+# the release workflow and could silently stop being true.
 #
 # Writing a command into documentation without running it is the same fault as
 # believing an array's success reply, and this project has a rule about that.
@@ -236,16 +241,21 @@ check-secrets:
 check-doc-urls:
 	@echo "Checking the documentation's download URLs..."
 	@bad=0; \
-	if grep -rnE '(wget|curl)[^|]*releases/latest/download' docs/ README*.md 2>/dev/null; then \
-		echo "  ERROR: /releases/latest/download 404s while every release is a prerelease"; \
-		bad=1; \
-	fi; \
 	if grep -rn 'dpkg -i jt-pve-storage-synology' docs/ README*.md 2>/dev/null; then \
 		echo "  ERROR: dpkg -i does not resolve dependencies. On a node without"; \
 		echo "         multipath-tools it unpacks and then leaves the package"; \
 		echo "         unconfigured. Document 'apt install ./<file>.deb'."; \
 		bad=1; \
 	fi; \
+	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/latest/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
+		code=$$(curl -sL -o /dev/null -w '%{http_code}' --max-time 25 "$$u"); \
+		if [ "$$code" != "200" ]; then \
+			echo "  ERROR: $$code for $$u"; \
+			echo "         the release workflow must publish a version-free copy"; \
+			echo "         of the .deb, and the newest release must not be a prerelease"; \
+			bad=1; \
+		else echo "  ok $$code  $$u"; fi; \
+	done; \
 	pending=v$$(echo "$(VERSION)" | tr '~' '-'); \
 	for u in $$(grep -rhoE 'https://github\.com/[^" )]*/releases/download/[^" )]*' docs/ README*.md 2>/dev/null | sort -u); do \
 		case "$$u" in \
@@ -303,7 +313,7 @@ release-check: check-multipath-flush check-secrets check-zh syntax unit unit-nop
 	dl_tag=v$$(echo "$(VERSION)" | tr '~' '-'); \
 	dl_asset=jt-pve-storage-synology_$$(echo "$(VERSION)" | tr '~' '.')-1_all.deb; \
 	for f in docs/index.html README.md README_zh-TW.md; do \
-		for u in $$(grep -ohE 'releases/download/[^ "<)]+' $$f 2>/dev/null | sort -u); do \
+		for u in $$(grep -ohE 'releases/download/[^ "<)]+' $$f 2>/dev/null | grep -v '^releases/download/latest' | sort -u); do \
 			if [ "$$u" != "releases/download/$$dl_tag/$$dl_asset" ]; then \
 				echo "  ERROR: $$f documents $$u"; \
 				echo "         expected releases/download/$$dl_tag/$$dl_asset"; fail=1; \

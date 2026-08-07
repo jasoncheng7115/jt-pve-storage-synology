@@ -108,7 +108,7 @@
         <!-- The version sits on this line, immediately after the class, because
              `make release-check` reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.6.4 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.6.5 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
@@ -472,8 +472,8 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.4/jt-pve-storage-synology_0.6.4-1_all.deb
-apt install ./jt-pve-storage-synology_0.6.4-1_all.deb
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install ./jt-pve-storage-synology_all.deb
 systemctl restart pvedaemon pveproxy pvestatd</code></pre>
 
     <div class="alert alert--warning">
@@ -499,8 +499,8 @@ systemctl restart pvedaemon pveproxy pvestatd</code></pre>
     </div>
 
     <div class="note">
-        <span class="lang-en">The version is in the URL on purpose. <strong><code>/releases/latest/download/…</code> answers 404 here</strong>, because every 0.x is tagged as a prerelease and GitHub's <code>latest</code> skips those — it will work from 1.0.0. Newer builds are on the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
-        <span class="lang-zh">網址裡帶版本號是刻意的。<strong>這裡的 <code>/releases/latest/download/…</code> 會回 404</strong>，因為每一個 0.x 都標記為預發行版，而 GitHub 的 <code>latest</code> 會跳過它們——從 1.0.0 起才能用。更新的版本在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>。從 clone 安裝：<code>make install</code>。</span>
+        <span class="lang-en">That URL always points at the newest release, so it does not go stale. It works because the <code>beta1</code> suffix is gone from 0.6.5 onwards — releases are no longer flagged as prereleases, which GitHub's <code>latest</code> used to skip — and because the release publishes the package a second time under this version-free name alongside the versioned one. To pin a version instead, take the URL from the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">releases page</a>. From a clone: <code>make install</code>.</span>
+        <span class="lang-zh">那個網址永遠指向最新的發行版，所以不會過期。它之所以有用，是因為從 0.6.5 起 <code>beta1</code> 字樣拿掉了——發行版不再被標記為預發行版，而 GitHub 的 <code>latest</code> 原本會跳過那些——以及因為發行流程會在帶版本號的那份之外，額外用這個不帶版本號的名稱再發布一份。若要固定版本，請從<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/releases">發行頁面</a>取用網址。從 clone 安裝：<code>make install</code>。</span>
     </div>
 
     <p>

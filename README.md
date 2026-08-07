@@ -245,8 +245,8 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.4/jt-pve-storage-synology_0.6.4-1_all.deb
-apt install ./jt-pve-storage-synology_0.6.4-1_all.deb
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install ./jt-pve-storage-synology_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
 
@@ -280,9 +280,11 @@ on a node without `multipath-tools` it unpacks and then fails with *dependency
 problems — leaving unconfigured*. The leading `./` is required, or apt treats the
 argument as a package name.
 
-The version is in the URL on purpose: `/releases/latest/download/…` answers **404**
-here, because every 0.x is tagged as a prerelease and GitHub's `latest` skips those.
-Newer builds are on the [releases page](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases).
+That URL always points at the newest release, so it does not go stale — the `beta1`
+suffix is gone from 0.6.4 onwards, so releases are no longer flagged as prereleases
+(which GitHub's `latest` used to skip), and each release publishes the package a
+second time under this version-free name. To pin a version, take the URL from the
+[releases page](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases).
 From a clone, `make install`.
 
 > **Schedule the first install.** `activate_storage` writes a multipath drop-in for

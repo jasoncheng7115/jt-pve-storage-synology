@@ -154,8 +154,8 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
-wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.4/jt-pve-storage-synology_0.6.4-1_all.deb
-apt install ./jt-pve-storage-synology_0.6.4-1_all.deb
+wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
+apt install ./jt-pve-storage-synology_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
 
@@ -167,7 +167,7 @@ systemctl restart pvedaemon pveproxy pvestatd
 
 然後用 `apt install ./…`，不是 `dpkg -i`：`dpkg` 不會處理相依性——在沒有 `multipath-tools` 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。前面的 `./` 是必要的，否則 apt 會把它當成套件名稱。
 
-網址裡帶版本號是刻意的：這裡的 `/releases/latest/download/…` 會回 **404**，因為每一個 0.x 都標記為預發行版，而 GitHub 的 `latest` 會跳過它們。更新的版本在[發行頁面](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases)。從 clone 安裝則是 `make install`。
+那個網址永遠指向最新的發行版，所以不會過期——從 0.6.4 起 `beta1` 字樣拿掉了，發行版不再被標記為預發行版（GitHub 的 `latest` 原本會跳過那些），而且每一次發行都會用這個不帶版本號的名稱額外發布一份。若要固定版本，請從[發行頁面](https://github.com/jasoncheng7115/jt-pve-storage-synology/releases)取用網址。從 clone 安裝則是 `make install`。
 
 > **第一次安裝請排維護時段**。`activate_storage` 會寫一個對應 `vendor "SYNOLOGY"` 的 multipath drop-in，而當那個檔案變更時會執行 `multipathd reconfigure`——那是**節點層級**的。它只在檔案第一次出現或變更時執行一次。這個 drop-in 是必要的，不是調校：沒有它就會套用 multipath 的通用預設值，而那包含 `no_path_retry "queue"`，會把「失去所有路徑」變成一個殺不掉的行程，而不是一個 I/O 錯誤。
 
