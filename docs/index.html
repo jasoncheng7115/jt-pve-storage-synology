@@ -599,6 +599,16 @@
         <span class="lang-zh">同一個頁面也是確認 storage 運作正常的快方法：這個 plugin 建立的 LUN 會顯示<strong>Btrfs、秒級快照</strong>並且支援快照，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。這正是 <code>pvesm add</code> 之所以會拒絕 ext4 儲存空間的那個差別。</span>
     </div>
 
+        <h3 class="subsection-title"><span class="lang-en">Cloning from a snapshot</span><span class="lang-zh">從快照複製</span></h3>
+
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Cloning from a snapshot: the web interface can, if the source is a template</span><span class="lang-zh">從快照複製：網頁介面可以，前提是來源是範本</span></strong>
+        <span class="lang-en">Proxmox VE decides which kind of clone to ask for with <code>isTemplate ? 'clone' : 'copy'</code>. For a <strong>template</strong> it asks for a linked clone, this storage supports that from a snapshot, and the GUI works. For anything else it always asks for a <strong>full</strong> clone —which means reading the disk <em>at</em> the snapshot, and a Synology LUN has no device there, so the plugin declares it unsupported and PVE refuses before it starts.<br><br>So: convert the source to a template, or use the command line, where <code>--full 0</code> is required —omitting it defaults to <em>true</em> for a non-template:</span>
+        <span class="lang-zh">Proxmox VE 用 <code>isTemplate ? 'clone' : 'copy'</code> 決定要求哪一種複製。對<strong>範本</strong>它要求連結複製，而這個 storage 從快照支援它，所以 GUI 可以做。對其他任何東西它一律要求<strong>完整</strong>複製——那意思是去讀「快照當下的那顆磁碟」，而 Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 在動手之前就拒絕。<br><br>所以：把來源轉成範本，或者用指令列，而指令列必須加 <code>--full 0</code>——不加的話對非範本會預設為「真」：</span>
+        <span class="lang-en"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this array the result is an independent <strong>reflink</strong>, not a dependent clone —measured: a template's LUN was deleted while a clone of it was running, and the clone kept running. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
+        <span class="lang-zh"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這個陣列上做出來的是獨立的 <strong>reflink</strong>，不是相依的複本——已量測：在複本執行中把範本的 LUN 刪除，複本照樣跑。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
+    </div>
+
     <h3 class="subsection-title"><span class="lang-en">Why the size in Proxmox VE does not match the size in DSM</span><span class="lang-zh">為什麼 Proxmox VE 與 DSM 顯示的容量不一致</span></h3>
 
     <p>
@@ -630,13 +640,6 @@
         <span class="lang-zh">兩邊都是 15,356,124,401,664 與 4,318,122,532,864 位元組。兩列之間的比值是 2<sup>40</sup> ÷ 10<sup>12</sup> = 1.0995，而 15.36 ÷ 14 = 1.0971，扣掉 DSM 進位到兩位有效數字後就是同一個數。百分比是最快的檢查點，而它們一致：<strong>28.12%</strong> 對 <strong>28%</strong>。Proxmox VE 自己其實也不一致——同一個介面上，VM 的記憶體顯示為 <code>4.00 GiB</code>，用的是二進位單位而且標示清楚。那是 Proxmox VE 的慣例，plugin 不會去猜它想怎麼顯示。</span>
     </p>
 
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Cloning from a snapshot: the web interface can, if the source is a template</span><span class="lang-zh">從快照複製：網頁介面可以，前提是來源是範本</span></strong>
-        <span class="lang-en">Proxmox VE decides which kind of clone to ask for with <code>isTemplate ? 'clone' : 'copy'</code>. For a <strong>template</strong> it asks for a linked clone, this storage supports that from a snapshot, and the GUI works. For anything else it always asks for a <strong>full</strong> clone —which means reading the disk <em>at</em> the snapshot, and a Synology LUN has no device there, so the plugin declares it unsupported and PVE refuses before it starts.<br><br>So: convert the source to a template, or use the command line, where <code>--full 0</code> is required —omitting it defaults to <em>true</em> for a non-template:</span>
-        <span class="lang-zh">Proxmox VE 用 <code>isTemplate ? 'clone' : 'copy'</code> 決定要求哪一種複製。對<strong>範本</strong>它要求連結複製，而這個 storage 從快照支援它，所以 GUI 可以做。對其他任何東西它一律要求<strong>完整</strong>複製——那意思是去讀「快照當下的那顆磁碟」，而 Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 在動手之前就拒絕。<br><br>所以：把來源轉成範本，或者用指令列，而指令列必須加 <code>--full 0</code>——不加的話對非範本會預設為「真」：</span>
-        <span class="lang-en"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this array the result is an independent <strong>reflink</strong>, not a dependent clone —measured: a template's LUN was deleted while a clone of it was running, and the clone kept running. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
-        <span class="lang-zh"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這個陣列上做出來的是獨立的 <strong>reflink</strong>，不是相依的複本——已量測：在複本執行中把範本的 LUN 刪除，複本照樣跑。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
-    </div>
 
 
     <h3 class="subsection-title"><span class="lang-en">Restricting it to certain nodes</span><span class="lang-zh">限定可用節點</span></h3>
@@ -745,7 +748,7 @@
 
     <p>
         <span class="lang-en">It creates nothing, deletes nothing, and logs out after itself. The password is prompted for with echo off —never passed on the command line, where it would be visible in <code>ps</code> and in the shell history.</span>
-        <span class="lang-zh">它不建立、不刪除任何東西，跑完會自己登出。密碼以關閉回顯的方式提示輸入——絕不從命令列傳入，那會在 <code>ps</code> 和 shell 歷史裡看得到。</span>
+        <span class="lang-zh">它不建立、不刪除任何東西，跑完會自己登出。密碼是提示輸入的，輸入時不會顯示在畫面上——絕不從命令列傳入，那會在 <code>ps</code> 和 shell 歷史裡看得到。</span>
     </p>
 
     <div class="config-block"><pre><code><span class="comment"># from a .deb release, or straight out of the repository</span>

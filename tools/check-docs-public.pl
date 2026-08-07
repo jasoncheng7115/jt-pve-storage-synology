@@ -34,7 +34,7 @@ my @RULES = (
     # that mistake in this project. A hostname in backticks is still a published
     # hostname, so only this rule gets the exemption.
     [ 'mainland wording',
-      qr{登记|登記簿|软件|默认|服务器},
+      qr{登记|登記簿|软件|默认|服务器|回显|回顯|缺省|寻址|优化},
       'Taiwan terminology — see the glossary', 1 ],
 );
 
