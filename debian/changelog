@@ -1,3 +1,18 @@
+jt-pve-storage-synology (0.6.16-1) unstable; urgency=medium
+
+  * A DS925+ on DSM 7.3.2-86009 Update 4 was driven end to end over a VPN:
+    pvesm add, LUN creation, target creation, iSCSI login, multipath, a guest
+    booting, a snapshot, a rollback proven by the array's own restored_time,
+    and the storage removed leaving nothing behind on either side. Resize,
+    clone, backup, restore, migration, two-portal multipath and HA were NOT
+    repeated there and the documents say so.
+  * Answered a question the project could not: DSM starts listening on 3260
+    when a target exists. A NAS with no target refuses the port, which is not
+    a firewall and not a port to open -- creating the target is the act that
+    starts the service, and the plugin does it.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 16:55:00 +0800
+
 jt-pve-storage-synology (0.6.15-1) unstable; urgency=medium
 
   * A SECOND MODEL AND A SECOND DSM VERSION have answered, read-only: a DS925+

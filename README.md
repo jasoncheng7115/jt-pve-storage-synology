@@ -19,22 +19,27 @@ locally.
 > **0 of 60 reads** during a path failure, and a DSM management outage left the
 > guest with **zero I/O errors**.
 >
-> A **second model and a second DSM version** have now answered, read-only: a
-> **DS925+ on DSM 7.3.2-86009 Update 4**. Every API this plugin uses is present
-> at the same version and the same CGI path, the per-model ceilings read the
-> same, and the Btrfs and support checks that gate `pvesm add` pass. The data
-> path was not exercised there — that NAS refuses port 3260 — so this is the API
-> half of the answer, not the whole of it.
+> **A second model and a second DSM version have now been driven end to end**: a
+> **DS925+ on DSM 7.3.2-86009 Update 4**, over a VPN. `pvesm add`, LUN creation,
+> **target creation**, iSCSI login, multipath, a guest booting, a snapshot, a
+> **rollback** — with the array's own `restored_time` to prove it — and then the
+> whole storage removed, leaving **nothing behind on either side**. Every API is
+> present at the same version and the same CGI path, including `SYNO.API.Auth` on
+> `entry.cgi` rather than the `auth.cgi` both public reference clients hardcode.
 >
-> What is still honest to say: the **data path** has been driven against **one**
-> model only, no Synology HA or dual-controller chassis has ever been near it,
-> and the DSM account needs administrator rights because DSM 7.1.1 offers no
-> narrower one — a non-administrator cannot even log in. Around thirty defects
-> were found by running it that no amount of reading had shown, so assume there
-> are more.
+> Not everything was repeated there: **resize, clone, backup, restore, migration,
+> two-portal multipath and HA were exercised on the DS918+ only.** And that NAS is
+> reached over a VPN, which is fine for testing and is **not** where a production
+> guest's disk belongs — a dropped tunnel is a pulled cable.
 >
-> `1.0.0` waits on a second model **for the data path**, and the minimum DSM
-> privileges settled. [docs/TESTING.md](docs/TESTING.md) is the register of what is
+> What is still honest to say: no Synology HA or dual-controller chassis has ever
+> been near this, and the DSM account needs administrator rights because DSM
+> offers no narrower one — a non-administrator cannot even log in. Around thirty
+> defects were found by running it that no amount of reading had shown, so assume
+> there are more.
+>
+> `1.0.0` waits on the minimum DSM privileges being settled, and on the remaining
+> operations being repeated on a second model. [docs/TESTING.md](docs/TESTING.md) is the register of what is
 > verified and what is not, and it is worth reading before trusting this.
 
 ---

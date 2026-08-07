@@ -6,6 +6,37 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.6.16] - 2026-08-07
+
+### Verified
+
+- **A DS925+ on DSM 7.3.2-86009 Update 4, driven end to end** over a VPN:
+  `pvesm add` · `pvesm status` · LUN creation · **target creation** · iSCSI login
+  · multipath with the device confirmed by the kernel's WWID · a guest booting in
+  6.4 s · a snapshot of a running guest in 4.0 s · a **rollback in 3.3 s**, proven
+  by the array's own `restored_time` rather than by the absence of an error ·
+  snapshot deletion · `free_image` · and the whole storage removed. **The NAS was
+  left with 0 LUNs and 0 targets and the node with no session** — nothing behind
+  on either side.
+
+  This was also the first real run of the credential path since 0.6.10 changed it:
+  the file landed at `0600` in `/etc/pve/priv` and no password reached
+  `storage.cfg`, which is what the project's own release checklist requires and
+  what two earlier releases shipped without.
+
+  **Not repeated there**: resize, clone, backup, restore, migration, two-portal
+  multipath and HA were exercised on the DS918+ only. And that NAS is reached over
+  a VPN — fine for testing, and **not** where a production guest's disk belongs,
+  because a dropped tunnel is a pulled cable. Both READMEs say so.
+
+- **DSM starts listening on 3260 when a target exists.** A NAS with no target
+  refuses the port outright. That is neither a firewall nor a port to open: the
+  firewall was checked and permits the subnet for every port, and a closed port
+  answers RST on both NAS units. **Creating the target is the act that starts the
+  service**, and the plugin does that itself in `_ensure_target` — so `pvesm add`
+  needs no iSCSI at all, and the first disk brings the port up. Measured: refused
+  before `pvesm alloc`, listening immediately after.
+
 ## [0.6.15] - 2026-08-07
 
 ### Added
