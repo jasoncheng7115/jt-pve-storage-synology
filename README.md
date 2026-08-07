@@ -22,7 +22,7 @@ locally.
 > **A second model and a second DSM version have now been driven end to end**: a
 > **DS925+ on DSM 7.3.2-86009 Update 4**, over a VPN. `pvesm add`, LUN creation,
 > **target creation**, iSCSI login, multipath, a guest booting, a snapshot, a
-> **rollback** — with the array's own `restored_time` to prove it — and then the
+> **rollback** — with the storage server's own `restored_time` to prove it — and then the
 > whole storage removed, leaving **nothing behind on either side**. Every API is
 > present at the same version and the same CGI path, including `SYNO.API.Auth` on
 > `entry.cgi` rather than the `auth.cgi` both public reference clients hardcode.
@@ -165,7 +165,7 @@ for anything that is not a template:
 qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 ```
 
-On this array "linked" is a misnomer in your favour: DSM's
+On this storage server "linked" is a misnomer in your favour: DSM's
 `clone_from_snapshot` produces a **reflink**, so the new LUN is independent —
 deleting the source snapshot afterwards does not affect it — while costing no
 space at the moment it is made.
@@ -199,7 +199,7 @@ rolled back repeatedly.
 
 | | |
 |---|---|
-| DSM | **7.0 or later**, and only 7.1.1 has been verified. Dual-controller DSM UC is **refused**, not approximated. See below — the version is a floor, not the decision |
+| DSM | **7.0 or later**. **7.1.1**, **7.3.2** and **7.4.1** are verified. Dual-controller DSM UC is **refused**, not approximated. See below — the version is a floor, not the decision |
 | Volume | **Btrfs.** Snapshots exist only for a thin LUN on Btrfs — an ext4 volume is refused when the storage is added, rather than failing at the first snapshot |
 | Model | One with iSCSI target support and enough free space. **The LUN ceiling is per-model and small on some of them** — a DS425+ or any J/Value model publishes **4 LUNs**, which is four virtual disks for the whole storage. Sourced table: [docs/LIMITS.md](docs/LIMITS.md) |
 | Network | HTTPS to DSM (5001). Plain HTTP is refused |

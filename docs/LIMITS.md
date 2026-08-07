@@ -13,7 +13,7 @@ than capacity:
   ceiling.
 - **It counts every LUN on that NAS**, including ones you created in SAN Manager
   for something else entirely. The plugin counts them too, which is why it can
-  refuse before the array does.
+  refuse before the storage server does.
 - **A VM usually spends more than one.** A system disk plus a data disk is two, so
   a model publishing 256 holds roughly **128 such VMs**; a model publishing 4 holds
   **two**.

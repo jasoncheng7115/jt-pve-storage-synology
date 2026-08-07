@@ -66,7 +66,7 @@ HA pair and a dual-controller chassis.
   `max_snapshot_per_lun_v2` **128** and does not say which it enforces — a DS918+
   on 7.4.1 and a DS925+ on 7.3.2 report the identical pair, so it is systematic.
   Which is real cannot be settled read-only; it would take a 129th snapshot on one
-  LUN. Guarding at the higher one would let the array refuse first, which is the
+  LUN. Guarding at the higher one would let the storage server refuse first, which is the
   one thing this check exists to prevent, so the lower one wins and the refusal
   names both numbers.
 
@@ -365,7 +365,7 @@ HA pair and a dual-controller chassis.
   `pvesm add` · `pvesm status` · LUN creation · **target creation** · iSCSI login
   · multipath with the device confirmed by the kernel's WWID · a guest booting in
   6.4 s · a snapshot of a running guest in 4.0 s · a **rollback in 3.3 s**, proven
-  by the array's own `restored_time` rather than by the absence of an error ·
+  by the storage server's own `restored_time` rather than by the absence of an error ·
   snapshot deletion · `free_image` · and the whole storage removed. **The NAS was
   left with 0 LUNs and 0 targets and the node with no session** — nothing behind
   on either side.
@@ -466,7 +466,7 @@ HA pair and a dual-controller chassis.
   The corrected invariant: a `snap` claim must work without **`path()`**, and
   `activate_volume` must be a successful **no-op** for a snapname. There is
   nothing to activate — a Synology LUN has no device at a snapshot and
-  `clone_from_snapshot` is entirely array-side — and `deactivate_volume` had
+  `clone_from_snapshot` is entirely storage-server-side — and `deactivate_volume` had
   always returned 1 for a snapname. Activation was the missing half of that
   symmetry. `path()` still refuses, and must: a caller that genuinely needs a
   device *at* a snapshot has to fail loudly rather than be handed the current
@@ -621,7 +621,7 @@ shebang, which depends on the harness noticing it and passing the switch on.
   reads returned pre-rollback bytes until the cache was dropped. A rollback now
   **refuses** if the flush cannot be done, a snapshot **warns** (it is still
   crash-consistent, only staler than intended), and the post-rollback
-  invalidation warns because the array-side work is already complete by then.
+  invalidation warns because the storage-server-side work is already complete by then.
 
 ## [0.6.7] - 2026-08-07
 
@@ -976,9 +976,9 @@ Upgrade past them.
 - **CHAP was applied only when the target was created.** Adding CHAP to a storage
   whose target already existed gave no error and no access control — the target
   kept `auth_type=0` on the NAS while the configuration said otherwise. Measured on
-  hardware. `Target::ensure` now reconciles CHAP against what the array reports,
+  hardware. `Target::ensure` now reconciles CHAP against what the storage server reports,
   and the update hook pushes the secret to **every** target the storage owns,
-  because in `per-volume` mode there is one per disk. The array never returns a
+  because in `per-volume` mode there is one per disk. The storage server never returns a
   password, so a changed secret can only be pushed, never compared.
 - **A CHAP username with no secret was accepted with a warning.** Refused now,
   before anything is written, and `pvesm set` leaves the configuration untouched.
@@ -988,7 +988,7 @@ Upgrade past them.
   computes the effective configuration — current, minus deletions, plus new values.
 - **An unrelated `pvesm set --disable 1` reported "CHAP REMOVED from 1 target(s)"**
   for a storage that had no CHAP and lost none. The reconcile now skips a target
-  the array already reports as having none.
+  the storage server already reports as having none.
 
 ### Verified on hardware
 
@@ -1574,7 +1574,7 @@ state afterwards.
 ## [0.1.3~beta1] - 2026-08-06
 
 Stage-4 write tests against a DS918+ on DSM 7.1.1, on a dedicated `pvetest-`
-prefix, with every object deleted afterwards and the array confirmed back to its
+prefix, with every object deleted afterwards and the storage server confirmed back to its
 original contents.
 
 ### Added
@@ -1607,7 +1607,7 @@ original contents.
   unmapping before deleting is entirely this plugin's responsibility.
 - `map_target` adds and `unmap_target` removes only what is named, the opposite
   of Unity's replace-the-list behaviour.
-- Sixteen simultaneous creates all succeeded and the array matched what the API
+- Sixteen simultaneous creates all succeeded and the storage server matched what the API
   reported; a second login does not evict the first.
 - `_` is not legal in a LUN name, nor space, `+` or `@`. Sizes are created
   exactly, with no rounding — and the documented 1 GB minimum is not enforced by

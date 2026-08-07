@@ -5,7 +5,7 @@ not**, and to give the test plan that moves things from the second list to the
 first.
 
 It is kept honest deliberately. A storage plugin that quietly guesses is worse
-than one that refuses, so every array-facing fact carries where it came from,
+than one that refuses, so every storage-server-facing fact carries where it came from,
 and anything that could not be established says so.
 
 ---
@@ -53,7 +53,7 @@ below.
 Everything down to the `dev_attribs` table was read-only. The sections marked
 as write tests below were run on a dedicated `pvetest-` name prefix, with the
 owner's agreement, and every object created was deleted afterwards and the
-array confirmed back to its original contents.
+storage server confirmed back to its original contents.
 
 ### How a session is carried — the two reference clients disagree, and one is wrong here
 
@@ -191,7 +191,7 @@ is clean (**18990503**, an illegal name) and nothing is made.
 
 ```
 create, 255-char name  ->  REFUSED 18990068
-                       ->  ... and 1 new LUN is on the array
+                       ->  ... and 1 new LUN is on the storage server
 create, 256-char name  ->  REFUSED 18990503, nothing created
 ```
 
@@ -262,7 +262,7 @@ different LUN. This is the "wrote to the wrong disk" class of fault, and it is
 reachable by ordinary use: detach a disk, attach another.
 
 Both public reference clients identify devices by `/dev/disk/by-path` and
-nothing else. **On this array that is not safe.** It is why the WWID derivation
+nothing else. **On this storage server that is not safe.** It is why the WWID derivation
 above is load-bearing rather than a convenience: a device is accepted only once
 the kernel's own identification of it matches the LUN that was asked for.
 
@@ -280,7 +280,7 @@ because a behaviour that has been measured once on one firmware is not a promise
 
 ### Concurrency and sessions
 
-- **Sixteen simultaneous creates all succeeded**, in 15 s, and the array's
+- **Sixteen simultaneous creates all succeeded**, in 15 s, and the storage server's
   contents matched what the API reported — no lost or duplicated LUN. The ~1 s
   per create suggests DSM serialises internally, which would explain why
   Cinder's driver wraps every request in a process-wide lock, but nothing here
@@ -544,7 +544,7 @@ here cannot use `_`, and a storage id containing one has to be sanitised to
 something legal. That reintroduces the collision the related projects hit, where
 two different storage ids fold to the same prefix and each can then see and
 delete the other's disks, so the check that refuses the second such storage is
-not optional on this array.
+not optional on this storage server.
 
 ### Size granularity: there is none, and the documented minimum is not enforced
 
@@ -931,7 +931,7 @@ two PVE stages.
 target still reported `auth_type=0` on the NAS. An operator adding CHAP to an
 existing storage got no error and no access control — worse than the empty-secret
 fault it was found next to, because there is nothing at all to notice. `ensure`
-now reconciles CHAP against what the array reports, and the update hook pushes the
+now reconciles CHAP against what the storage server reports, and the update hook pushes the
 secret to **every** target the storage owns, because in `per-volume` mode there is
 one per disk.
 
@@ -1127,7 +1127,7 @@ one, the plugin refuses rather than assumes.
 | R-9 | ~~Whether the listings have a server-side cap~~ **ANSWERED PER LISTING, re-measured read-only on DSM 7.4.1 ().** `LUN list` and `Target list` **ignore `offset`/`limit` entirely** — the same full list comes back for `limit=1` as for no parameters — and neither reports a total. `LUN list_snapshot` is the exception: it **does** report a `count` beside the array, and that count agreed with the row count on all nine LUNs, including one holding a snapshot. Measured at 9 LUNs, 4 targets, 1 snapshot; a threshold above those counts cannot be ruled out from this | **A silently truncated listing reads as "this is everything"**, and the code that reads it decides what may be deleted. Parameters being ignored is the strong evidence: a paged API honours `limit`. And where a total *is* reported it is now checked — `assert_room_for_snapshot` refuses when `count` disagrees with the rows, because it counted the array, and under-counting there fails in the direction of taking the snapshot |
 | R-10 | ~~Whether DSM's own scheduled snapshots appear in `list_snapshot`~~ **FULLY ANSWERED, and the filter holds.** A daily LUN snapshot schedule was enabled in SAN Manager on `pve-<storeid>-vm-146-disk-0` (DS918+, DSM 7.4.1-90080) and the 18:00 run was measured read-only. The scheduled snapshot **does** appear in the LUN's `list_snapshot` — so the worry was real — and it is **distinguishable**: `taken_by` is **`scheduler`** where this plugin's is `jt-pve-storage-synology`, with `name` `SnapShot-1` and `description` `Scheduled snapshot taken by [nas2]`. Verified end to end through the plugin itself: the NAS held **two** snapshots on that LUN and `volume_snapshot_info` reported **one** to Proxmox VE — only its own. `count` also agreed with the row count on the mixed set, which is a second data point for the check added in 0.6.22 | This was the entry that could have let PVE show a user's scheduled snapshot as its own and then delete it. It cannot: the `taken_by` filter is measured, not assumed. The other half also holds — `assert_room_for_snapshot` uses `all => 1` and therefore counted **two**, which is what the shared 256-per-LUN ceiling requires. One consequence worth knowing: DSM names its scheduled snapshots `SnapShot-N`, and this plugin sends the PVE snapshot name to the NAS verbatim, so a PVE snapshot deliberately named `SnapShot-1` would be refused as a duplicate (18990513) rather than silently merged |
 | R-11 | ~~`mapping_index` ceiling per target, and whether it is reused~~ **ANSWERED: it IS reused.** A freed index goes to the next LUN mapped | This is the "wrote to the wrong disk" fault, reachable by detaching one disk and attaching another. It is why device identity comes from the kernel's WWID and never from a path. The ceiling itself is still unmeasured |
-| R-12 | ~~Whether DSM tolerates concurrent requests~~ **ANSWERED: sixteen simultaneous creates all succeeded** and the array matched what the API reported. ~1 s each suggests internal serialisation | Cinder wraps every request in a process-wide lock; nothing here needed it for correctness |
+| R-12 | ~~Whether DSM tolerates concurrent requests~~ **ANSWERED: sixteen simultaneous creates all succeeded** and the storage server matched what the API reported. ~1 s each suggests internal serialisation | Cinder wraps every request in a process-wide lock; nothing here needed it for correctness |
 | R-13 | ~~Whether a second login on one account evicts the first~~ **ANSWERED: it does not.** Both sessions work simultaneously | Error 107 had made this a real worry for a cluster sharing one account |
 
 ### Needs a non-administrator account
@@ -1136,7 +1136,7 @@ one, the plugin refuses rather than assumes.
 |---|---|
 | R-25 | ~~The unit of a snapshot's `create_time`~~ **ANSWERED: epoch seconds**, measured against PVE's own displayed time on a real snapshot — see above. Originally: Believed to be epoch seconds; asserted in a code comment as "confirmed against the NAS's own clock" until , when the audit found no measurement behind it. **It cannot be settled read-only: a LUN carries no `create_time` field at all**, so it needs a snapshot taken and read back against the NAS's clock. Nothing in Proxmox VE 9 reads the value, and the plugin now yields no timestamp rather than an implausible one |
 | R-14 | ~~The minimum DSM privileges~~ **ANSWERED: there is no finer-grained privilege to grant, so the account must be an administrator.** Two halves. Through the API, on DSM 7.1.1: only three groups exist and none is iSCSI-specific; an account with no groups is refused at login with **402**, and so is one in `users`; `SYNO.Core.User get` exposes no privilege fields; and `Group.Member add` to `administrators` reports success without acting. Then in the DSM interface, on **7.4.1-90080 (DS918+)**, the account's **Applications** tab was read directly: it lists twenty applications — AFP, Active Backup for Business (three entries), Audio Station, Central Management System, Cloud Sync, DSM, Download Station, FTP, File Station, Notification Center, Note Station, SFTP, SMB, Synology Photos, Surveillance Station, Synology Drive, Universal Search, rsync and the text editor — and **not one of them is SAN Manager, Storage Manager or iSCSI.** So the access this plugin needs cannot be granted or denied as an application at all; it comes with `administrators` | The question was never whether an administrator works, it was whether anything smaller does. It does not, and now that is a reading of DSM's own interface rather than an inference from the API's silence. What the finding *does* enable is worth acting on: those twenty applications **can** each be denied to the account, so a dedicated administrator with every other application denied, 2FA, and an IP restriction is the smallest configuration that exists. `DSM-ACCOUNT.md` says so |
-| R-26 | **NEW, , and open.** `SYNO.Core.System info type=define` reports **two** snapshot ceilings, not one: `max_snapshot_per_lun` **256** and `max_snapshot_per_lun_v2` **128**. The share pair is the same shape — `max_snapshots_per_share` 1024 against `_v2` 512. The plugin reads the first. Confirmed on a second machine: **DS925+ on DSM 7.3.2 reports the identical pair** — 256 against 128, and 1024 against 512 for shares — so it is systematic rather than a quirk of one model or one firmware. Which one DSM actually **enforces** is unknown, and it cannot be settled read-only: it needs a 129th snapshot on one LUN | If `_v2` is the enforced value, `assert_room_for_snapshot` guards at twice the real limit and the NAS refuses first — a guard whose whole purpose is to refuse **before** the array does. A `_v2` suffix on a Synology key usually marks a newer generation, and this plugin requires **Btrfs** LUNs, so `_v2` being *our* number is the case to worry about. Neither direction risks data: guarding too high means the NAS returns an error, guarding too low means the plugin does. The conservative fix is to take the lower of the two and name both numbers in the refusal; it is **not applied yet**, because it changes behaviour on every storage and the project owner has not ruled on it |
+| R-26 | **NEW, , and open.** `SYNO.Core.System info type=define` reports **two** snapshot ceilings, not one: `max_snapshot_per_lun` **256** and `max_snapshot_per_lun_v2` **128**. The share pair is the same shape — `max_snapshots_per_share` 1024 against `_v2` 512. The plugin reads the first. Confirmed on a second machine: **DS925+ on DSM 7.3.2 reports the identical pair** — 256 against 128, and 1024 against 512 for shares — so it is systematic rather than a quirk of one model or one firmware. Which one DSM actually **enforces** is unknown, and it cannot be settled read-only: it needs a 129th snapshot on one LUN | If `_v2` is the enforced value, `assert_room_for_snapshot` guards at twice the real limit and the NAS refuses first — a guard whose whole purpose is to refuse **before** the storage server does. A `_v2` suffix on a Synology key usually marks a newer generation, and this plugin requires **Btrfs** LUNs, so `_v2` being *our* number is the case to worry about. Neither direction risks data: guarding too high means the NAS returns an error, guarding too low means the plugin does. The conservative fix is to take the lower of the two and name both numbers in the refusal; it is **not applied yet**, because it changes behaviour on every storage and the project owner has not ruled on it |
 | R-27 | ~~`qm move_disk` back onto this storage and `qmrestore` fail after a LUN has been deleted~~ **FIXED in 0.6.25, found by re-running the release checklist against a release that had already shipped.** After a LUN is deleted the NAS reuses its mapping index, and the node reuses the sd node with it: the kernel re-reads the VPD on rescan and updates `/sys/block/<sd>/device/wwid` to the **new** LUN, while **multipathd never re-reads the path** and goes on holding a map for the LUN that is gone. Measured side by side — kernel `naa.60014052e46494ed5667d4a29dbe0dd9`, multipathd `36001405bbc484c9dc23cd4accd8f7fd1`, the same `sde`. `ensure_map` then waited for a map that could never be built. `activate_volume` now detects it and asks the **kernel** to rediscover the device — remove the sd node, rescan the session, re-confirm the WWID, ask for the map again — which is the only remedy that was measured to work | It failed **four times in a row**, each with a fresh WWID, on two release-checklist rows (B3, E4). **Never a data risk**: the plugin refused rather than using the device, which is rule 48 doing its job. Three other fixes were tried and reverted rather than shipped — clearing the sd node on a WWID mismatch (the kernel never reports one here), asking multipathd for its view (the command runner correctly refused the argument `'%d %w'` because the untaint allowlist has no space, and the `eval` swallowed the die so the branch silently never ran), and drop-path/flush-corpse/re-add-path (the corpse survives). Verified on node A, PVE 9.2.5, `find_multipaths no`, DS918+/DSM 7.4.1: the recovery fires and the activation succeeds, and it does **not** fire on a clean node, where B3 and E4 pass unchanged |
 
 ### Supported by design, unverified — needs hardware this project does not have
@@ -1338,7 +1338,7 @@ anything that is not a template:
 qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 ```
 
-On this array "linked" understates it: DSM's `clone_from_snapshot` makes a
+On this storage server "linked" understates it: DSM's `clone_from_snapshot` makes a
 **reflink**, so the new LUN is independent — deleting the source snapshot
 afterwards does not affect it — while costing no space when it is made. Measured:
 a template's LUN was deleted while a linked clone of it was **running**, and the
@@ -1364,7 +1364,7 @@ wonders *why* the code does something odd should be able to find the answer.
 | can_snapshot and emulate_tpu are both 0 by default | A LUN created without asking for them cannot be snapshotted and never gives freed space back |
 | vpd_unit_sn is the LUN's uuid, and the WWID derives from it deterministically | A node can identify its device by the kernel's own view instead of the path it was found on. Both reference clients use only by-path |
 | A create that reports failure can create the LUN anyway (a 255-character name, error 18990068) | So a failed create is never believed: the name is looked up afterwards and what is found is adopted or deleted. Otherwise every such failure leaks a LUN PVE has no record of |
-| mapping_index is reused —a freed index goes to the next LUN mapped | A stale device path would resolve to a different disk. Both public clients identify devices by path alone; on this array that is not safe, which is what makes the WWID derivation load-bearing |
+| mapping_index is reused —a freed index goes to the next LUN mapped | A stale device path would resolve to a different disk. Both public clients identify devices by path alone; on this storage server that is not safe, which is what makes the WWID derivation load-bearing |
 | The CSI driver's twelve-type LUN filter hid a LUN —a Virtual Machine Manager virtual disk | Its capacity still comes out of the same volume. So this project lists unfiltered and matches locally: a filter verified to be incomplete is worse than no filter |
 | max_sessions defaults to 1 | A target left at the default admits exactly one node, so no cluster can share it and no map can be multipathed |
 

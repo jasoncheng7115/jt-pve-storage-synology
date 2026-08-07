@@ -233,13 +233,13 @@
     <h2 class="section-title"><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照倒回</span></h2>
 
     <p>
-        <span class="lang-en"><strong>A disk can be rolled back to any of its snapshots, repeatedly, and it is the array that does the work.</strong> Two things make it safe, and both are measured rather than assumed:</span>
-        <span class="lang-zh"><strong>一顆磁碟可以倒回它的任何一個快照，而且可以反覆做，實際動作是由陣列完成的。</strong>有兩件事讓它安全，而兩件都是量測到的、不是假設的：</span>
+        <span class="lang-en"><strong>A disk can be rolled back to any of its snapshots, repeatedly, and it is the storage server that does the work.</strong> Two things make it safe, and both are measured rather than assumed:</span>
+        <span class="lang-zh"><strong>一顆磁碟可以倒回它的任何一個快照，而且可以反覆做，實際動作是由儲存伺服器完成的。</strong>有兩件事讓它安全，而兩件都是量測到的、不是假設的：</span>
     </p>
 
     <ul>
         <li><span class="lang-en"><strong>The LUN's uuid does not change</strong>, so the SCSI serial and the WWID survive and a node does not suddenly find a different disk where its own was.</span><span class="lang-zh"><strong>LUN 的 uuid 不會變</strong>，所以 SCSI 序號與 WWID 都存活，節點不會突然在自己磁碟的位置上找到另一顆。</span></li>
-        <li><span class="lang-en"><strong>Snapshots newer than the restored one survive.</strong> Restoring to the oldest of three left all three in place, and <code>restored_time</code> records the epoch second so the result is observable afterwards.</span><span class="lang-zh"><strong>比還原點更新的快照會存活。</strong>還原到三個之中最舊的那一個，三個都還在，而 <code>restored_time</code> 會記錄還原當下的 epoch 秒，所以事後看得出來。</span></li>
+        <li><span class="lang-en"><strong>Snapshots newer than the restored one survive.</strong> Restoring to the oldest of three left all three in place, and <code>restored_time</code> records the epoch second so the result is observable afterwards.</span><span class="lang-zh"><strong>比快照時間點更新的快照會存活。</strong>還原到三個之中最舊的那一個，三個都還在，而 <code>restored_time</code> 會記錄還原當下的 epoch 秒，所以事後看得出來。</span></li>
     </ul>
 
     <div class="alert alert--success">
@@ -256,7 +256,7 @@
         <tbody>
         <tr>
             <td><strong>DSM</strong></td>
-            <td><span class="lang-en"><strong>7.0 or later</strong>, and only 7.1.1 verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，而且只驗證過 7.1.1。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
+            <td><span class="lang-en"><strong>7.0 or later</strong>. <strong>7.1.1</strong>, <strong>7.3.2</strong> and <strong>7.4.1</strong> are verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，已驗證 <strong>7.1.1</strong>、<strong>7.3.2</strong> 與 <strong>7.4.1</strong>。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs——而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
         </tr>
         <tr>
             <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
@@ -332,8 +332,8 @@
 
     <div class="alert alert--warning">
         <strong><span class="lang-en">The LUN ceiling is your VM-disk ceiling. Count it before you buy.</span><span class="lang-zh">LUN 上限就是你的 VM 磁碟數上限。買之前先算。</span></strong>
-        <span class="lang-en">This is not a size limit, it is a <strong>count</strong>. One VM disk is one LUN, so a NAS that publishes 256 LUNs holds <strong>256 VM disks in total</strong> —for the whole cluster, not per node, and shared with every LUN already on that NAS for anything else. A VM with a system disk and a data disk spends two of them, so 256 is roughly <strong>128 such VMs</strong>. On a model that publishes 4, it is <strong>two</strong>.<br><br>The plugin reads the number from your NAS and refuses before the array does, counting every LUN on it rather than only its own. So the failure is an error message at allocation time, not a surprise — but the planning is still yours.</span>
-        <span class="lang-zh">這不是容量限制，是<strong>數量</strong>限制。一顆 VM 磁碟就是一個 LUN，所以一台公布 256 個 LUN 的 NAS，總共只能放 <strong>256 顆 VM 磁碟</strong>——是整個叢集共用，不是每個節點各算，而且要和那台 NAS 上為別的用途建的每一個 LUN 一起分。一台有系統碟加資料碟的 VM 就用掉兩個，所以 256 大約是 <strong>128 台這樣的 VM</strong>。在公布 4 個的機型上，是<strong>兩台</strong>。<br><br>Plugin 會從你的 NAS 讀那個數字，並且在陣列拒絕之前先拒絕，而且數的是那台 NAS 上的每一個 LUN，不只是它自己建的。所以撞到上限時看到的是配置當下的錯誤訊息，不是意外——但規劃還是你的事。</span>
+        <span class="lang-en">This is not a size limit, it is a <strong>count</strong>. One VM disk is one LUN, so a NAS that publishes 256 LUNs holds <strong>256 VM disks in total</strong> —for the whole cluster, not per node, and shared with every LUN already on that NAS for anything else. A VM with a system disk and a data disk spends two of them, so 256 is roughly <strong>128 such VMs</strong>. On a model that publishes 4, it is <strong>two</strong>.<br><br>The plugin reads the number from your NAS and refuses before the storage server does, counting every LUN on it rather than only its own. So the failure is an error message at allocation time, not a surprise — but the planning is still yours.</span>
+        <span class="lang-zh">這不是容量限制，是<strong>數量</strong>限制。一顆 VM 磁碟就是一個 LUN，所以一台公布 256 個 LUN 的 NAS，總共只能放 <strong>256 顆 VM 磁碟</strong>——是整個叢集共用，不是每個節點各算，而且要和那台 NAS 上為別的用途建的每一個 LUN 一起分。一台有系統碟加資料碟的 VM 就用掉兩個，所以 256 大約是 <strong>128 台這樣的 VM</strong>。在公布 4 個的機型上，是<strong>兩台</strong>。<br><br>Plugin 會從你的 NAS 讀那個數字，並且在儲存伺服器拒絕之前先拒絕，而且數的是那台 NAS 上的每一個 LUN，不只是它自己建的。所以撞到上限時看到的是配置當下的錯誤訊息，不是意外——但規劃還是你的事。</span>
     </div>
 
     <p>
@@ -401,8 +401,8 @@
 
     <div class="alert alert--info">
         <strong><span class="lang-en">Snapshots: the NAS reports two ceilings and does not say which it enforces</span><span class="lang-zh">快照：NAS 回報兩個上限，而且沒說它執行哪一個</span></strong>
-        <span class="lang-en">A DS918+ and a DS925+ both publish <code>max_snapshot_per_lun</code> <strong>256</strong> and <code>max_snapshot_per_lun_v2</code> <strong>128</strong> —the identical pair, so it is not a quirk of one model. Which one DSM enforces cannot be read out of the API; it would take a 129th snapshot on one LUN to find out. The plugin therefore guards at the <strong>lower</strong> one, because a guard that lets the array refuse first has failed at its only job. If you are refused at 128 the message names both numbers. The ceiling is also <strong>shared with any snapshot schedule you set in SAN Manager</strong>, and those count.</span>
-        <span class="lang-zh">DS918+ 與 DS925+ 都公布 <code>max_snapshot_per_lun</code> <strong>256</strong> 與 <code>max_snapshot_per_lun_v2</code> <strong>128</strong>——一模一樣的一對，所以這不是某個機型的怪癖。DSM 實際執行哪一個，從 API 讀不出來；要在同一顆 LUN 上拍到第 129 張才知道。因此 plugin 守在<strong>較小</strong>的那個，因為一道讓陣列先拒絕的守門，等於沒有做到它唯一的工作。如果你在 128 被拒絕，訊息會把兩個數字都寫出來。這個上限也<strong>和你在 SAN Manager 裡設的快照排程共用</strong>，那些也算在內。</span>
+        <span class="lang-en">A DS918+ and a DS925+ both publish <code>max_snapshot_per_lun</code> <strong>256</strong> and <code>max_snapshot_per_lun_v2</code> <strong>128</strong> —the identical pair, so it is not a quirk of one model. Which one DSM enforces cannot be read out of the API; it would take a 129th snapshot on one LUN to find out. The plugin therefore guards at the <strong>lower</strong> one, because a guard that lets the storage server refuse first has failed at its only job. If you are refused at 128 the message names both numbers. The ceiling is also <strong>shared with any snapshot schedule you set in SAN Manager</strong>, and those count.</span>
+        <span class="lang-zh">DS918+ 與 DS925+ 都公布 <code>max_snapshot_per_lun</code> <strong>256</strong> 與 <code>max_snapshot_per_lun_v2</code> <strong>128</strong>——一模一樣的一對，所以這不是某個機型的怪癖。DSM 實際執行哪一個，從 API 讀不出來；要在同一顆 LUN 上拍到第 129 張才知道。因此 plugin 守在<strong>較小</strong>的那個，因為一道讓儲存伺服器先拒絕的守門，等於沒有做到它唯一的工作。如果你在 128 被拒絕，訊息會把兩個數字都寫出來。這個上限也<strong>和你在 SAN Manager 裡設的快照排程共用</strong>，那些也算在內。</span>
     </div>
 </section>
 
@@ -569,7 +569,7 @@
 
     <p>
         <span class="lang-en">SAN Manager's <strong>Snapshot</strong> page manages <em>schedules</em>. Expanding a LUN there shows its schedule, when the last snapshot was taken and a <strong>restore-point count</strong> —but not the snapshots themselves. To list them, go to <strong>LUN → select the LUN → Snapshot</strong>, or open <strong>Snapshot List</strong> from the Snapshot page.</span>
-        <span class="lang-zh">SAN Manager 的<strong>快照</strong>頁面管理的是「排程」。在那裡展開一個 LUN 會看到它的排程、最近一次快照的時間，以及一個<strong>還原點數量</strong>——但不會列出快照本身。要列出快照，請到 <strong>LUN → 選擇該 LUN → 快照</strong>，或從快照頁面開啟<strong>快照清單</strong>。</span>
+        <span class="lang-zh">SAN Manager 的<strong>快照</strong>頁面管理的是「排程」。在那裡展開一個 LUN 會看到它的排程、最近一次快照的時間，以及一個<strong>快照時間點數量</strong>——但不會列出快照本身。要列出快照，請到 <strong>LUN → 選擇該 LUN → 快照</strong>，或從快照頁面開啟<strong>快照清單</strong>。</span>
     </p>
 
     <p>
@@ -605,8 +605,8 @@
         <strong><span class="lang-en">Cloning from a snapshot: the web interface can, if the source is a template</span><span class="lang-zh">從快照複製：網頁介面可以，前提是來源是範本</span></strong>
         <span class="lang-en">Proxmox VE decides which kind of clone to ask for with <code>isTemplate ? 'clone' : 'copy'</code>. For a <strong>template</strong> it asks for a linked clone, this storage supports that from a snapshot, and the GUI works. For anything else it always asks for a <strong>full</strong> clone —which means reading the disk <em>at</em> the snapshot, and a Synology LUN has no device there, so the plugin declares it unsupported and PVE refuses before it starts.<br><br>So: convert the source to a template, or use the command line, where <code>--full 0</code> is required —omitting it defaults to <em>true</em> for a non-template:</span>
         <span class="lang-zh">Proxmox VE 用 <code>isTemplate ? 'clone' : 'copy'</code> 決定要求哪一種複製。對<strong>範本</strong>它要求連結複製，而這個 storage 從快照支援它，所以 GUI 可以做。對其他任何東西它一律要求<strong>完整</strong>複製——那意思是去讀「快照當下的那顆磁碟」，而 Synology 的 LUN 在快照上沒有裝置，所以 plugin 宣告不支援，PVE 在動手之前就拒絕。<br><br>所以：把來源轉成範本，或者用指令列，而指令列必須加 <code>--full 0</code>——不加的話對非範本會預設為「真」：</span>
-        <span class="lang-en"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this array the result is an independent <strong>reflink</strong>, not a dependent clone —measured: a template's LUN was deleted while a clone of it was running, and the clone kept running. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
-        <span class="lang-zh"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這個陣列上做出來的是獨立的 <strong>reflink</strong>，不是相依的複本——已量測：在複本執行中把範本的 LUN 刪除，複本照樣跑。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
+        <span class="lang-en"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>On this storage server the result is an independent <strong>reflink</strong>, not a dependent clone —measured: a template's LUN was deleted while a clone of it was running, and the clone kept running. <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Why</a>.</span>
+        <span class="lang-zh"><code>qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0</code><br><br>在這台儲存伺服器上做出來的是獨立的 <strong>reflink</strong>，不是相依的複本——已量測：在複本執行中把範本的 LUN 刪除，複本照樣跑。<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">原因</a>。</span>
     </div>
 
     <h3 class="subsection-title"><span class="lang-en">Why the size in Proxmox VE does not match the size in DSM</span><span class="lang-zh">為什麼 Proxmox VE 與 DSM 顯示的容量不一致</span></h3>
