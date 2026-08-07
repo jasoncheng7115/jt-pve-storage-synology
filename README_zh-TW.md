@@ -150,12 +150,15 @@ SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經�
 
 ```bash
 # 每個節點都要 —— PVE 不會替你裝的兩個套件
+apt update
 apt install -y open-iscsi multipath-tools
 
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
+
+> **如果你已經用 `dpkg -i` 失敗過**。本頁先前的版本寫的是 `dpkg -i`。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先執行 `dpkg --remove jt-pve-storage-synology`，然後再跑上面那段。如果清掉之後前置套件還是裝不起來，用 `apt policy kpartx sg3-utils-udev` 檢查——`kpartx` 來自 Debian 的 `trixie/main`，而 `sg3-utils-udev` 來自 Proxmox VE 的套件庫。
 
 `open-iscsi` 和 `multipath-tools` 是 Proxmox VE 節點真的可能沒有的兩個——PVE 不會拉進它們，而安裝 `multipath-tools` 正是那個維護時段真正在做的事。這個套件另外需要的四個 Perl 模組，各自是 86 到 151 個 PVE 套件的相依，所以一定已經在了。
 

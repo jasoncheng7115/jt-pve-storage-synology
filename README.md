@@ -241,12 +241,22 @@ On every node of the cluster.
 
 ```bash
 # on each node — the two packages PVE does not install for you
+apt update
 apt install -y open-iscsi multipath-tools
 
 wget https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/download/v0.6.3-beta1/jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 apt install ./jt-pve-storage-synology_0.6.3.beta1-1_all.deb
 systemctl restart pvedaemon pveproxy pvestatd
 ```
+
+> **If a `dpkg -i` already failed here.** An earlier version of this page said
+> `dpkg -i`. That leaves the package unpacked but *unconfigured*, and apt then
+> refuses to solve anything else — you get `Unmet dependencies` naming `kpartx`
+> and `sg3-utils-udev` as "not going to be installed", which looks like a
+> repository problem and is not. Run `dpkg --remove jt-pve-storage-synology`
+> first, then the block above. If the prerequisites still will not resolve, check
+> `apt policy kpartx sg3-utils-udev` — `kpartx` comes from Debian `trixie/main`
+> and `sg3-utils-udev` from the Proxmox VE repository.
 
 `open-iscsi` and `multipath-tools` are the two a Proxmox VE node can genuinely be
 missing — nothing in PVE pulls them in, and installing `multipath-tools` is what the
