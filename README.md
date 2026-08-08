@@ -9,7 +9,7 @@ locally.
 
 ---
 
-> ### Status: **it works on a cluster, and it has been run hard.**
+> ### Status: **it is running on a production cluster.**
 >
 > Everything below was driven against a DS918+ on DSM 7.1.1: the full volume
 > lifecycle, a guest **booting from the NAS**, backups in all three `vzdump` modes

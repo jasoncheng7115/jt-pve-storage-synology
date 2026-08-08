@@ -144,7 +144,7 @@
     <h2 class="section-title"><span class="lang-en">Status and risk</span><span class="lang-zh">狀態與風險</span></h2>
 
     <details class="alert alert--warning">
-        <summary><strong><span class="lang-en">It works on a cluster, and it has been run hard.</span><span class="lang-zh">它在叢集上可以運作，而且已經被大量操作驗證過。</span></strong></summary>
+        <summary><strong><span class="lang-en">It is running on a production cluster.</span><span class="lang-zh">它已經在正式環境的叢集上運作。</span></strong></summary>
         <span class="lang-en"><strong>Driven on hardware:</strong> a guest booting from the NAS, backups in all three <code>vzdump</code> modes restored byte-identical, live migration across five nodes, and two-portal multipath through a path failure —<strong>60 reads, 0 failures</strong>. A crashed node's LUN was taken over by a surviving node in <strong>3.6&nbsp;s</strong>. A whole-NAS outage left the nodes untouched: nothing in uninterruptible sleep, every other storage still active.</span>
         <span class="lang-zh"><strong>已在實機上跑過：</strong>guest 從 NAS 開機、三種 <code>vzdump</code> 模式備份還原後位元組完全相同、跨五個節點即時遷移，以及雙 portal multipath 撐過一次路徑故障：<strong>60 次讀取，0 次失敗</strong>。節點當掉時，存活節點在 <strong>3.6&nbsp;秒</strong>內接手它的 LUN。整台 NAS 中斷時，節點毫髮無傷：沒有行程卡在不可中斷睡眠，其他 storage 全部照常。</span>
         <span class="lang-en"><strong>Two models, three DSM versions:</strong> a DS918+ carried from 7.1.1 across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> end to end.</span>
