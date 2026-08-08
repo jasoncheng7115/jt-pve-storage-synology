@@ -19,26 +19,27 @@ Backup / Restore · Multipath.
 ## Which Proxmox VE operations work
 
 Every row was driven on real hardware, from the web interface and from the
-command line, with virtual machines and with containers. The rows that are not a
-yes say why.
+command line, for virtual machines and for containers alike. The rows that are
+not a yes say why.
 
-| Operation | State |
-|---|---|
-| Create and remove a VM disk | ✓ |
-| Resize | ✓ |
-| Snapshot and rollback | ✓ |
-| A snapshot including memory | ✓ |
-| Full clone | ✓ |
-| Linked clone | ✓ |
-| Convert to a template | ✓ |
-| Live migration and offline migration | ✓ |
-| Backup and restore, all three `vzdump` modes | ✓ |
-| Moving a disk to another storage type | ✓ |
-| Multipath, through a path failure | ✓ |
-| CHAP | ✓ |
-| Full clone from a snapshot<br>A full clone means PVE reads the source data itself, so it needs a readable block device at that snapshot. A Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. Use a linked clone, which this storage does support, or convert the source to a template first | Not supported |
-| LXC containers, as the root filesystem and as a mount point — snapshot, rollback, resize, clone, template, migration | ✓ |
-| A container backup *in snapshot mode* (`vzdump --mode snapshot`)<br>Snapshot mode mounts the snapshot to read the files out, and a Synology LUN snapshot has no device to mount. Use `--mode suspend` or `--mode stop`. Virtual machines are unaffected | Not supported |
+| Operation | VM | Container |
+|---|---|---|
+| Create and remove a disk | ✓ | ✓ |
+| Resize<br>For a container the filesystem grows online too | ✓ | ✓ |
+| Snapshot and rollback<br>Verified at the block level: written data, snapshot, overwritten with zeros, rolled back, the original checksum returned | ✓ | ✓ |
+| A snapshot including memory<br>Proxmox VE does not snapshot a container's memory at all | ✓ | n/a |
+| Full clone<br>Proxmox VE refuses a full clone of a running container itself | ✓ | Stopped only |
+| Linked clone | ✓ | ✓ |
+| Convert to a template | ✓ | ✓ |
+| Live migration<br>Proxmox VE has no live migration for containers. `--restart` migration is verified and took 26 seconds | ✓ | n/a |
+| Offline migration | ✓ | ✓ |
+| Backup and restore, `stop` and `suspend` modes | ✓ | ✓ |
+| Backup and restore, `snapshot` mode<br>Snapshot mode mounts the snapshot to read the files out, and a Synology LUN snapshot has no device to mount. Use `--mode suspend` or `--mode stop` | ✓ | Not supported |
+| Move a disk to another storage type<br>Off and back on again, both ways | ✓ | ✓ |
+| Full clone *from a snapshot*<br>A full clone has Proxmox VE read the source itself, so it needs a readable block device at that snapshot, and a Synology LUN snapshot does not provide one. Use a linked clone, or convert the source to a template first | Not supported | Not supported |
+
+Multipath through a path failure, and CHAP, are properties of the storage rather
+than of a guest: one iSCSI session on the node serves both kinds. Both are verified.
 
 > ### Status: **it is running on a production cluster.**
 >

@@ -518,6 +518,9 @@ td.yes { color: var(--green); font-size: 1rem; }
 td.verdict { font-size: 0.8rem; }
 td.verdict--no       { color: var(--red); }
 td.verdict--untested { color: var(--amber); }
+td.verdict--na       { color: var(--text-muted); font-weight: 400; }
+/* A qualified yes: not a mark, but still one short phrase. */
+td.verdict--part     { color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; }
 
 .cell-note {
     margin-top: 4px;
