@@ -311,7 +311,7 @@ answer with the same interfaces, so the mechanism is harmless where it is not
 needed. On those models a target's `network_portals` also carries a
 `controller_id`, which a single-controller NAS omits entirely.
 
-### Neither has been run on hardware, and the plugin says so
+### Neither HA shape has been run on hardware, and the plugin says so
 
 SHA is low risk: it is one address that happens to move, which is the case the
 plugin already handles. UC is a genuine unknown, and the open questions are the
@@ -323,10 +323,12 @@ So the plugin **warns** when it detects `DSM UC` rather than refusing, and this
 page will keep saying "unverified" until someone reports a run. Both are in the
 register as R-15 and R-16.
 
-**If you run either, the most useful thing you can report is one number**: does
-`SYNO.Core.ISCSI.Node`'s uuid stay the same across a failover? A storage's
-identity is pinned to it, so if it changes, that pin stops protecting the
-storage and starts breaking it.
+**If you run either, one answer is worth more than any other report**: after a
+failover, does `SYNO.Core.ISCSI.Node` still return the same uuid? The plugin
+uses that uuid as its answer to "which storage server is this", rather than the
+management address, because an address can be re-pointed at a different NAS. If
+the uuid changes across a failover, one NAS is read as two, and the approach
+itself has to change.
 
 ## Installing
 
@@ -338,12 +340,18 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
+# no version in the filename: this URL always gives you the newest release
 wget -O jt-pve-storage-synology_all.deb \
   https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
 apt install -y ./jt-pve-storage-synology_all.deb
 
 dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # check what you got
 ```
+
+**The filename carries no version on purpose.** `releases/latest/download/…`
+always resolves to the newest release, so this command line stays correct after
+every release. If you want a specific version instead, the release page also
+carries the versioned file, `jt-pve-storage-synology_<version>-1_all.deb`.
 
 > **The `-O` is not decoration.** Without it, `wget` refuses to overwrite a file
 > that is already there and saves the download as
@@ -409,7 +417,7 @@ Four of these plugins can share a node — but `PVE::SectionConfig::init` **dies
 duplicate property name**, and every storage on the node then stops working. The
 `syno-` prefix exists for that reason.
 
-## Adding a synologysan storage in Proxmox VE
+## Adding a Synology SAN storage in Proxmox VE
 
 Once, on one node. The storage is shared by construction.
 

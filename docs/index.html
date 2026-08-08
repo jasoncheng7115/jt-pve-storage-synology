@@ -94,7 +94,7 @@
             <span class="lang-en">Use it</span><span class="lang-zh">使用</span>
         </div>
         <a href="#install" class="sidebar__link"><span class="lang-en">Installing</span><span class="lang-zh">安裝</span></a>
-        <a href="#configure" class="sidebar__link"><span class="lang-en">Adding the storage</span><span class="lang-zh">新增 storage</span></a>
+        <a href="#configure" class="sidebar__link"><span class="lang-en">Adding the storage</span><span class="lang-zh">新增 Storage</span></a>
         <a href="#reap" class="sidebar__link"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></a>
         <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
         <a href="#trouble" class="sidebar__link"><span class="lang-en">When something goes wrong</span><span class="lang-zh">故障處理</span></a>
@@ -460,14 +460,14 @@
     </p>
 
     <details class="alert alert--warning">
-        <summary><strong><span class="lang-en">Neither has been run on hardware, and the plugin says so.</span><span class="lang-zh">兩種都沒有在實機上跑過，而 plugin 會說出這件事。</span></strong></summary>
+        <summary><strong><span class="lang-en">Neither HA shape has been run on hardware, and the plugin says so.</span><span class="lang-zh">兩種 HA 都還沒有在實機上跑過，而 plugin 會說出這件事。</span></strong></summary>
         <span class="lang-en">SHA is low risk —one address that happens to move, which is already handled. UC is a genuine unknown: whether a LUN is owned by one controller, and whether a target's portals differ per controller, together decide whether a node still reaches its disk after a failover. So the plugin <strong>warns</strong> on <code>DSM UC</code> rather than refusing, and this page keeps saying unverified until someone reports a run.</span>
         <span class="lang-zh">SHA 風險低：就是一個會移動的位址，而那已經處理了。UC 是真正的未知：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同，這兩件合起來決定故障切換之後節點還找不找得到自己的磁碟。所以 plugin 偵測到 <code>DSM UC</code> 時<strong>發出警告</strong>而不是拒絕，而這一頁會一直寫著未驗證，直到有人回報實際運行結果。</span>
     </details>
 
     <p>
-        <span class="lang-en"><strong>If you run either, the most useful thing you can report is one number</strong>: does <code>SYNO.Core.ISCSI.Node</code>'s uuid stay the same across a failover? A storage's identity is pinned to it, so if it changes, that pin stops protecting the storage and starts breaking it.</span>
-        <span class="lang-zh"><strong>如果你手上有其中任何一種，最有價值的回報是一個數字</strong>：<code>SYNO.Core.ISCSI.Node</code> 的 uuid 在故障切換之後還是同一個嗎？storage 的身分釘在它上面，所以如果它會變，那道釘子就不再保護 storage，而是開始破壞它。</span>
+        <span class="lang-en"><strong>If you run either, one answer is worth more than any other report</strong>: after a failover, does <code>SYNO.Core.ISCSI.Node</code> still return the same uuid? The plugin uses that uuid as its answer to "which storage server is this", rather than the management address, because an address can be re-pointed at a different NAS. If the uuid changes across a failover, one NAS is read as two, and the approach itself has to change.</span>
+        <span class="lang-zh"><strong>如果你手上有這兩種機型之一，最值得回報的就是一件事</strong>：故障切換之後，<code>SYNO.Core.ISCSI.Node</code> 回傳的 uuid 還是同一個嗎？plugin 拿這個 uuid 來認「這台儲存伺服器是誰」，而不是拿管理位址，因為位址可以被改指到另一台 NAS。如果 uuid 在切換之後會變，同一台 NAS 前後就會被認成兩台，那這個做法本身就得換掉。</span>
     </p>
 </section>
 
@@ -483,11 +483,17 @@
 <span class="cmd">apt</span> install <span class="flag">-y</span> open-iscsi multipath-tools
 
 <span class="cmd">cd</span> /tmp
+<span class="comment"># no version in the filename: this URL always gives you the newest release</span>
 <span class="cmd">wget</span> <span class="flag">-O</span> jt-pve-storage-synology_all.deb \
   <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
 <span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
 
 <span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{print $3}'</span>   <span class="comment"># check what you got</span></code></pre>
+
+    <p>
+        <span class="lang-en"><strong>The filename carries no version on purpose.</strong> <code>releases/latest/download/…</code> always resolves to the newest release, so this command line stays correct after every release. If you want a specific version instead, the release page also carries the versioned file, <code>jt-pve-storage-synology_&lt;version&gt;-1_all.deb</code>.</span>
+        <span class="lang-zh"><strong>檔名刻意不帶版本號。</strong>這個網址一律指向最新的一版，所以每次發布之後，同一段指令都還是對的。想裝特定版本的話，發布頁上也有帶版本號的檔案 <code>jt-pve-storage-synology_&lt;版本&gt;-1_all.deb</code>。</span>
+    </p>
 
     <details class="alert alert--warning">
         <summary><strong><span class="lang-en">The <code>-O</code> is not decoration</span><span class="lang-zh">那個 <code>-O</code> 不是裝飾</span></strong></summary>
@@ -501,8 +507,8 @@
     </p>
 
     <p class="muted">
-        <span class="lang-en">Why each of those is true, and what to do if an older version of this page told you to use <code>dpkg -i</code> —<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
-        <span class="lang-zh">以上每一項為什麼成立，以及本頁舊版本叫你用 <code>dpkg -i</code> 時怎麼補救：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
+        <span class="lang-en">Where each of those comes from, and what to do if you installed with <code>dpkg -i</code> because an earlier version of this page said to: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#notes-for-the-curious">Notes for the curious</a>.</span>
+        <span class="lang-zh">上面這幾點各自的來由，還有如果你照本文件早期的版本用 <code>dpkg -i</code> 裝過，該怎麼處理，都寫在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#給想深入的人">給想深入的人</a>。</span>
     </p>
 
     <h3 class="subsection-title" id="upgrade"><span class="lang-en">Upgrading</span><span class="lang-zh">更新</span></h3>
@@ -534,7 +540,7 @@
 
 <section class="doc-section" id="configure">
 
-    <h2 class="section-title"><span class="lang-en">Adding a synologysan storage in Proxmox VE</span><span class="lang-zh">在 Proxmox VE 新增 synologysan storage</span></h2>
+    <h2 class="section-title"><span class="lang-en">Adding a Synology SAN storage in Proxmox VE</span><span class="lang-zh">在 Proxmox VE 新增 Synology SAN Storage</span></h2>
     <p class="section-subtitle">
         <span class="lang-en"><strong>Run this once, on one node</strong> —unlike the install, which is every node in the cluster. The storage is shared by construction, so the others pick it up.</span>
         <span class="lang-zh"><strong>在其中一個節點上執行一次就好</strong>，和安裝相反，安裝是叢集中每個節點都要。這個 storage 依其本質就是共用的，其他節點會自己接手。</span>

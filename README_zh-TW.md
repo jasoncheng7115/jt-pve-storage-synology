@@ -186,13 +186,13 @@ Synology 有兩種都被叫做「HA」的架構，但它們是兩個不同的問
 
 UC 機箱的第二個位址不必手動設定：`SYNO.Core.Network.Interface` 接受 `relay_node=node0` 與 `node1`，可以列舉對側控制器的介面。在單控制器的 NAS 上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的。那些機型上，target 的 `network_portals` 還會帶 `controller_id`，而單控制器的 NAS 完全不回傳這個欄位。
 
-### 兩種都沒有在實機上跑過，而 plugin 會說出這件事
+### 兩種 HA 都還沒有在實機上跑過，而 plugin 會說出這件事
 
 SHA 風險低：它就是一個會移動的位址，而那正是 plugin 已經處理的情況。UC 是真正的未知，而未解的問題正是只有機箱能回答的——一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同。這兩件合起來決定故障切換之後節點還找不找得到自己的磁碟。
 
-所以 plugin 偵測到 `DSM UC` 時**發出警告**而不是拒絕，而這一頁會一直寫著「未驗證」，直到有人回報實際運行結果。兩者在驗證紀錄上都列為未驗證。
+所以 plugin 偵測到 `DSM UC` 時**發出警告**而不是拒絕，而這份文件會一直寫著「未驗證」，直到有人回報實際運行結果。兩者在驗證紀錄上是 R-15 與 R-16。
 
-**如果你手上有其中任何一種，最有價值的回報是一個數字**：`SYNO.Core.ISCSI.Node` 的 uuid 在故障切換之後還是同一個嗎？storage 的身分釘在它上面，所以如果它會變，那道釘子就不再保護 storage，而是開始破壞它。
+**如果你手上有這兩種機型之一，最值得回報的就是一件事**：故障切換之後，`SYNO.Core.ISCSI.Node` 回傳的 uuid 還是同一個嗎？plugin 拿這個 uuid 來認「這台儲存伺服器是誰」，而不是拿管理位址，因為位址可以被改指到另一台 NAS。如果 uuid 在切換之後會變，同一台 NAS 前後就會被認成兩台，那這個做法本身就得換掉。
 
 ## 安裝
 
@@ -204,12 +204,15 @@ apt update
 apt install -y open-iscsi multipath-tools
 
 cd /tmp
+# 檔名不帶版本號，這個網址一律給你最新的一版
 wget -O jt-pve-storage-synology_all.deb \
   https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb
 apt install -y ./jt-pve-storage-synology_all.deb
 
 dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'    # 確認裝到的是哪一版
 ```
+
+**檔名刻意不帶版本號。**`releases/latest/download/…` 一律指向最新的一版，所以每次發布之後，同一段指令都還是對的。想裝特定版本的話，發布頁上也有帶版本號的檔案 `jt-pve-storage-synology_<版本>-1_all.deb`。
 
 > **那個 `-O` 不是裝飾**。少了它，`wget` 不會覆蓋已經存在的檔案，而是把下載的東西存成 `jt-pve-storage-synology_all.deb.1`——接著 `apt install ./jt-pve-storage-synology_all.deb` 裝的就是上次留在 `/tmp` 裡的**舊檔案**。這在實機上發生過，把 0.6.7 靜靜降級成 0.6.5：`apt` 會印一行 `DOWNGRADING:`，而加了 `-y` 它不會停下來問。這也是為什麼這個區塊的最後一行是版本確認。
 
@@ -222,7 +225,7 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'   # 每個節點都跑�
 
 > **第一次安裝請排維護時段**。`activate_storage` 會寫一個對應 `vendor "SYNOLOGY"` 的 multipath drop-in，而當那個檔案變更時會執行 `multipathd reconfigure`。這是一個**節點層級**的命令。實測：一邊對一個既有的、不相關的 map 持續做 direct read，一邊執行 reconfigure，得到 **1776 次讀取、0 次失敗**，而那個 map 的 device-mapper 事件計數器完全沒有動——代表它從未被重新載入。這個時段是給正式節點第一次安裝的建議，不是已知的中斷。
 
-上面每一項為什麼成立、版本混雜時那個很難判讀的症狀、為什麼那一行是 `apt install ./…` 而不是 `dpkg -i`，以及本頁舊版本已經把你帶進那個坑時怎麼補救——[給想深入的人](docs/TESTING_zh-TW.md#給想深入的人)。
+上面這幾點各自的來由、版本混雜時那個很難判讀的症狀、為什麼那一行是 `apt install ./…` 而不是 `dpkg -i`，還有如果你照本文件早期的版本用 `dpkg -i` 裝過該怎麼處理，都寫在[給想深入的人](docs/TESTING_zh-TW.md#給想深入的人)。
 
 ## 更新
 
@@ -247,7 +250,7 @@ dpkg -l jt-pve-storage-synology | awk '/^ii/{print $3}'
 
 四支這樣的 plugin 可以共存於同一個節點，但 `PVE::SectionConfig::init` **遇到重複的屬性名稱會直接 die**，而節點上每一個 storage 都會停止運作。`syno-` 這個前置字串就是為了這件事而存在。
 
-## 在 Proxmox VE 新增 synologysan storage
+## 在 Proxmox VE 新增 Synology SAN Storage
 
 在其中一個節點上執行一次就好。這個 storage 依其本質就是共用的。
 
