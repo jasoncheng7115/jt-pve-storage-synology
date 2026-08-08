@@ -96,6 +96,26 @@ Two limits, both measured:
    stops on the failed `umount -l -d /mnt/vzsnap0/`, so the snapshot it created is
    never deleted. `pct delsnapshot <ctid> vzdump` clears it, measured.
 
+Two things in `PVE/VZDump/LXC.pm` settle this, and both were read rather than
+inferred:
+
+- Line 264 is `PVE::Storage::activate_volumes($storage_cfg, $volids, 'vzdump')`,
+  and line 267 mounts each disk at that same snapname. So snapshot mode does not
+  merely take a snapshot, it **activates and mounts the volume at the snapshot**.
+  No CLI option changes that path: the mode is gated on
+  `has_feature('snapshot', ...)`, which is legitimately true here, and there is no
+  separate "mountable snapshot" feature to answer no to. Declaring `snapshot`
+  false would only trade this error for `mode failure - some volumes do not
+  support snapshots`, and would take real container snapshots away with it.
+- **`deactivate_volumes` does not appear in the file at all** — zero occurrences.
+  So the temporary-clone workaround that was considered for `copy => { snap => 1 }`
+  fails here for the same reason: there is nowhere to give the clone back, and a
+  leaked reflink grows as the source diverges.
+
+And the leftover snapshot is explained by the order in `cleanup`: the `umount -l -d`
+loop runs before the `remove_snapshot` block, `run_command` dies when unmounting
+something that was never mounted, and the snapshot deletion below it never runs.
+
 Two of PVE's own rules were confirmed in passing: a running container cannot be
 full-cloned at all (PVE says "only possible from a snapshot"), and a full clone
 from a snapshot is refused by this storage — **and the refusal left nothing behind

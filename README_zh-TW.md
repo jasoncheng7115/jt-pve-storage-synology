@@ -31,8 +31,8 @@
 | 多重路徑，含路徑故障 | ✓ |
 | CHAP 驗證 | ✓ |
 | 從**快照**做完整複製<br>完整複製是由 PVE 自己讀取來源資料，所以它需要在那個快照上有一個可以讀取的區塊裝置。Synology 的 LUN 快照給不了這個：快照必須先倒回，或先用 reflink 複製成另一個 LUN，才會有裝置可以讀。請改用連結複製，這個 storage 支援；或先把來源轉成範本 | 不支援 |
-| LXC 容器，當根檔案系統與當掛接點 | ✓ |
-| 容器備份的 `vzdump --mode snapshot`<br>容器的快照模式備份，是先拍一個 storage 快照，再把它掛起來讀檔案，而 Synology LUN 的快照沒有裝置可掛。請改用 `--mode stop` 或 `--mode suspend`，兩種都驗證過。虛擬機不受影響，QEMU 讀的是活的磁碟。被拒絕的那一次會留下 PVE 自己建的 `vzdump` 快照，因為它的清理卡在失敗的 `umount` 上，用 `pct delsnapshot <ctid> vzdump` 清掉 | 不支援 |
+| LXC 容器，當根檔案系統與當掛接點：快照、倒回、擴充、複製、範本、遷移都可以 | ✓ |
+| 容器備份的 snapshot **模式**（`vzdump --mode snapshot`）<br>容器自己的快照沒有問題，那是上面那一列。這裡講的是備份的模式：它先拍一個 storage 快照，再把它掛起來讀檔案，而 Synology LUN 的快照沒有裝置可掛。請改用 `--mode stop` 或 `--mode suspend`，兩種都驗證過；suspend 模式的容器除了短暫暫停以外會繼續執行。虛擬機不受影響，QEMU 讀的是活的磁碟。被拒絕的那一次會留下 PVE 自己建的 `vzdump` 快照：它的清理是先卸載再刪除，而卸載一個從未掛上的東西會先失敗。用 `pct delsnapshot <ctid> vzdump` 清掉 | 不支援 |
 
 > ### 狀態：**它已經在正式環境的叢集上運作。**
 >

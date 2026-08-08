@@ -37,8 +37,8 @@ yes say why.
 | Multipath, through a path failure | ✓ |
 | CHAP | ✓ |
 | Full clone from a snapshot<br>A full clone means PVE reads the source data itself, so it needs a readable block device at that snapshot. A Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. Use a linked clone, which this storage does support, or convert the source to a template first | Not supported |
-| LXC containers, as the root filesystem and as a mount point | ✓ |
-| A container backup in `vzdump --mode snapshot`<br>A container backup in snapshot mode takes a storage snapshot and then mounts it to read the files out, and a Synology LUN snapshot has no device to mount. Use `--mode stop` or `--mode suspend`, both verified. Virtual machines are unaffected: QEMU reads the live disk. A refused attempt leaves PVE's own `vzdump` snapshot behind, because its cleanup stops on the failed `umount` — remove it with `pct delsnapshot <ctid> vzdump` | Not supported |
+| LXC containers, as the root filesystem and as a mount point — snapshot, rollback, resize, clone, template, migration | ✓ |
+| A container backup *in snapshot mode* (`vzdump --mode snapshot`)<br>A container's own snapshots are fine — that is the row above. This is the backup mode: it takes a storage snapshot and then mounts it to read the files out, and a Synology LUN snapshot has no device to mount, so the plugin refuses and says so. Use `--mode stop` or `--mode suspend`, both verified; a container in suspend mode keeps running apart from a brief pause. Virtual machines are unaffected, because QEMU reads the live disk. A refused attempt leaves PVE's own `vzdump` snapshot behind: its cleanup unmounts before it deletes, and the unmount of something never mounted fails first. Remove it with `pct delsnapshot <ctid> vzdump` | Not supported |
 
 > ### Status: **it is running on a production cluster.**
 >

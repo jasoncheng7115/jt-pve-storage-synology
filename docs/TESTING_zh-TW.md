@@ -72,6 +72,13 @@
 1. **容器的 `vzdump --mode snapshot` 不能用**。它是拍一個 storage 快照，再把快照掛起來讀檔案，而 Synology LUN 的快照沒有裝置可掛。plugin 明確拒絕：`a Synology LUN cannot be addressed at a snapshot: roll back to it, or clone it into a new disk`。虛擬機不受影響，QEMU 讀的是活的磁碟。
 2. **那次失敗會留下 PVE 自己建的 `vzdump` 快照**。PVE 的清理停在失敗的 `umount -l -d /mnt/vzsnap0/` 上，所以它建的快照沒有被刪掉。用 `pct delsnapshot <ctid> vzdump` 清，實測清得掉。
 
+`PVE/VZDump/LXC.pm` 裡有兩件事決定了這個結果，兩件都是讀出來的，不是推論的：
+
+- 第 264 行是 `PVE::Storage::activate_volumes($storage_cfg, $volids, 'vzdump')`，第 267 行把每一顆磁碟掛在同一個快照名稱上。所以 snapshot 模式不只是拍一個快照，它是**在那個快照上啟用並掛載那顆磁碟**。沒有任何指令列選項會改變這條路徑：這個模式的判斷依據是 `has_feature('snapshot', ...)`，而那在這裡確實是真的，也沒有另一個「快照可掛載」的能力可以回答不。把 `snapshot` 宣告成假，只會把這個錯誤換成 `mode failure - some volumes do not support snapshots`，還會順手把容器真正可用的快照一起拿掉。
+- **`deactivate_volumes` 在這個檔案裡完全沒有出現**，零次。所以當初為 `copy => { snap => 1 }` 考慮過的「暫時複本」做法在這裡失敗的原因一樣：沒有地方可以把那個複本交還，而一個漏掉的 reflink 會隨著來源分歧而長大。
+
+至於留下來的那個快照，`cleanup` 的順序就解釋完了：`umount -l -d` 的迴圈在 `remove_snapshot` 區塊之前，而 `run_command` 在卸載一個從未掛上的東西時會中止，所以它下面那段刪除快照的程式碼從來沒有執行。
+
 順帶確認了兩件 PVE 自己的規則：執行中的容器不能做完整複製（PVE 說「only possible from a snapshot」），而從快照做完整複製會被這個 storage 拒絕，**而且被拒絕之後目的端沒有留下任何東西**，PVE 的錯誤處理把它建好的那顆磁碟釋放掉了。
 
 ### 工作階段怎麼帶——兩份參考實作的做法不同，而其中一份在這裡是錯的
