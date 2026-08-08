@@ -508,6 +508,14 @@ img { max-width: 100%; height: auto; display: block; }
 /* The verdict column is a word or a mark, never a paragraph: a fixed narrow
    column made the two explained rows wrap to one character per line. The reason
    belongs under the operation name, where there is room for it. */
+/* The two guest-type columns: the heading sits over its own ticks, not off to the
+   left of them. `th` is left-aligned globally, which is right for a data table and
+   wrong for a matrix. */
+.table--matrix th:not(:first-child) { text-align: center; }
+.table--matrix th:not(:first-child),
+.table--matrix td.yes,
+.table--matrix td.verdict { width: 17%; }
+
 td.yes, td.verdict {
     text-align: center;
     white-space: nowrap;
