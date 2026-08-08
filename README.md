@@ -319,7 +319,8 @@ under-count against the very ceiling it was checking.
 ## High availability and dual controllers
 
 Synology has two arrangements that both get called "HA", and they are different
-problems with different answers. **Both are supported.**
+problems with different answers. **The plugin handles both, and neither has been
+verified on hardware yet.**
 
 | | **Synology HA (SHA)** | **UC / SA dual controller** |
 |---|---|---|
