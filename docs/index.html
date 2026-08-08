@@ -238,6 +238,13 @@
                     <td class="yes">&#10003;</td>
                 </tr>
                 <tr>
+                    <td><span class="lang-en">Multipath, configured for you</span><span class="lang-zh">多重路徑，而且是自動設定的</span>
+                        <div class="cell-note"><span class="lang-en">The plugin writes its own <code>/etc/multipath/conf.d</code> drop-in and reloads multipathd when that file changes, so there is nothing to edit by hand. There is no built-in multipath entry for Synology, and without one the generic defaults apply, <code>no_path_retry "queue"</code> among them, which is how a path failure becomes a hung guest. Give <code>syno-data-portals</code> two addresses on separate subnets and the second path is real: verified through a path failure with 60 reads and 0 failures.</span><span class="lang-zh">plugin 自己寫 <code>/etc/multipath/conf.d</code> 的 drop-in，並且在那個檔案變更時重新載入 multipathd，所以沒有東西需要手動編輯。multipath 沒有內建 Synology 的設定，而少了它就會套用通用預設值，其中包括 <code>no_path_retry "queue"</code>，那正是路徑故障變成 guest 卡死的原因。<code>syno-data-portals</code> 給兩個位於不同子網的位址，第二條路徑才是真的：實測撐過一次路徑故障，60 次讀取、0 次失敗。</span></div>
+                    </td>
+                    <td class="yes">&#10003;</td>
+                    <td class="yes">&#10003;</td>
+                </tr>
+                <tr>
                     <td><span class="lang-en">Move a disk to another storage type</span><span class="lang-zh">把磁碟搬到其他 storage 型別</span>
                         <div class="cell-note"><span class="lang-en">Off and back on again, both ways.</span><span class="lang-zh">搬出去再搬回來，兩個方向都測。</span></div>
                     </td>
@@ -249,7 +256,7 @@
     </div>
 
     <p class="muted">
-        <span class="lang-en">Multipath through a path failure, and CHAP, are properties of the storage rather than of a guest: one iSCSI session on the node serves both kinds. Both are verified.</span><span class="lang-zh">多重路徑撐過路徑故障，以及 CHAP，是這個 storage 的性質，不是 guest 的：節點上同一個 iSCSI 工作階段同時服務兩種 guest。兩者都驗證過。</span>
+        <span class="lang-en">CHAP is a property of the storage rather than of a guest, since one iSCSI session on the node serves both kinds, so it is not in the table. It is verified.</span><span class="lang-zh">CHAP 是這個 storage 的性質，不是 guest 的，因為節點上同一個 iSCSI 工作階段同時服務兩種 guest，所以沒有放進表格。它驗證過。</span>
     </p>
 </section>
 
@@ -973,10 +980,99 @@
     </p>
 
     <details>
+        <summary><span class="lang-en">The storage does not appear in the web interface at all</span><span class="lang-zh">這個 storage 在網頁介面上完全看不到</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">A node without the plugin installed makes the storage <strong>invisible</strong> rather than reporting an error, and the interface you are browsing is a node too. Install it on every node in the cluster, on the same version, then reload the page.</span>
+            <span class="lang-zh">沒有裝 plugin 的節點會讓這個 storage <strong>看不到</strong>，而不是回報錯誤，而你正在瀏覽的那台也是一個節點。叢集中每個節點都要裝、版本要一致，然後重新載入頁面。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en"><code>pvesm status</code> shows it inactive and one login is all that is tried</span><span class="lang-zh"><code>pvesm status</code> 顯示 inactive，而且只嘗試登入一次</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">A rejected credential latches, on purpose: DSM's Auto Block will lock the account out and then the whole node, and the iSCSI data path goes on working while it does, which is what makes it easy to miss. Fix the password with <code>pvesm set</code> — any configuration change clears the latch — and check Control Panel → Security → Account → Auto Block for the node's address. Removing an entry there takes effect immediately.</span>
+            <span class="lang-zh">被拒絕的憑證會被鎖住，這是刻意的：DSM 的自動封鎖會先鎖帳號、接著鎖整個節點，而封鎖期間 iSCSI 資料路徑照常運作，那正是它容易被忽略的原因。用 <code>pvesm set</code> 改掉密碼（任何設定變更都會解除鎖定），並到控制台 → 安全性 → 帳號 → 自動封鎖檢查那個節點的位址。把項目移除會立即生效。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en"><code>pvesm add</code> refuses the storage</span><span class="lang-zh"><code>pvesm add</code> 拒絕建立這個 storage</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">Three reasons, and it says which: the DSM volume is not <strong>Btrfs</strong>, the model does not support iSCSI targets or snapshots, or the storage id would fold onto an existing storage's LUN prefix. It is meant to fail here rather than at your first snapshot.</span>
+            <span class="lang-zh">三個原因，而它會說是哪一個：DSM 儲存空間不是 <strong>Btrfs</strong>、機型不支援 iSCSI target 或快照，或者這個 storage id 會摺疊成與既有 storage 相同的 LUN 前置字串。它就是要在這裡失敗，而不是等到你第一次拍快照。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">A guest will not start: <em>no device appeared on this node</em></span><span class="lang-zh">guest 開不起來：<code>no device appeared on this node</code></span></summary>
+        <div class="detail-content">
+            <span class="lang-en">Usually a rollback that has just finished. DSM asks the initiator to <strong>log out</strong> while it restores a snapshot, twice over about seven seconds, so the plugin rescans every five seconds for up to forty-five. If it persists, the node's own multipath policy is the next thing to look at: <code>find_multipaths yes</code> builds no map for a single-path device unless its WWID is in <code>/etc/multipath/wwids</code>, and the plugin appends it — check the file and <code>multipath -ll</code>.</span>
+            <span class="lang-zh">通常是剛剛做完一次倒回。DSM 在還原快照時會要求 initiator <strong>登出</strong>，七秒內兩次，所以 plugin 會每五秒重掃一次、最多四十五秒。如果一直不出現，接著要看的是節點自己的 multipath 政策：<code>find_multipaths yes</code> 不會為單一路徑的裝置建 map，除非它的 WWID 在 <code>/etc/multipath/wwids</code> 裡，而 plugin 會把它加進去——檢查那個檔案和 <code>multipath -ll</code>。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">A resize ends with QEMU saying <em>Cannot grow device files</em></span><span class="lang-zh">擴充最後 QEMU 說 <code>Cannot grow device files</code></span></summary>
+        <div class="detail-content">
+            <span class="lang-en">The array grew and the node had not caught up. <code>multipathd resize map</code> exits 0 on a map it left alone, because it reads the path's size from its own udev view and that view is stale for as long as it takes udevd to process the uevent. The plugin polls until the map carries the new size and fails with an explanation if it never does — so on a current version you should see that explanation instead of QEMU's.</span>
+            <span class="lang-zh">陣列已經變大，而節點還沒跟上。<code>multipathd resize map</code> 對它其實沒有動到的 map 也會回 0，因為它是從自己的 udev 視角讀路徑大小，而在 udevd 處理完 uevent 之前那個視角是舊的。Plugin 會輪詢到 map 帶著新的大小為止，如果始終沒有就帶著說明失敗——所以在目前的版本上，你應該會看到那個說明，而不是 QEMU 的訊息。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">A snapshot with RAM is refused because of its name</span><span class="lang-zh">含記憶體的快照因為名稱被拒絕</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">Proxmox VE puts the snapshot name inside a volume name when the snapshot includes memory, and DSM accepts only letters, digits, <code>-</code>, <code>.</code> and <code>:</code> in a LUN name. From 0.9.2 an underscore is handled — it becomes a dot on the array and comes back unchanged — and every name Proxmox VE constructs is accepted. On an older version, name the snapshot with letters, digits and hyphens.</span>
+            <span class="lang-zh">含記憶體的快照會讓 Proxmox VE 把快照名稱放進磁碟名稱裡，而 DSM 的 LUN 名稱只接受字母、數字、<code>-</code>、<code>.</code> 與 <code>:</code>。從 0.9.2 起底線已經處理掉了——它在陣列上變成點，讀回來還是底線——而且 Proxmox VE 會產生的每一種名稱都接受。如果你在舊版上，快照名稱請只用字母、數字和連字號。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">Migration completes but the source node's cleanup fails</span><span class="lang-zh">遷移完成了，但來源節點的清理失敗</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">Almost always different plugin versions on the two nodes. The guest is fine — it is running on the target — but the source node could not parse something the target wrote. Bring every node in the cluster to the same version, then run <code>pve-syno-reap --all</code> on the source to see whether anything is actually left.</span>
+            <span class="lang-zh">幾乎都是兩個節點的 plugin 版本不同。guest 沒事，它在目標節點上跑著，只是來源節點看不懂目標節點寫下的東西。把叢集中每個節點升到同一版，然後在來源節點跑一次 <code>pve-syno-reap --all</code> 看是不是真的留了東西。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en"><code>qm move_disk</code> back onto this storage, or a restore, fails</span><span class="lang-zh"><code>qm move_disk</code> 搬回這個 storage、或還原備份時失敗</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">On a version before 0.9.x, and only on a node that had previously deleted a LUN there: the NAS reuses the mapping index, the kernel re-reads the device and reports the new LUN, and multipathd goes on holding a map for the old one. The plugin refuses rather than using the wrong device — which is the safe direction — and from 0.9.x it asks the kernel to rediscover the device and carries on. Upgrade; there is no manual step.</span>
+            <span class="lang-zh">只發生在 0.9.x 之前的版本，而且只在「曾經在那裡刪過 LUN」的節點上：NAS 會重用 mapping index，核心重讀裝置後回報新的 LUN，而 multipathd 還守著舊的那個 map。Plugin 是拒絕而不是拿錯的裝置去用，那是安全的方向；從 0.9.x 起它會請核心重新探索裝置然後繼續。升級即可，沒有手動步驟。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">A node crashed — what has to be done by hand?</span><span class="lang-zh">節點當機了，有什麼需要手動處理？</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">Run <code>pve-syno-reap --all</code> on it after it rejoins, and <code>--remove</code> if it reports anything. A hard-reset node never runs <code>deactivate_volume</code>, so its tracking file can claim a LUN it is not attached to. Nothing in Proxmox VE cleans that up, which is why the tool exists. It refuses a device in use and one whose state it cannot establish, and it will not touch another vendor's map.</span>
+            <span class="lang-zh">等它重新加入叢集之後，在它上面跑 <code>pve-syno-reap --all</code>，如果有回報就加 <code>--remove</code>。被硬重置的節點不會執行 <code>deactivate_volume</code>，所以它的追蹤檔可能宣稱持有一顆其實沒掛載的 LUN。Proxmox VE 裡沒有任何東西會清理那個，這就是這個工具存在的原因。它會拒絕使用中的裝置、也會拒絕狀態無法確定的裝置，而且不會動到別家廠商的 map。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">Allocation fails with a five-digit number while <code>pvesm status</code> still shows free space</span><span class="lang-zh">配置磁碟時失敗，出現一個五位數字，而 <code>pvesm status</code> 還顯示有空間</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">You reached a <strong>count</strong>, not a size: <strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots per LUN. One VM disk is one LUN, the ceiling belongs to the whole NAS rather than to this storage, and adding disks does not raise it.</span>
+            <span class="lang-zh">你撞到的是<strong>數量</strong>上限，不是容量：LUN 是 <strong>18990541</strong>、target 是 <strong>18990542</strong>、每顆 LUN 的快照是 <strong>18990543</strong>。一顆 VM 磁碟就是一個 LUN，這個上限屬於整台 NAS 而不是這個 storage，而且加硬碟不會提高它。</span>
+        </div>
+    </details>
+
+    <details>
+        <summary><span class="lang-en">Proxmox VE and DSM disagree about the capacity</span><span class="lang-zh">Proxmox VE 和 DSM 顯示的容量不一致</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">Both are right. Proxmox VE labels the number in SI units and DSM in binary ones, and the plugin passes the byte count through untouched. The percentages agree, which is the quickest check.</span>
+            <span class="lang-zh">兩邊都對。Proxmox VE 用 SI 單位標示，DSM 用二進位單位，而 plugin 是把位元組數原封不動傳過去。百分比會一致，那是最快的檢查點。</span>
+        </div>
+    </details>
+
+    <details>
         <summary><span class="lang-en">&#8220;Full clone feature is not supported for a snapshot of&#8230;&#8221;</span><span class="lang-zh">「Full clone feature is not supported for a snapshot of…」</span></summary>
         <div class="detail-content">
-            <span class="lang-en">A full clone has Proxmox VE read the source data itself, so it needs a readable block device <strong>at that snapshot</strong>, and a Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. The web interface asks for a full clone for anything that is not a template, so it always lands here. Two routes work: convert the source to a template, after which the interface offers a linked clone, or <code>qm clone &lt;vmid&gt; &lt;newid&gt; --snapname &lt;snap&gt; --full 0</code>. The <code>--full 0</code> is not optional there, because <code>full</code> defaults to whether the source is a template.</span>
-            <span class="lang-zh">完整複製是由 Proxmox VE 自己讀取來源資料，所以它需要<strong>在那個快照上</strong>有一個可以讀取的區塊裝置，而 Synology LUN 的快照給不了：快照必須先倒回，或先用 reflink 複製成另一個 LUN，才會有裝置可以讀。網頁介面對任何不是範本的東西都會要求完整複製，所以從介面做一定會走到這裡。兩條路可以走：把來源轉成範本，之後介面就會提供連結複製；或是 <code>qm clone &lt;vmid&gt; &lt;newid&gt; --snapname &lt;snap&gt; --full 0</code>。那個 <code>--full 0</code> 不是可以省的，因為 <code>full</code> 的預設值取決於來源是不是範本。</span>
+            <p><span class="lang-en">This is only a full clone <strong>from a snapshot</strong>. A full clone of the disk as it stands is fine, and so is a linked clone.</span><span class="lang-zh">只有<strong>從快照</strong>做完整複製會這樣。對磁碟目前狀態做完整複製沒有問題，連結複製也沒有問題。</span></p>
+            <p><span class="lang-en">A full clone has Proxmox VE read the source data itself, so it needs a readable block device <strong>at that snapshot</strong>, and a Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. The web interface asks for a full clone for anything that is not a template, so choosing a snapshot and pressing Full Clone always lands here.</span><span class="lang-zh">完整複製是由 Proxmox VE 自己讀取來源資料，所以它需要<strong>在那個快照上</strong>有一個可以讀取的區塊裝置，而 Synology LUN 的快照給不了：快照必須先倒回，或先用 reflink 複製成另一個 LUN，才會有裝置可以讀。網頁介面對任何不是範本的東西都會要求完整複製，所以從介面選了快照再按完整複製，一定會走到這裡。</span></p>
+            <p><span class="lang-en">Two routes give the same result: convert the source to a template, after which the interface offers a linked clone, or use <code>qm clone &lt;vmid&gt; &lt;newid&gt; --snapname &lt;snap&gt; --full 0</code>. The <code>--full 0</code> is not optional there, because <code>full</code> defaults to whether the source is a template.</span><span class="lang-zh">兩條路都可以得到同樣的結果：把來源轉成範本，之後介面就會提供連結複製；或者用 <code>qm clone &lt;vmid&gt; &lt;newid&gt; --snapname &lt;snap&gt; --full 0</code>。那個 <code>--full 0</code> 不是可以省的，因為 <code>full</code> 的預設值取決於來源是不是範本。</span></p>
         </div>
     </details>
 
@@ -985,84 +1081,6 @@
         <div class="detail-content">
             <span class="lang-en">A container backup in <code>--mode snapshot</code> was attempted and refused. PVE takes that snapshot itself, and its cleanup unmounts before it deletes, so the unmount of something never mounted fails first and the deletion never runs. Remove it with <code>pct delsnapshot &lt;ctid&gt; vzdump</code>, and back up in <code>--mode suspend</code> or <code>--mode stop</code>.</span>
             <span class="lang-zh">有人用 <code>--mode snapshot</code> 備份容器而被拒絕了。那個快照是 PVE 自己建的，而它的清理是先卸載再刪除，所以卸載一個從未掛上的東西會先失敗，後面的刪除就沒有執行。用 <code>pct delsnapshot &lt;ctid&gt; vzdump</code> 清掉，並改用 <code>--mode suspend</code> 或 <code>--mode stop</code> 備份。</span>
-        </div>
-    </details>
-
-    <details>
-        <summary><span class="lang-en">The storage does not appear in the web interface at all</span><span class="lang-zh">這個 storage 在網頁介面上完全看不到</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">A node without the plugin installed makes the storage <strong>invisible</strong> rather than reporting an error, and the interface you are browsing is a node too. Install it on every node in the cluster, on the same version, then reload the page.</span>
-            <span class="lang-zh">沒有裝 plugin 的節點會讓這個 storage <strong>看不到</strong>，而不是回報錯誤，而你正在瀏覽的那台也是一個節點。叢集中每個節點都要裝、版本要一致，然後重新載入頁面。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en"><code>pvesm status</code> shows it inactive and one login is all that is tried</span><span class="lang-zh"><code>pvesm status</code> 顯示 inactive，而且只嘗試登入一次</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">A rejected credential latches, on purpose: DSM's Auto Block will lock the account out and then the whole node, and the iSCSI data path goes on working while it does, which is what makes it easy to miss. Fix the password with <code>pvesm set</code> — any configuration change clears the latch — and check Control Panel → Security → Account → Auto Block for the node's address. Removing an entry there takes effect immediately.</span>
-            <span class="lang-zh">被拒絕的憑證會被鎖住，這是刻意的：DSM 的自動封鎖會先鎖帳號、接著鎖整個節點，而封鎖期間 iSCSI 資料路徑照常運作，那正是它容易被忽略的原因。用 <code>pvesm set</code> 改掉密碼（任何設定變更都會解除鎖定），並到控制台 → 安全性 → 帳號 → 自動封鎖檢查那個節點的位址。把項目移除會立即生效。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en"><code>pvesm add</code> refuses the storage</span><span class="lang-zh"><code>pvesm add</code> 拒絕建立這個 storage</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">Three reasons, and it says which: the DSM volume is not <strong>Btrfs</strong>, the model does not support iSCSI targets or snapshots, or the storage id would fold onto an existing storage's LUN prefix. It is meant to fail here rather than at your first snapshot.</span>
-            <span class="lang-zh">三個原因，而它會說是哪一個：DSM 儲存空間不是 <strong>Btrfs</strong>、機型不支援 iSCSI target 或快照，或者這個 storage id 會摺疊成與既有 storage 相同的 LUN 前置字串。它就是要在這裡失敗，而不是等到你第一次拍快照。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">A guest will not start: <em>no device appeared on this node</em></span><span class="lang-zh">guest 開不起來：<code>no device appeared on this node</code></span></summary>
-        <div class="detail-content">
-            <span class="lang-en">Usually a rollback that has just finished. DSM asks the initiator to <strong>log out</strong> while it restores a snapshot, twice over about seven seconds, so the plugin rescans every five seconds for up to forty-five. If it persists, the node's own multipath policy is the next thing to look at: <code>find_multipaths yes</code> builds no map for a single-path device unless its WWID is in <code>/etc/multipath/wwids</code>, and the plugin appends it — check the file and <code>multipath -ll</code>.</span>
-            <span class="lang-zh">通常是剛剛做完一次倒回。DSM 在還原快照時會要求 initiator <strong>登出</strong>，七秒內兩次，所以 plugin 會每五秒重掃一次、最多四十五秒。如果一直不出現，接著要看的是節點自己的 multipath 政策：<code>find_multipaths yes</code> 不會為單一路徑的裝置建 map，除非它的 WWID 在 <code>/etc/multipath/wwids</code> 裡，而 plugin 會把它加進去——檢查那個檔案和 <code>multipath -ll</code>。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">A resize ends with QEMU saying <em>Cannot grow device files</em></span><span class="lang-zh">擴充最後 QEMU 說 <code>Cannot grow device files</code></span></summary>
-        <div class="detail-content">
-            <span class="lang-en">The array grew and the node had not caught up. <code>multipathd resize map</code> exits 0 on a map it left alone, because it reads the path's size from its own udev view and that view is stale for as long as it takes udevd to process the uevent. The plugin polls until the map carries the new size and fails with an explanation if it never does — so on a current version you should see that explanation instead of QEMU's.</span>
-            <span class="lang-zh">陣列已經變大，而節點還沒跟上。<code>multipathd resize map</code> 對它其實沒有動到的 map 也會回 0，因為它是從自己的 udev 視角讀路徑大小，而在 udevd 處理完 uevent 之前那個視角是舊的。Plugin 會輪詢到 map 帶著新的大小為止，如果始終沒有就帶著說明失敗——所以在目前的版本上，你應該會看到那個說明，而不是 QEMU 的訊息。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">A snapshot with RAM is refused because of its name</span><span class="lang-zh">含記憶體的快照因為名稱被拒絕</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">Proxmox VE puts the snapshot name inside a volume name when the snapshot includes memory, and DSM accepts only letters, digits, <code>-</code>, <code>.</code> and <code>:</code> in a LUN name. From 0.9.2 an underscore is handled — it becomes a dot on the array and comes back unchanged — and every name Proxmox VE constructs is accepted. On an older version, name the snapshot with letters, digits and hyphens.</span>
-            <span class="lang-zh">含記憶體的快照會讓 Proxmox VE 把快照名稱放進磁碟名稱裡，而 DSM 的 LUN 名稱只接受字母、數字、<code>-</code>、<code>.</code> 與 <code>:</code>。從 0.9.2 起底線已經處理掉了——它在陣列上變成點，讀回來還是底線——而且 Proxmox VE 會產生的每一種名稱都接受。如果你在舊版上，快照名稱請只用字母、數字和連字號。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">Migration completes but the source node's cleanup fails</span><span class="lang-zh">遷移完成了，但來源節點的清理失敗</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">Almost always different plugin versions on the two nodes. The guest is fine — it is running on the target — but the source node could not parse something the target wrote. Bring every node in the cluster to the same version, then run <code>pve-syno-reap --all</code> on the source to see whether anything is actually left.</span>
-            <span class="lang-zh">幾乎都是兩個節點的 plugin 版本不同。guest 沒事，它在目標節點上跑著，只是來源節點看不懂目標節點寫下的東西。把叢集中每個節點升到同一版，然後在來源節點跑一次 <code>pve-syno-reap --all</code> 看是不是真的留了東西。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en"><code>qm move_disk</code> back onto this storage, or a restore, fails</span><span class="lang-zh"><code>qm move_disk</code> 搬回這個 storage、或還原備份時失敗</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">On a version before 0.9.x, and only on a node that had previously deleted a LUN there: the NAS reuses the mapping index, the kernel re-reads the device and reports the new LUN, and multipathd goes on holding a map for the old one. The plugin refuses rather than using the wrong device — which is the safe direction — and from 0.9.x it asks the kernel to rediscover the device and carries on. Upgrade; there is no manual step.</span>
-            <span class="lang-zh">只發生在 0.9.x 之前的版本，而且只在「曾經在那裡刪過 LUN」的節點上：NAS 會重用 mapping index，核心重讀裝置後回報新的 LUN，而 multipathd 還守著舊的那個 map。Plugin 是拒絕而不是拿錯的裝置去用，那是安全的方向；從 0.9.x 起它會請核心重新探索裝置然後繼續。升級即可，沒有手動步驟。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">A node crashed — what has to be done by hand?</span><span class="lang-zh">節點當機了，有什麼需要手動處理？</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">Run <code>pve-syno-reap --all</code> on it after it rejoins, and <code>--remove</code> if it reports anything. A hard-reset node never runs <code>deactivate_volume</code>, so its tracking file can claim a LUN it is not attached to. Nothing in Proxmox VE cleans that up, which is why the tool exists. It refuses a device in use and one whose state it cannot establish, and it will not touch another vendor's map.</span>
-            <span class="lang-zh">等它重新加入叢集之後，在它上面跑 <code>pve-syno-reap --all</code>，如果有回報就加 <code>--remove</code>。被硬重置的節點不會執行 <code>deactivate_volume</code>，所以它的追蹤檔可能宣稱持有一顆其實沒掛載的 LUN。Proxmox VE 裡沒有任何東西會清理那個，這就是這個工具存在的原因。它會拒絕使用中的裝置、也會拒絕狀態無法確定的裝置，而且不會動到別家廠商的 map。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">Allocation fails with a five-digit number while <code>pvesm status</code> still shows free space</span><span class="lang-zh">配置磁碟時失敗，出現一個五位數字，而 <code>pvesm status</code> 還顯示有空間</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">You reached a <strong>count</strong>, not a size: <strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots per LUN. One VM disk is one LUN, the ceiling belongs to the whole NAS rather than to this storage, and adding disks does not raise it.</span>
-            <span class="lang-zh">你撞到的是<strong>數量</strong>上限，不是容量：LUN 是 <strong>18990541</strong>、target 是 <strong>18990542</strong>、每顆 LUN 的快照是 <strong>18990543</strong>。一顆 VM 磁碟就是一個 LUN，這個上限屬於整台 NAS 而不是這個 storage，而且加硬碟不會提高它。</span>
-        </div>
-    </details>
-    <details>
-        <summary><span class="lang-en">Proxmox VE and DSM disagree about the capacity</span><span class="lang-zh">Proxmox VE 和 DSM 顯示的容量不一致</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">Both are right. Proxmox VE labels the number in SI units and DSM in binary ones, and the plugin passes the byte count through untouched. The percentages agree, which is the quickest check.</span>
-            <span class="lang-zh">兩邊都對。Proxmox VE 用 SI 單位標示，DSM 用二進位單位，而 plugin 是把位元組數原封不動傳過去。百分比會一致，那是最快的檢查點。</span>
         </div>
     </details>
 </section>

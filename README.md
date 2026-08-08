@@ -35,10 +35,11 @@ not a yes say why.
 | Live migration<br>Proxmox VE has no live migration for containers. `--restart` migration is verified and took 26 seconds | ✓ | n/a |
 | Offline migration | ✓ | ✓ |
 | Backup and restore | ✓ | ✓ |
+| Multipath, configured for you<br>The plugin writes its own `/etc/multipath/conf.d` drop-in and reloads multipathd when that file changes, so there is nothing to edit by hand. There is no built-in multipath entry for Synology, and without one the generic defaults apply, `no_path_retry "queue"` among them, which is how a path failure becomes a hung guest. Give `syno-data-portals` two addresses on separate subnets and the second path is real: verified through a path failure with 60 reads and 0 failures | ✓ | ✓ |
 | Move a disk to another storage type<br>Off and back on again, both ways | ✓ | ✓ |
 
-Multipath through a path failure, and CHAP, are properties of the storage rather
-than of a guest: one iSCSI session on the node serves both kinds. Both are verified.
+CHAP is a property of the storage rather than of a guest, since one iSCSI session on
+the node serves both kinds, so it is not in the table. It is verified.
 
 > ### Status: **it is running on a production cluster.**
 >
