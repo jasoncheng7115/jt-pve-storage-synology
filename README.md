@@ -44,12 +44,12 @@ locally.
 
 ---
 
-> ### Start on a workload you can afford to lose
+> ### Start with a non-critical system
 >
-> All of the above was measured, and none of it is a substitute for your own
-> hardware and your own DSM version. Put a test guest on it first, run a snapshot,
-> a rollback and a backup, and leave it a few days before anything you would miss
-> goes near it. Two models and three DSM versions is a small sample of what
+> Everything above was measured, and none of it replaces your own hardware and
+> your own DSM version. Begin with a non-critical guest: take a snapshot, roll it
+> back, run a backup, and let it run for a few days before you move anything
+> important onto it. Two models and three DSM versions is a small sample of what
 > Synology sells.
 
 ## What has been driven on a production cluster
