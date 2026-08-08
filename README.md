@@ -303,11 +303,10 @@ Before it asks the NAS to create anything it compares the LUN count against
 holds its model's maximum number of LUNs, deleting is the only remedy. It also
 warns once when fewer than sixteen remain, while there is still time to plan.
 
-**The count includes LUNs this storage does not own** — the owner's own LUNs and
-any Virtual Machine Manager virtual disks all consume the same ceiling. That is
-the second reason this plugin never sends the types filter Synology's own client
-sends: that filter hides exactly those objects, so a client trusting it would
-under-count against the very ceiling it was checking.
+**The count includes LUNs this storage does not own**: your own, and any Virtual
+Machine Manager virtual disks, all draw on the same ceiling. That is also why the
+types filter Synology's own client sends is never sent here — it hides exactly
+those objects.
 
 ### The three ceilings, in the order they will bite
 

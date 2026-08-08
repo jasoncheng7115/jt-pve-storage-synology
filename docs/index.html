@@ -463,8 +463,8 @@
     <a href="LIMITS.md" class="btn btn--outline"><span class="lang-en">Every model's published limits, with sources</span><span class="lang-zh">各機型公布的上限，附出處</span></a>
 
     <p>
-        <span class="lang-en">At the ceiling DSM refuses cleanly —<strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots. Nothing is damaged, but the refusal reaches an operator as an allocation failure with a five-digit number in it while <code>pvesm status</code> goes on showing terabytes free, because free space is not the problem and adding disks will not fix it.</span>
-        <span class="lang-zh">達到上限時 DSM 會明確拒絕並回報錯誤碼：LUN 是 <strong>18990541</strong>、target 是 <strong>18990542</strong>、快照是 <strong>18990543</strong>。什麼都不會壞，但那個拒絕到操作者眼前是「配置失敗」加一個五位數字，而 <code>pvesm status</code> 還繼續顯示好幾 TB 可用，因為可用空間不是問題所在，加硬碟也解決不了。</span>
+        <span class="lang-en">At the ceiling DSM refuses cleanly, with a code: <strong>18990541</strong> for LUNs, <strong>18990542</strong> for targets, <strong>18990543</strong> for snapshots. Nothing is damaged, but an operator sees only an allocation failure with a five-digit number in it, while <code>pvesm status</code> goes on showing terabytes free. Space is not the problem, so adding disks will not help.</span>
+        <span class="lang-zh">達到上限時 DSM 會明確拒絕，並回報錯誤碼：LUN 是 <strong>18990541</strong>、target 是 <strong>18990542</strong>、快照是 <strong>18990543</strong>。什麼都不會壞，但操作者看到的只是「配置失敗」加一個五位數字，而 <code>pvesm status</code> 還顯示好幾 TB 可用。問題不是空間，所以加硬碟也沒有用。</span>
     </p>
 
     <details class="alert alert--warning">
@@ -474,8 +474,8 @@
     </details>
 
     <div class="alert alert--info">
-        <span class="lang-en"><strong>So the plugin refuses first</strong>, with a message that names the real reason, and warns once while sixteen remain. <strong>The count includes LUNs this storage does not own</strong> —the owner's own and any Virtual Machine Manager disks consume the same ceiling. That is the second reason it never sends the types filter Synology's own client sends: that filter hides exactly those objects, so a client trusting it would under-count against the ceiling it was checking.</span>
-        <span class="lang-zh"><strong>所以 plugin 會先拒絕</strong>，用一句說得出真正原因的話，並在剩下十六個時警告一次。<strong>這個數量包含不屬於這個 storage 的 LUN</strong>：擁有者自己的、以及任何 Virtual Machine Manager 的磁碟，都吃同一個上限。這就是它從不送 Synology 自己那份型態過濾條件的第二個理由：那個過濾條件藏起來的正是這些物件，所以相信它的用戶端會在它正在檢查的那個上限上少算。</span>
+        <span class="lang-en"><strong>So the plugin refuses first, and names the real reason</strong>, and warns once while sixteen remain. That count includes <strong>LUNs this storage does not own</strong>: your own, and any Virtual Machine Manager disks, all draw on the same ceiling.</span>
+        <span class="lang-zh"><strong>所以 plugin 會先拒絕，並且說出真正的原因</strong>，剩下十六個的時候也會先警告一次。這個計數包含<strong>不屬於這個 storage 的 LUN</strong>：你自己建的、Virtual Machine Manager 用的，都吃同一個上限。</span>
     </div>
 
     <p>
@@ -486,7 +486,7 @@
     <div class="alert alert--info">
         <strong><span class="lang-en">Snapshots: the NAS reports two ceilings and does not say which it enforces</span><span class="lang-zh">快照：NAS 回報兩個上限，而且沒說它執行哪一個</span></strong>
         <span class="lang-en">A DS918+ and a DS925+ both publish <code>max_snapshot_per_lun</code> <strong>256</strong> and <code>max_snapshot_per_lun_v2</code> <strong>128</strong> —the identical pair, so it is not a quirk of one model. Which one DSM enforces cannot be read out of the API; it would take a 129th snapshot on one LUN to find out. The plugin therefore guards at the <strong>lower</strong> one, because a guard that lets the storage server refuse first has failed at its only job. If you are refused at 128 the message names both numbers. The ceiling is also <strong>shared with any snapshot schedule you set in SAN Manager</strong>, and those count.</span>
-        <span class="lang-zh">DS918+ 與 DS925+ 都公布 <code>max_snapshot_per_lun</code> <strong>256</strong> 與 <code>max_snapshot_per_lun_v2</code> <strong>128</strong>，一模一樣的一對，所以這不是某個機型的怪癖。DSM 實際執行哪一個，從 API 讀不出來；要在同一顆 LUN 上拍到第 129 張才知道。因此 plugin 守在<strong>較小</strong>的那個，因為一道讓儲存伺服器先拒絕的守門，等於沒有做到它唯一的工作。如果你在 128 被拒絕，訊息會把兩個數字都寫出來。這個上限也<strong>和你在 SAN Manager 裡設的快照排程共用</strong>，那些也算在內。</span>
+        <span class="lang-zh">DS918+ 與 DS925+ 都公布 <code>max_snapshot_per_lun</code> <strong>256</strong> 與 <code>max_snapshot_per_lun_v2</code> <strong>128</strong>，兩台一模一樣，所以這不是某一個機型的怪癖。DSM 實際執行的是哪一個，從 API 讀不出來，要在同一顆 LUN 上拍到第 129 張才知道，所以 plugin 守在<strong>較小</strong>的那個。如果你在 128 被拒絕，訊息會把兩個數字都寫出來。這個上限也<strong>和你在 SAN Manager 裡設的快照排程共用</strong>。</span>
     </div>
 </section>
 
