@@ -452,12 +452,15 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* The measured numbers, above the prose that explains them: a reader deciding
    whether to try this wants the evidence before the narrative. */
+/* Three across, so six cards are two even rows rather than four and a gap. */
 .stat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin: 4px 0 20px;
 }
+@media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .stat-grid { grid-template-columns: 1fr; } }
 .stat {
     background: var(--surface-0);
     border: 1px solid var(--border);
@@ -471,6 +474,9 @@ img { max-width: 100%; height: auto; display: block; }
     letter-spacing: -0.02em;
     margin-bottom: 4px;
 }
+/* A version pair is a figure too, and it does not fit at the headline size. */
+.stat__value--sm { font-size: 1.1rem; }
+
 .stat__label {
     font-size: 0.78rem; color: var(--text-secondary);
     line-height: 1.5;
@@ -499,10 +505,26 @@ img { max-width: 100%; height: auto; display: block; }
 .split-card ul { margin: 0 0 8px 18px; }
 .split-card li { font-size: 0.84rem; line-height: 1.6; margin-bottom: 5px; }
 
-/* A yes in the operations table is a mark, not a sentence. */
-td.yes {
-    color: var(--green); font-weight: 700;
-    font-size: 1rem; text-align: center; width: 12%;
+/* The verdict column is a word or a mark, never a paragraph: a fixed narrow
+   column made the two explained rows wrap to one character per line. The reason
+   belongs under the operation name, where there is room for it. */
+td.yes, td.verdict {
+    text-align: center;
+    white-space: nowrap;
+    width: 104px;
+    font-weight: 700;
+}
+td.yes { color: var(--green); font-size: 1rem; }
+td.verdict { font-size: 0.8rem; }
+td.verdict--no       { color: var(--red); }
+td.verdict--untested { color: var(--amber); }
+
+.cell-note {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    font-weight: 400;
 }
 
 /* ============================================================

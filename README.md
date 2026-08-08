@@ -35,8 +35,8 @@ command line. The two rows that are not a yes say so.
 | Moving a disk to another storage type | ✓ |
 | Multipath, through a path failure | ✓ |
 | CHAP | ✓ |
-| Full clone *from a snapshot* | Refused up front. A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first |
-| LXC containers | Declared, never tested. Everything above was measured with virtual machines |
+| Full clone from a snapshot<br>A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first | Refused |
+| LXC containers<br>Declared, but everything above was measured with virtual machines | Untested |
 
 > ### Status: **it is running on a production cluster.**
 >

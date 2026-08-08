@@ -178,12 +178,18 @@
                 <tr><td><span class="lang-en">Multipath, through a path failure</span><span class="lang-zh">多重路徑，含路徑故障</span></td><td class="yes">&#10003;</td></tr>
                 <tr><td><span class="lang-en">CHAP</span><span class="lang-zh">CHAP 驗證</span></td><td class="yes">&#10003;</td></tr>
                 <tr>
-                    <td><span class="lang-en">Full clone <em>from a snapshot</em></span><span class="lang-zh">從<strong>快照</strong>做完整複製</span></td>
-                    <td><span class="lang-en">Refused up front. A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first.</span><span class="lang-zh">直接拒絕。Synology LUN 在快照上沒有可讀取的裝置，PVE 會做到一半才失敗。請用連結複製，或先把來源轉成範本。</span></td>
+                    <td>
+                        <span class="lang-en">Full clone from a snapshot</span><span class="lang-zh">從<strong>快照</strong>做完整複製</span>
+                        <div class="cell-note"><span class="lang-en">A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first.</span><span class="lang-zh">Synology LUN 在快照上沒有可讀取的裝置，PVE 會做到一半才失敗。請用連結複製，或先把來源轉成範本。</span></div>
+                    </td>
+                    <td class="verdict verdict--no"><span class="lang-en">Refused</span><span class="lang-zh">拒絕</span></td>
                 </tr>
                 <tr>
-                    <td><span class="lang-en">LXC containers</span><span class="lang-zh">LXC 容器</span></td>
-                    <td><span class="lang-en">Declared, never tested. Everything above was measured with virtual machines.</span><span class="lang-zh">有宣告，但沒有測過。上面每一項都是用虛擬機量測的。</span></td>
+                    <td>
+                        <span class="lang-en">LXC containers</span><span class="lang-zh">LXC 容器</span>
+                        <div class="cell-note"><span class="lang-en">Declared, but everything above was measured with virtual machines.</span><span class="lang-zh">有宣告，但上面每一項都是用虛擬機量測的。</span></div>
+                    </td>
+                    <td class="verdict verdict--untested"><span class="lang-en">Untested</span><span class="lang-zh">未測試</span></td>
                 </tr>
             </tbody>
         </table>
@@ -195,28 +201,28 @@
     <h2 class="section-title"><span class="lang-en">Measured on hardware, not just called through an API</span><span class="lang-zh">實機驗證過，不只是 API 呼叫得通</span></h2>
     <div class="stat-grid">
         <div class="stat">
-            <div class="stat__value">5</div>
-            <div class="stat__label"><span class="lang-en">node production cluster, live migration across all of them</span><span class="lang-zh">節點的正式叢集，跨全部節點即時遷移</span></div>
+            <div class="stat__value"><span class="lang-en">5 nodes</span><span class="lang-zh">5 節點</span></div>
+            <div class="stat__label"><span class="lang-en">in the production cluster, with live migration across all of them</span><span class="lang-zh">的正式叢集，跨全部節點的即時遷移都跑過</span></div>
         </div>
         <div class="stat">
-            <div class="stat__value">3.6 s</div>
-            <div class="stat__label"><span class="lang-en">for a surviving node to take over a crashed node's LUN, data intact</span><span class="lang-zh">存活節點接手當掉節點的 LUN，資料完整</span></div>
+            <div class="stat__value"><span class="lang-en">3.6 s</span><span class="lang-zh">3.6 秒</span></div>
+            <div class="stat__label"><span class="lang-en">for a surviving node to take over a crashed node's LUN, data intact</span><span class="lang-zh">節點當機後，存活節點接手它的 LUN 所花的時間，資料完整</span></div>
         </div>
         <div class="stat">
-            <div class="stat__value">60 / 0</div>
+            <div class="stat__value"><span class="lang-en">60 / 0</span><span class="lang-zh">60 / 0</span></div>
             <div class="stat__label"><span class="lang-en">reads and failures through a multipath path failure</span><span class="lang-zh">多重路徑故障期間的讀取次數與失敗次數</span></div>
         </div>
         <div class="stat">
-            <div class="stat__value">3</div>
-            <div class="stat__label"><span class="lang-en"><code>vzdump</code> modes, every restore byte-identical</span><span class="lang-zh">種 <code>vzdump</code> 模式，每次還原都位元組相同</span></div>
+            <div class="stat__value"><span class="lang-en">3</span><span class="lang-zh">3 種</span></div>
+            <div class="stat__label"><span class="lang-en"><code>vzdump</code> modes, every restore byte-identical</span><span class="lang-zh"><code>vzdump</code> 備份模式，還原後位元組完全相同</span></div>
         </div>
         <div class="stat">
-            <div class="stat__value">2 &times; 3</div>
-            <div class="stat__label"><span class="lang-en">models and DSM versions: DS918+ on 7.1.1 and 7.4.1, DS925+ on 7.3.2</span><span class="lang-zh">個機型、個 DSM 版本：DS918+ 的 7.1.1 與 7.4.1，DS925+ 的 7.3.2</span></div>
+            <div class="stat__value stat__value--sm"><span class="lang-en">7.1.1 &rarr; 7.4.1</span><span class="lang-zh">7.1.1 → 7.4.1</span></div>
+            <div class="stat__label"><span class="lang-en">a DSM upgrade carried across mid-test, every LUN uuid intact</span><span class="lang-zh">測試途中跨過的一次 DSM 升級，全部 LUN uuid 完好</span></div>
         </div>
         <div class="stat">
-            <div class="stat__value">0</div>
-            <div class="stat__label"><span class="lang-en">processes left in uninterruptible sleep by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後卡在不可中斷睡眠的行程數</span></div>
+            <div class="stat__value"><span class="lang-en">0</span><span class="lang-zh">0</span></div>
+            <div class="stat__label"><span class="lang-en">processes left in uninterruptible sleep by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後，節點上卡在不可中斷睡眠的行程數</span></div>
         </div>
     </div>
 
