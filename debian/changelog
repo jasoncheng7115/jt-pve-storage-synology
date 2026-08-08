@@ -1,3 +1,23 @@
+jt-pve-storage-synology (0.9.2-1) unstable; urgency=medium
+
+  * A snapshot that includes RAM failed if its name contained _ or -. PVE
+    allocates vm-<vmid>-state-<snapname> for the memory and a snapshot name is a
+    pve-configid, [a-z][a-z0-9_-]+, so both are ordinary there. DSM refuses _ in a
+    LUN name, so _ now becomes . on the way to the array and back, reversibly,
+    because that name is read back to decide ownership. And - was refused by the
+    plugin's own disk-name pattern, which ended in \w*; the pattern now carries
+    every volume name PVE constructs, read out of PVE: disk-<n>, cloudinit,
+    state-<snapname>, efi-enroll, fleece-<n> and tpmstate<n>. The last three were
+    unsupported.
+  * Naming::assert_dsm_legal passes [A-Za-z0-9.:-] and otherwise dies naming the
+    offending character, so nothing DSM refuses can leave for the array.
+  * Which characters DSM accepts was asked of DSM: 33 characters, one create each,
+    verified by a lookup and deleted afterwards. Accepted are letters, digits, -,
+    . and : plus a backslash the plugin refuses anyway; everything else is
+    18990503. The register previously named four of them.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Sat, 08 Aug 2026 13:00:00 +0800
+
 jt-pve-storage-synology (0.9.1-1) unstable; urgency=medium
 
   * Everything published was swept for the development environment, and

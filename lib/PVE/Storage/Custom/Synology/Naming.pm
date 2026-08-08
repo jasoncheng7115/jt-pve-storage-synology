@@ -123,10 +123,33 @@ sub prefix_for {
     return PREFIX . '-' . $fold;
 }
 
-# A PVE disk name: vm-100-disk-0, base-100-disk-1, and the vm-100-cloudinit
-# form. Deliberately anchored with \z and not $ — `$` also matches before a
-# trailing newline, so "vm-100-disk-0\n" would resolve to the same object.
-my $PVE_DISK = qr/\A(?:vm|base)-(\d+)-(?:disk|cloudinit|state)-?(\w*)\z/;
+# EVERY VOLUME NAME PROXMOX VE CONSTRUCTS, read out of PVE rather than guessed.
+# The previous pattern ended in `\w*`, which covers neither a hyphen nor three
+# whole forms, and the cost was visible: a snapshot named `open-ap` taken with RAM
+# was refused with 「is not a Proxmox VE disk name」, because PVE had asked for
+# `vm-146-state-open-ap` and `\w` does not match `-`. A pve-configid is
+# `[a-z][a-z0-9_-]+`, so both `_` and `-` are ordinary in a snapshot name.
+#
+#   (vm|base)-<vmid>-disk-<n>        an ordinary disk, and a template's
+#   vm-<vmid>-cloudinit              the cloud-init drive
+#   vm-<vmid>-state-<snapname>       a snapshot taken WITH RAM
+#   vm-<vmid>-efi-enroll             enrolling secure-boot keys
+#   vm-<vmid>-fleece-<n>             backup fleecing
+#   vm-<vmid>-tpmstate<n>            the TPM's state
+#
+# Anchored with \z and not $, because `$` also matches before a trailing newline
+# and "vm-100-disk-0\n" would then resolve to the same object.
+my $PVE_DISK = qr{
+    \A
+    (?:   (?: vm | base ) - \d+ - disk - \d+
+        | vm - \d+ - cloudinit
+        | vm - \d+ - state - [A-Za-z][A-Za-z0-9_-]*
+        | vm - \d+ - efi-enroll
+        | vm - \d+ - fleece - \d+
+        | vm - \d+ - tpmstate \d+
+    )
+    \z
+}x;
 
 sub is_pve_disk_name {
     _not_a_method($_[0]);
@@ -146,6 +169,61 @@ sub leaf_of {
     return $parts[-1];
 }
 
+# DSM REFUSES `_` IN A LUN NAME (18990503) AND PROXMOX VE ALLOWS IT IN A SNAPSHOT
+# NAME. Those two facts meet when a snapshot is taken WITH RAM: PVE allocates a
+# volume called `vm-<vmid>-state-<snapname>`, and a snapshot name is a
+# pve-configid, which is `[a-z][a-z0-9_-]+`. So a snapshot called `open_ap` could
+# not be taken with memory at all — the plugin refused before sending, which was
+# right, and left the operator with nothing they could do about it. Found by
+# Jason ticking「包含記憶體」on a snapshot whose name had an underscore.
+#
+# `_` therefore becomes `.` on the way to the array, and back again on the way
+# in. The mapping is reversible because a PVE volume name can never contain a
+# dot: a configid has none, and every disk form is vm-<digits>-disk-<digits> or
+# the cloudinit/state variants. The other characters DSM refuses — space, `+`,
+# `@` — cannot appear in a configid either, so this one substitution is the whole
+# problem rather than the first of a series.
+#
+# Every name reaching the array goes through `lun_name`, and everything reading a
+# name back goes through `is_pve_managed_volume` or `volname_from_lun_name`, so
+# encoding inside those three covers every call site.
+sub encode_leaf {
+    _not_a_method($_[0]);
+    my ($leaf) = @_;
+    return $leaf if !defined $leaf;
+    $leaf =~ tr/_/./;
+    return $leaf;
+}
+
+sub decode_leaf {
+    _not_a_method($_[0]);
+    my ($leaf) = @_;
+    return $leaf if !defined $leaf;
+    $leaf =~ tr/./_/;
+    return $leaf;
+}
+
+# THE ONE RULE THIS FILE EXISTS TO KEEP: nothing with a character DSM refuses may
+# leave for the array. Measured against hardware: `-`, `.`, `:` and upper case are
+# accepted; `_`, space, `+` and `@` are refused with 18990503. The encoding above
+# handles the `_` that Proxmox VE can produce, and this check is what makes that a
+# guarantee rather than a hope — if a future PVE volume name contains something
+# else, the plugin stops here with a message naming the character, instead of
+# sending it and reading a five-digit refusal back.
+my $DSM_LUN_OK = qr/\A[A-Za-z0-9.:-]+\z/;
+
+sub assert_dsm_legal {
+    _not_a_method($_[0]);
+    my ($name) = @_;
+    return $name if defined $name && $name =~ $DSM_LUN_OK;
+    my $shown = defined $name ? $name : '(undef)';
+    my ($bad) = defined $name ? ($name =~ /([^A-Za-z0-9.:-])/) : ();
+    die "storage: the LUN name '$shown' cannot be sent to DSM"
+      . (defined $bad ? " — it contains '$bad', which DSM refuses in a LUN name"
+                      : " — it is empty")
+      . ". DSM accepts letters, digits, '-', '.' and ':' only.\n";
+}
+
 sub lun_name {
     _not_a_method($_[0]);
     my ($storeid, $volname) = @_;
@@ -153,7 +231,7 @@ sub lun_name {
     die "cannot build a LUN name from an empty volume name\n"
         if !defined $leaf || !length $leaf;
     die "'$leaf' is not a Proxmox VE disk name\n" if !is_pve_disk_name($leaf);
-    return prefix_for($storeid) . '-' . $leaf;
+    return assert_dsm_legal(prefix_for($storeid) . '-' . encode_leaf($leaf));
 }
 
 # THE OWNERSHIP GATE.
@@ -172,7 +250,7 @@ sub is_pve_managed_volume {
 
     return 0 if index($name, "$prefix-") != 0;
 
-    my $leaf = substr($name, length($prefix) + 1);
+    my $leaf = decode_leaf(substr($name, length($prefix) + 1));
     return is_pve_disk_name($leaf) ? 1 : 0;
 }
 
@@ -183,7 +261,7 @@ sub volname_from_lun_name {
     my ($name, $storeid) = @_;
     return undef if !is_pve_managed_volume($name, $storeid);
     my $prefix = prefix_for($storeid);
-    return substr($name, length($prefix) + 1);
+    return decode_leaf(substr($name, length($prefix) + 1));
 }
 
 # Temporary objects this plugin creates and must be able to remove unattended.
@@ -197,7 +275,8 @@ sub temp_name {
     $purpose =~ s/[^a-z0-9]//g;
     $token   //= '';
     $token   =~ s/[^A-Za-z0-9]//g;
-    return prefix_for($storeid) . '-tmp-' . $purpose . ($token ? "-$token" : '');
+    return assert_dsm_legal(
+        prefix_for($storeid) . '-tmp-' . $purpose . ($token ? "-$token" : ''));
 }
 
 sub is_temp_name {

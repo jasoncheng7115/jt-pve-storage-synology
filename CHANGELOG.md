@@ -6,6 +6,40 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.9.2] - 2026-08-08
+
+### Fixed
+
+- **A snapshot that includes RAM failed if its name contained `_` or `-`.** Proxmox
+  VE allocates `vm-<vmid>-state-<snapname>` for the memory, and a snapshot name is
+  a `pve-configid` — `[a-z][a-z0-9_-]+` — so both characters are ordinary there.
+  Two separate faults met in that one operation:
+  - `_` is refused by DSM in a LUN name, so the plugin refused before sending,
+    correctly, and left the operator with nothing they could do. `_` now becomes
+    `.` on the way to the array and back again. The mapping is reversible because
+    no Proxmox VE volume name can contain a dot, and it has to be reversible: that
+    name is read back to decide ownership and to answer `list_images`.
+  - `-` was refused by the plugin's own idea of a disk name, whose pattern ended in
+    `\w*`. **The pattern now carries every volume name Proxmox VE constructs**, read
+    out of PVE rather than guessed: `disk-<n>`, `cloudinit`, `state-<snapname>`,
+    `efi-enroll`, `fleece-<n>` and `tpmstate<n>`. The last three were unsupported
+    and nobody had hit them yet.
+- **Nothing DSM refuses can leave for the array now, as a guarantee rather than a
+  hope.** `Naming::assert_dsm_legal` passes `[A-Za-z0-9.:-]` and otherwise dies
+  naming the offending character, so a future PVE volume name containing something
+  this encoding does not know stops here instead of being sent.
+
+### Verified
+
+- **Which characters DSM accepts in a LUN name, asked of DSM.** Thirty-three
+  characters, one create each, each verified by a lookup and deleted afterwards.
+  Accepted: letters, digits, `-`, `.`, `:` — and `\`, which the plugin refuses
+  anyway. Everything else is **18990503**. The register previously named four of
+  them, which was a sample rather than the set.
+- The RAM snapshot that prompted this was then taken on hardware: 1.37 GiB of VM
+  state written to its own LUN in two seconds, and R-27's recovery fired and healed
+  itself on the way — its first appearance under a real workload.
+
 ## [0.9.1] - 2026-08-07
 
 ### Documentation

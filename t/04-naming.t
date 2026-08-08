@@ -100,4 +100,94 @@ like($@, qr/needs a name/, 'an empty snapshot name is refused');
 eval { PVE::Storage::Custom::Synology::Naming->is_pve_managed_volume('pve-syno1-vm-100-disk-0', 'syno1') };
 like($@, qr/functions, not methods/, 'a method call is refused loudly rather than answering wrongly');
 
+# --- DSM's legal characters, and the underscore Proxmox VE can produce ---------
+#
+# DSM refuses `_` in a LUN name (18990503) and PVE allows it in a snapshot name:
+# a pve-configid is `[a-z][a-z0-9_-]+`. Those two facts meet when a snapshot is
+# taken WITH RAM, because PVE then allocates `vm-<vmid>-state-<snapname>`. A
+# snapshot called `open_ap` therefore could not be taken with memory at all —
+# the plugin refused before sending, correctly, and the operator could do nothing
+# about it.
+
+{
+    my $l = PVE::Storage::Custom::Synology::Naming::lun_name('syno-nas2', 'vm-146-state-open_ap');
+    is($l, 'pve-syno-nas2-vm-146-state-open.ap',
+       'an underscore becomes a dot, which DSM accepts');
+    unlike($l, qr/_/, 'and nothing with an underscore is built at all');
+}
+
+# Reversible, because that name is read back to decide ownership and to answer
+# `list_images`. A one-way sanitiser would have made every such LUN look like
+# somebody else's.
+{
+    for my $v (qw(vm-146-disk-0 vm-146-state-open_ap vm-146-state-a_b_c
+                  base-9-disk-1 vm-1-cloudinit)) {
+        my $l = PVE::Storage::Custom::Synology::Naming::lun_name('syno-nas2', $v);
+        is(PVE::Storage::Custom::Synology::Naming::volname_from_lun_name($l, 'syno-nas2'),
+           $v, "round trip survives: $v");
+        is(PVE::Storage::Custom::Synology::Naming::is_pve_managed_volume($l, 'syno-nas2'),
+           1, "and the ownership gate still recognises it: $v");
+    }
+}
+
+# THE GUARANTEE, not the hope: nothing DSM refuses may leave for the array, even
+# if a future PVE volume name contains something this encoding does not know.
+{
+    for my $bad ('pve-x-vm-1-state-a b', 'pve-x-vm-1-state-a+b',
+                 'pve-x-vm-1-state-a@b', 'pve-x-vm-1-state-a_b', '') {
+        my $err = '';
+        eval { PVE::Storage::Custom::Synology::Naming::assert_dsm_legal($bad) } or $err = $@;
+        ok($err, "refused before sending: '" . ($bad || '(empty)') . "'");
+    }
+    like(PVE::Storage::Custom::Synology::Naming::assert_dsm_legal('pve-x-vm-1-state-a.b:C-2'),
+         qr/\Apve-x-vm-1-state-a\.b:C-2\z/,
+         "and letters, digits, '-', '.' and ':' pass");
+}
+
+# --- every volume name Proxmox VE constructs -----------------------------------
+#
+# Read out of PVE rather than guessed, after two of them were rejected in a row:
+# a snapshot named `open_ap` (the underscore) and then `open-ap` (the hyphen).
+# A pve-configid is `[a-z][a-z0-9_-]+`, so both are ordinary in a snapshot name,
+# and a snapshot taken WITH RAM puts one inside a volume name.
+
+{
+    my @accept = (
+        'vm-146-disk-0'        => 'an ordinary disk',
+        'base-9-disk-12'       => "a template's disk",
+        'vm-1-cloudinit'       => 'the cloud-init drive',
+        'vm-146-state-open-ap' => 'a RAM snapshot whose name has a hyphen',
+        'vm-146-state-open_ap' => 'a RAM snapshot whose name has an underscore',
+        'vm-146-state-a-b_c'   => 'and both at once',
+        'vm-7-efi-enroll'      => 'enrolling secure-boot keys',
+        'vm-7-fleece-0'        => 'backup fleecing',
+        'vm-7-tpmstate0'       => "the TPM's state",
+    );
+    while (my ($name, $what) = splice(@accept, 0, 2)) {
+        is(PVE::Storage::Custom::Synology::Naming::is_pve_disk_name($name), 1,
+           "accepted: $what ($name)");
+    }
+}
+
+# And still refuses what is not one of those, because this pattern is half of the
+# ownership gate: everything with the storage's prefix that is NOT a PVE disk
+# name belongs to somebody else.
+{
+    for my $name ('vm-146-disk', 'vm-146-state-', 'vm-146-state-9bad',
+                  'somebody-else-lun', 'vm-x-disk-0', 'vm-146-disk-0-extra') {
+        is(PVE::Storage::Custom::Synology::Naming::is_pve_disk_name($name), 0,
+           "refused: $name");
+    }
+}
+
+# The two together: a RAM snapshot name survives the trip to the array and back.
+{
+    for my $v ('vm-146-state-open-ap', 'vm-146-state-open_ap', 'vm-7-tpmstate0') {
+        my $l = PVE::Storage::Custom::Synology::Naming::lun_name('syno-nas2', $v);
+        unlike($l, qr/[_ +\@]/, "nothing DSM refuses is built for $v");
+        is(PVE::Storage::Custom::Synology::Naming::volname_from_lun_name($l, 'syno-nas2'),
+           $v, "and it comes back unchanged: $v");
+    }
+}
+
 done_testing();
