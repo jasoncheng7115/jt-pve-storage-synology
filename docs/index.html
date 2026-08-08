@@ -244,7 +244,7 @@
 
     <div class="alert alert--success">
         <span class="lang-en">The second row is why the related projects <strong>refuse</strong> a rollback past newer snapshots: on those arrays the newer ones are destroyed, so letting PVE do it silently would delete snapshots the user could still see. Here nothing is destroyed, so that restriction is not needed and a disk can be rolled back repeatedly.</span>
-        <span class="lang-zh">第二列正是相關專案<strong>拒絕</strong>越過較新快照倒回的原因：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
+        <span class="lang-zh">第二列說明了相關專案為什麼<strong>拒絕</strong>越過較新的快照倒回：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
     </div>
 </section>
 
@@ -304,7 +304,7 @@
 
     <p>
         <span class="lang-en">Never the built-in <code>admin</code>. And one thing DSM will not let you narrow, worth knowing before you plan the NAS's network: <strong>there is no "manage LUNs" privilege</strong> —no SAN operator role, and SAN Manager is not in the per-user Applications list— so the account must be an administrator. Everything else can still be taken away, and should be: every shared folder, every application but DSM, every address that is not a PVE node. A leaked credential then cannot read your files over SMB.</span>
-        <span class="lang-zh">絕對不要用內建的 <code>admin</code>。而且有一件事 DSM 不讓你收窄，值得在規劃 NAS 的網路之前先知道：<strong>沒有「管理 LUN」這種權限</strong>——沒有 SAN 操作員角色，應用程式權限清單裡也沒有 SAN Manager——所以帳號必須是管理員。其他一切仍然拿得掉，也應該拿掉：每一個共用資料夾、除 DSM 以外的每一個應用程式、每一個不屬於 PVE 節點的位址。這樣一組洩漏的憑證就翻不了你的檔案。</span>
+        <span class="lang-zh">絕對不要用內建的 <code>admin</code>。而且在規劃 NAS 的網路之前，有一件 DSM 不讓你收窄的事最好先知道：<strong>沒有「管理 LUN」這種權限</strong>——沒有 SAN 操作員角色，應用程式權限清單裡也沒有 SAN Manager——所以帳號必須是管理員。其他一切仍然拿得掉，也應該拿掉：每一個共用資料夾、除 DSM 以外的每一個應用程式、每一個不屬於 PVE 節點的位址。這樣一組洩漏的憑證就翻不了你的檔案。</span>
     </p>
 
     <div class="alert alert--info">
@@ -661,7 +661,7 @@
 
     <p>
         <span class="lang-en">Two reasons to use it. <strong>A node without the plugin installed</strong> will otherwise log <em>unknown storage type</em> on every <code>pvestatd</code> poll —restricting the storage is the clean way to stage a rollout. And <strong>a node with no route to the NAS's data portals</strong> has no business trying: it will fail to activate volumes rather than fail politely.</span>
-        <span class="lang-zh">有兩個理由要用它。第一，<strong>沒有裝 plugin 的節點</strong>每一次 <code>pvestatd</code> 輪詢都會留下一筆「unknown storage type」的記錄，所以分批上線時先把它們排除掉最乾淨。第二，<strong>連不到 NAS 資料 portal 的節點</strong>本來就不該去嘗試：它會在啟用磁碟時失敗，而不是安靜地略過。</span>
+        <span class="lang-zh">有兩個理由要用它。第一，<strong>沒有裝 plugin 的節點</strong>每一次 <code>pvestatd</code> 輪詢都會留下一筆「unknown storage type」的記錄，所以分批上線時先把它們排除掉最乾淨。第二，<strong>連不到 NAS 資料 portal 的節點</strong>本來就不該去嘗試：它會在啟用磁碟時失敗，而不是悄悄略過。</span>
     </p>
 
     <div class="note">
