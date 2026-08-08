@@ -291,21 +291,21 @@
     </div>
 
     <p class="section-subtitle">
-        <span class="lang-en">Against a <strong>DS918+</strong> —read-only discovery first, then writes, then a guest, then a five-node cluster with node failures, and finally that NAS carried across a <strong>DSM 7.1.1 &rarr; 7.4.1 upgrade with every LUN uuid intact</strong>. Then a second model and a second DSM version: a <strong>DS925+ on DSM 7.3.2</strong>, driven end to end over a VPN —storage added, LUN and target created, guest booted, snapshot, rollback, and the storage removed leaving nothing behind on either side. Full detail in the register.</span>
-        <span class="lang-zh">對一台 <strong>DS918+</strong>：先唯讀探索，然後寫入，然後一台 guest，然後一個五節點叢集加上節點故障，最後那台 NAS 還帶著<strong>全部 LUN uuid 完好地跨過 DSM 7.1.1 → 7.4.1 升級</strong>。接著是第二個機型與第二個 DSM 版本：一台 <strong>DS925+，DSM 7.3.2</strong>，透過 VPN 完整跑過一輪：加入 storage、建立 LUN 與 target、guest 開機、快照、倒回，以及移除 storage 之後兩邊都沒有留下東西。完整細節在驗證紀錄裡。</span>
+        <span class="lang-en">Two models and three DSM versions: a <strong>DS918+</strong> on 7.1.1 and 7.4.1, a <strong>DS925+</strong> on 7.3.2. Both were driven from adding the storage through to removing it, leaving nothing behind on either side. Resize, clone, backup, migration and two-portal multipath were run on the DS918+ only.</span>
+        <span class="lang-zh">兩台機型、三個 DSM 版本：<strong>DS918+</strong> 的 7.1.1 與 7.4.1，<strong>DS925+</strong> 的 7.3.2。兩台都從加入 storage 跑到移除，兩邊都沒有留下東西。擴充、複製、備份、遷移與雙 portal 多重路徑只在 DS918+ 上跑過。</span>
     </p>
 
     <p class="muted">
-        <span class="lang-en">Nine protocol findings changed a design decision each —how a session must be carried, why a failed create is never believed, why device identity comes from the kernel and never from a path —and one rule the kernel's own source would lead you to get wrong: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#what-the-protocol-turned-out-to-be">What the protocol turned out to be</a>.</span>
-        <span class="lang-zh">有九個協定發現各自改變了一個設計決定（工作階段必須怎麼攜帶、為什麼失敗的建立絕不被相信、為什麼裝置身分來自核心而非路徑）以及一條照著核心自己的原始碼讀就會讀錯的規則：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#協定實際上長什麼樣">協定實際上長什麼樣</a>。</span>
+        <span class="lang-en">Nine protocol findings changed a design decision each, and one rule the kernel's own source would lead you to get wrong: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#what-the-protocol-turned-out-to-be">What the protocol turned out to be</a>.</span>
+        <span class="lang-zh">九個協定上的發現各自改變了一個設計決定，還有一條照著核心原始碼讀會讀錯的規則：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#協定實際上長什麼樣">協定實際上長什麼樣</a>。</span>
     </p>
 
 
     <h3 class="subsection-title"><span class="lang-en">The release checklist</span><span class="lang-zh">發版前的操作清單</span></h3>
 
     <p>
-        <span class="lang-en"><strong>Every row was run on a production five-node cluster, and B through D were run twice —once from the web interface and once from the CLI.</strong> Doing both is not belt and braces: <code>pvedaemon</code>, <code>pveproxy</code>, <code>vzdump</code> and <code>pct</code> run under <code>-T</code> with no <code>PATH</code> while <code>qm</code> and <code>pvesm</code> do not, so the same operation runs in two different environments. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
-        <span class="lang-zh"><strong>每一列都在一個五節點的正式叢集上跑過，而且 B 到 D 是從網頁介面和指令列各跑一次。</strong>兩邊都跑不是多此一舉：<code>pvedaemon</code>、<code>pveproxy</code>、<code>vzdump</code> 與 <code>pct</code> 在 <code>-T</code> 底下執行而且沒有 <code>PATH</code>，而 <code>qm</code>、<code>pvesm</code> 不是，同一個操作在兩邊是不同的環境。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
+        <span class="lang-en"><strong>Every row was run on a production five-node cluster, and B through D once from the web interface and once from the CLI.</strong> The two run in different environments, so the same operation is not guaranteed to behave the same way, and that has caught five defects. What each row exercises: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#before-every-release--the-operational-checklist">the checklist</a>.</span>
+        <span class="lang-zh"><strong>每一列都在一個五節點的正式叢集上跑過，B 到 D 從網頁介面和指令列各跑一次。</strong>網頁介面和指令列的執行環境不一樣，同一個操作不保證有同樣結果，而這件事抓到過五個缺陷。每一列走到什麼：<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#每次發行前操作清單">操作清單</a>。</span>
     </p>
 
     <table>
@@ -326,8 +326,8 @@
     </table>
 
     <div class="alert alert--success">
-        <span class="lang-en"><strong>And then the audit, which is the part that catches what an operation reported as successful.</strong> After all of the above: the NAS held exactly the LUNs and target mappings its VM configurations referenced, and the node exactly the maps and tracking entries — no orphan, no stale mapping, <code>pve-syno-reap</code> reporting nothing left behind on every node.</span>
-        <span class="lang-zh"><strong>然後是盤點，那才是抓「操作回報成功但其實沒做到」的部分。</strong>以上全部做完之後：NAS 上剩下的 LUN 與 target 對應，正好就是 VM 設定所引用的那些；節點上的 map 與追蹤紀錄也正好對得上，沒有孤兒、沒有失效對應，每個節點的 <code>pve-syno-reap</code> 都回報沒有殘留。</span>
+        <span class="lang-en"><strong>Then check both sides against each other, which is the step that catches what an operation reported as successful.</strong> After all of the above, the storage server held exactly the LUNs and target mappings its VM configurations referenced; the node's maps and tracking entries matched too; and <code>pve-syno-reap</code> reported nothing left behind on every node.</span>
+        <span class="lang-zh"><strong>最後要兩邊核對一次，這一步才抓得到「回報成功但其實沒做到」。</strong>全部做完之後，儲存伺服器上剩下的 LUN 與 target 對應，剛好就是 VM 設定引用的那些；節點上的 map 與追蹤紀錄也對得上；每個節點的 <code>pve-syno-reap</code> 都回報沒有殘留。</span>
     </div>
 </section>
 
