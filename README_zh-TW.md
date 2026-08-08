@@ -29,7 +29,7 @@
 | 即時遷移<br>Proxmox VE 沒有容器的即時遷移。`--restart` 遷移驗證過，花 26 秒 | ✓ | 不適用 |
 | 離線遷移 | ✓ | ✓ |
 | 備份、還原 | ✓ | ✓ |
-| 多重路徑，而且是自動設定的<br>plugin 自己寫 `/etc/multipath/conf.d` 的 drop-in，並且在那個檔案變更時重新載入 multipathd，所以沒有東西需要手動編輯。multipath 沒有內建 Synology 的設定，而少了它就會套用通用預設值，其中包括 `no_path_retry "queue"`，那正是路徑故障變成 guest 卡死的原因。`syno-data-portals` 給兩個位於不同子網的位址，第二條路徑才是真的：實測撐過一次路徑故障，60 次讀取、0 次失敗 | ✓ | ✓ |
+| 多重路徑，而且是自動設定的<br>multipath 的設定由 plugin 自己寫，變更時也自己重新載入。沒有東西需要手動編輯 | ✓ | ✓ |
 | 把磁碟搬到其他 storage 型別<br>搬出去再搬回來，兩個方向都測 | ✓ | ✓ |
 
 CHAP 是這個 storage 的性質，不是 guest 的，因為節點上同一個 iSCSI 工作階段同時服務兩種 guest，所以沒有放進表格。它驗證過。
