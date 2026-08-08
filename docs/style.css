@@ -332,6 +332,13 @@ img { max-width: 100%; height: auto; display: block; }
     background: var(--red-subtle) !important;
 }
 
+/* Marks a section as read-before-you-deploy WITHOUT tinting the background.
+   The tint is fine behind two paragraphs and bad behind a wide table: the
+   table's own white rows and grey header stop reading as a table at all. */
+.doc-section--flag {
+    border-top: 3px solid var(--red) !important;
+}
+
 .doc-section:last-child { border-bottom: none; }
 
 /* -- Section Headings -- */
