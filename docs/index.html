@@ -460,7 +460,7 @@
     </p>
 
     <details class="alert alert--warning">
-        <summary><strong><span class="lang-en">Neither HA shape has been run on hardware, and the plugin says so.</span><span class="lang-zh">兩種 HA 都還沒有在實機上跑過，而 plugin 會說出這件事。</span></strong></summary>
+        <summary><strong><span class="lang-en">Neither HA shape has been run on hardware</span><span class="lang-zh">兩種 HA 都還沒有在實機上跑過</span></strong></summary>
         <span class="lang-en">SHA is low risk —one address that happens to move, which is already handled. UC is a genuine unknown: whether a LUN is owned by one controller, and whether a target's portals differ per controller, together decide whether a node still reaches its disk after a failover. So the plugin <strong>warns</strong> on <code>DSM UC</code> rather than refusing, and this page keeps saying unverified until someone reports a run.</span>
         <span class="lang-zh">SHA 風險低：就是一個會移動的位址，而那已經處理了。UC 是真正的未知：一顆 LUN 是否由單一控制器擁有、target 的 portal 是否依控制器而不同，這兩件合起來決定故障切換之後節點還找不找得到自己的磁碟。所以 plugin 偵測到 <code>DSM UC</code> 時<strong>發出警告</strong>而不是拒絕，而這一頁會一直寫著未驗證，直到有人回報實際運行結果。</span>
     </details>

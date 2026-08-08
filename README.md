@@ -311,7 +311,7 @@ answer with the same interfaces, so the mechanism is harmless where it is not
 needed. On those models a target's `network_portals` also carries a
 `controller_id`, which a single-controller NAS omits entirely.
 
-### Neither HA shape has been run on hardware, and the plugin says so
+### Neither HA shape has been run on hardware
 
 SHA is low risk: it is one address that happens to move, which is the case the
 plugin already handles. UC is a genuine unknown, and the open questions are the
