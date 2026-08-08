@@ -566,8 +566,22 @@ td.verdict { font-size: 0.8rem; }
 td.verdict--no       { color: var(--red); }
 td.verdict--untested { color: var(--amber); }
 td.verdict--na       { color: var(--text-muted); font-weight: 400; }
-/* A qualified yes: not a mark, but still one short phrase. */
-td.verdict--part     { color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; }
+
+/* A qualified yes keeps the tick, because the answer IS yes; the amber and the
+   condition under it are what make it a qualified one. Three states, three colours,
+   one shape where the answer is the same: green tick, amber tick, and words. */
+td.verdict--part { white-space: normal; }
+.verdict__mark {
+    display: block;
+    color: var(--amber); font-weight: 700; font-size: 1rem;
+    line-height: 1.1;
+}
+.verdict__note {
+    display: block;
+    color: var(--amber); font-weight: 600;
+    font-size: 0.72rem; line-height: 1.35;
+    margin-top: 2px;
+}
 
 .cell-note {
     margin-top: 4px;
