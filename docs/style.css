@@ -763,6 +763,22 @@ details.alert > summary::before {
     opacity: 0.55;
 }
 details.alert > summary > strong { font-weight: 600; }
-details.alert > *:not(summary) { padding: 0 14px; }
-details.alert > *:not(summary):last-child { padding-bottom: 12px; }
-details.alert[open] > summary { padding-bottom: 6px; }
+/* THE BODY OF A CALLOUT IS A SPAN, and padding on an inline element applies only at
+   the start and end of the inline box — not to every line. So the first line was
+   indented by 14px and every line after it ran to the edge of the box, which is what
+   an expanded callout looked like. Making the body a block is the whole fix.
+
+   The language switcher hides the other language with `display: none !important`, so
+   this cannot un-hide it, and only one of the two spans is ever visible — which is
+   why the bottom padding goes on both rather than on :last-child. */
+details.alert > *:not(summary) {
+    display: block;
+    padding: 0 14px;
+    margin: 0 0 0.75em;
+    line-height: 1.7;
+}
+/* The bottom gap belongs to the box, not to the last child: the last child is
+   often the HIDDEN language, and a margin on a `display: none` element is no
+   margin at all. */
+details.alert[open] { padding-bottom: 6px; }
+details.alert[open] > summary { padding-bottom: 8px; }
