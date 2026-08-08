@@ -20,6 +20,10 @@
 
 ---
 
+> ### 請從「壞掉也還好」的系統開始
+>
+> 上面每一項都是量測出來的，但那都不能取代你自己的硬體和你自己的 DSM 版本。先放一台測試用的 guest 上去，做一次快照、一次倒回、一次備份，觀察幾天，再讓你捨不得的東西靠近它。兩個機型、三個 DSM 版本，對照 Synology 賣的機型數量只是很小的樣本。
+
 ## 已在正式環境的叢集上實際跑過
 
 以下每一項都是在一個五節點、正式運行中的 Proxmox VE 叢集上，**從網頁介面與指令列各跑一次**，對一台 DS918+（DSM 7.1.1）跑出來的。介面很重要：`pvedaemon`、`pveproxy`、`vzdump` 與 `pct` 是 `#!/usr/bin/perl -T` 而且**沒有 `PATH`**，而 `qm`、`pvesm`、`pvesh`、`qmrestore` 不是，所以「在 shell 上驗證過」不等於驗證過。
@@ -375,6 +379,10 @@ iscsiadm -m node -T <iqn> -p <portal> -o delete
 | [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) | 哪些驗證過、哪些沒有，以及測試計畫。**在信任任何東西之前先讀這份** |
 | [docs/LIMITS_zh-TW.md](docs/LIMITS_zh-TW.md) | 各機型公布的 LUN 與 target 上限，每個數字都附官方出處 |
 | [docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md) | DSM 帳號、最小權限、自動封鎖、兩步驟驗證、TLS |
+
+## 故障處理
+
+這個 plugin 真的產生過的十一種失敗，每一項都附上它的意思和該怎麼做，寫在文件網站的[故障處理](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh#trouble)：storage 在網頁介面看不到、憑證被鎖住與 DSM 的自動封鎖、`pvesm add` 被拒絕、倒回之後出現 `no device appeared`、擴充之後 QEMU 抱怨、DSM 不接受的快照名稱、遷移後來源節點清理失敗、`move_disk` 搬回這個 storage、節點當機之後要做什麼、還有空間卻出現五位數字，以及 Proxmox VE 與 DSM 回報的容量不一致。
 
 ## 相關專案
 

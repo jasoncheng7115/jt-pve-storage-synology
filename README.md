@@ -44,6 +44,14 @@ locally.
 
 ---
 
+> ### Start on a workload you can afford to lose
+>
+> All of the above was measured, and none of it is a substitute for your own
+> hardware and your own DSM version. Put a test guest on it first, run a snapshot,
+> a rollback and a backup, and leave it a few days before anything you would miss
+> goes near it. Two models and three DSM versions is a small sample of what
+> Synology sells.
+
 ## What has been driven on a production cluster
 
 Everything below was run from **both the web interface and the command line** on a
@@ -587,6 +595,18 @@ source.
 | [docs/TESTING.md](docs/TESTING.md) | What is verified, what is not, and the test plan. **Read this before trusting anything** |
 | [docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md) | The DSM account, its minimum privileges, Auto Block, 2FA, TLS |
 | [docs/LIMITS.md](docs/LIMITS.md) | Every model's published LUN and target maxima, with the official source for each figure |
+
+## When something goes wrong
+
+Eleven failures this plugin has actually produced, each with what it means and what
+to do, are on the documentation site under
+[When something goes wrong](https://jasoncheng7115.github.io/jt-pve-storage-synology/#trouble):
+the storage invisible in the web interface, a latched credential and DSM's Auto
+Block, `pvesm add` refusing, *no device appeared* after a rollback, a resize QEMU
+complains about, a snapshot name DSM will not take, a migration whose source
+cleanup fails, a `move_disk` back onto the storage, what to do after a node crash,
+a five-digit number while free space remains, and the capacity Proxmox VE and DSM
+report differently.
 
 ## Related projects
 
