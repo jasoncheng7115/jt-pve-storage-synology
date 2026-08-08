@@ -229,4 +229,82 @@ SKIP: {
     like($_, qr/wwid\s*=>/, "and passes the wwid: $_") for @calls;
 }
 
+# --- whose map is this, asked before anything is flushed ----------------------
+#
+# The reaper only ever considers WWIDs from this node's own tracking file, which
+# the plugin wrote itself, so a foreign WWID cannot get in there in normal
+# operation. This is the second line, and it earns its place on a node that also
+# runs Ceph, LVM, NFS and another vendor's iSCSI: if a foreign WWID ever did get
+# in — a hand-edited file, a restored backup of one, a future bug — the flush
+# would otherwise act on somebody else's map.
+#
+# Measured on hardware against a live NETAPP map: refused, and afterwards the map
+# still had two paths active and queue_if_no_path still set, which is the proof
+# that the refusal happens BEFORE `disablequeueing` rather than after it.
+
+{
+    package VendorMP;
+    our @ISA = ('PVE::Storage::Custom::Synology::Multipath');
+}
+
+# A map whose paths report another vendor is not ours.
+{
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::Synology::Multipath::slaves_of_map = sub { ['/dev/sdz'] };
+    local *PVE::Storage::Custom::Synology::Multipath::sysfs_read_with_timeout = sub { "NETAPP\n" };
+    is(PVE::Storage::Custom::Synology::Multipath::map_is_ours('3600a0980deadbeef'), 0,
+       'a NETAPP path means the map is not ours');
+}
+
+# Ours is ours.
+{
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::Synology::Multipath::slaves_of_map = sub { ['/dev/sdb'] };
+    local *PVE::Storage::Custom::Synology::Multipath::sysfs_read_with_timeout = sub { "SYNOLOGY\n" };
+    is(PVE::Storage::Custom::Synology::Multipath::map_is_ours('36001405deadbeef'), 1,
+       'a SYNOLOGY path means it is');
+}
+
+# One foreign path is enough to refuse: a map this plugin owns has none.
+{
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::Synology::Multipath::slaves_of_map = sub { ['/dev/sdb','/dev/sdz'] };
+    my @v = ("SYNOLOGY\n", "NETAPP\n");
+    local *PVE::Storage::Custom::Synology::Multipath::sysfs_read_with_timeout = sub { shift @v };
+    is(PVE::Storage::Custom::Synology::Multipath::map_is_ours('36001405mixed'), 0,
+       'one foreign path among ours is still a refusal');
+}
+
+# THE THREE-VALUED PART. No slaves, or an unreadable vendor, is undef — and
+# `flush_map` treats undef as no, because a cleanup that cannot tell whose disk it
+# is holding must not remove it.
+{
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::Synology::Multipath::slaves_of_map = sub { [] };
+    ok(!defined PVE::Storage::Custom::Synology::Multipath::map_is_ours('36001405nomap'),
+       'no slaves is undef, not a yes');
+
+    local *PVE::Storage::Custom::Synology::Multipath::slaves_of_map = sub { ['/dev/sdb'] };
+    local *PVE::Storage::Custom::Synology::Multipath::sysfs_read_with_timeout = sub { undef };
+    ok(!defined PVE::Storage::Custom::Synology::Multipath::map_is_ours('36001405unreadable'),
+       'an unreadable vendor is undef, not a yes');
+}
+
+# And nothing is run when the answer is not a clear yes. The stub counts commands;
+# a refusal must leave the count at zero, because `disablequeueing` already changes
+# how another vendor's map behaves under a path failure.
+{
+    no warnings 'redefine', 'once';
+    my $ran = 0;
+    local *PVE::Storage::Custom::Synology::Multipath::run_cmd = sub { $ran++; return '' };
+    local *PVE::Storage::Custom::Synology::Multipath::slaves_of_map = sub { ['/dev/sdz'] };
+    local *PVE::Storage::Custom::Synology::Multipath::sysfs_read_with_timeout = sub { "NETAPP\n" };
+    my $warned = '';
+    local $SIG{__WARN__} = sub { $warned .= $_[0] };
+    is(PVE::Storage::Custom::Synology::Multipath::flush_map('somemap', wwid => '3600a0980x'), 0,
+       'flush_map refuses a map that is not ours');
+    is($ran, 0, 'and ran no command at all — not even disablequeueing');
+    like($warned, qr/refusing to flush/, 'and said so');
+}
+
 done_testing();

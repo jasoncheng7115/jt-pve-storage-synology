@@ -510,6 +510,41 @@ sub resize_map {
 }
 
 # Remove ONE map, named. Never every unused map on the node.
+# IS THIS MAP OURS AT ALL? Asked of the kernel, before anything is flushed.
+#
+# Returns 1 / 0 / undef, and undef means "could not establish" — which the flush
+# path treats as no, because a cleanup that cannot tell whose disk it is holding
+# must not remove it.
+#
+# The reaper only ever considers WWIDs from this node's own tracking file, which
+# the plugin wrote itself, so a foreign WWID cannot get in there in normal
+# operation. This is the second line: if one ever did — a hand-edited file, a
+# restored backup of one, a future bug — the flush would otherwise act on another
+# vendor's map, and on this very node that means Ceph, LVM and two NFS stores. The
+# vendor comes from `/sys/block/<sd>/device/vendor`, which is the kernel's own
+# record of the SCSI INQUIRY rather than a tool's choice of words.
+sub map_is_ours {
+    _not_a_method($_[0]);
+    my ($wwid) = @_;
+    return undef if !defined $wwid || !length $wwid;
+
+    my $slaves = slaves_of_map($wwid);
+    return undef if ref $slaves ne 'ARRAY' || !@$slaves;
+
+    my $seen_any = 0;
+    for my $sd (@$slaves) {
+        my ($base) = $sd =~ m{([^/]+)\z} or next;
+        next if $base !~ /\A[a-z0-9]+\z/;
+        my $v = sysfs_read_with_timeout("/sys/block/$base/device/vendor", 3);
+        next if !defined $v;
+        $v =~ s/\s+\z//; $v =~ s/\A\s+//;
+        $seen_any = 1;
+        # One foreign path is enough to refuse: a map this plugin owns has none.
+        return 0 if uc($v) ne VENDOR;
+    }
+    return $seen_any ? 1 : undef;
+}
+
 sub flush_map {
     _not_a_method($_[0]);
     my ($name, %opt) = @_;
@@ -518,6 +553,21 @@ sub flush_map {
     # Optional, and what makes the verification below possible. Callers that have
     # it should pass it; the WWID is how this module identifies anything.
     my $wwid = $opt{wwid};
+
+    # WHOSE MAP IS THIS. Checked before the first destructive command, not after:
+    # `disablequeueing` and `fail_if_no_path` already change how another vendor's
+    # map behaves under a path failure. Refused on undef as well as on 0 — a
+    # cleanup that cannot tell whose disk it is holding must not remove it.
+    if (defined $wwid) {
+        my $ours = map_is_ours($wwid);
+        if (!defined $ours || !$ours) {
+            warn "refusing to flush map '$name': "
+               . (defined $ours ? "its device does not report vendor " . VENDOR
+                                : "could not establish which vendor it belongs to")
+               . ". Nothing was changed.\n";
+            return 0;
+        }
+    }
 
     # Stop queueing first, or the flush waits forever for I/O that can never
     # complete once the paths are gone.

@@ -797,6 +797,7 @@ NAS 上有一顆沒有任何設定引用的 LUN，或一筆指向已不存在 uu
 | **F1** | 在 storage 上**有 guest 執行中**的情況下跑 `pve-syno-reap --all --remove` | guest 繼續執行、它的 map 還在，而工具回報沒有殘留。使用中的裝置會被拒絕，無法確定狀態的也一樣 |
 | **F2** | 停止那個 guest | 它的 multipath map 與追蹤記錄兩者都消失 |
 | **F3** | 「LUN 還存在、但這個節點上沒在用」的 map，也就是舊版可能留下的那種 | `dmsetup info -o open` 是 **0** 且 `lsof` 沒有持有者，指名的 `multipath -f <wwid>` 可以移除它，而之後 guest 照樣開機、map 自動重建 |
+| **F5** | 追蹤記錄裡出現**別家廠商**的 WWID——最壞的情況，因為 reaper 只讀自己的追蹤檔，要走到那裡只能靠手動改檔或未來的缺陷 | 拒絕，而且**一個命令都不會執行**：對一個活著的 NETAPP map 實測過，事後它仍然有兩條路徑 active、`queue_if_no_path` 也還開著。廠商是從 `/sys/block/<sd>/device/vendor` 讀的，那是核心自己的記錄，而讀不到也一樣拒絕 |
 | **F4** | `make check-multipath-flush` | 整個原始碼樹裡絕不出現 `multipath -F`。大寫的那個會把節點上每一個未使用的 map 都 flush 掉，包含其他廠商的 |
 
 F1 是真正重要的那一項：它是唯一可能弄壞執行中 guest 的操作，所以它**刻意就是對著執行中的 guest 跑**。

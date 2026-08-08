@@ -1208,6 +1208,7 @@ verifies is the consequence — after any of it, a guest on that storage still s
 | **F1** | With a guest **running** on the storage, `pve-syno-reap --all --remove` | The guest keeps running, its map survives, and the tool reports nothing left behind. A device in use is refused, and so is one whose state cannot be established |
 | **F2** | Stop that guest | Its multipath map and its tracking entry both disappear |
 | **F3** | A map for a LUN that still exists but is unused on this node — the case an older version could leave behind | `dmsetup info -o open` is **0** and `lsof` shows no holder, the named `multipath -f <wwid>` removes it, and the guest still starts afterwards with the map rebuilt |
+| **F5** | A tracking entry naming **another vendor's** WWID — the worst case, since the reaper only reads its own tracking file and one could only get there by a hand edit or a future bug | Refused, and **nothing is run at all**: measured against a live NETAPP map, which afterwards still had two paths active and `queue_if_no_path` still set. The vendor comes from `/sys/block/<sd>/device/vendor`, the kernel's own record, and an unreadable one is refused too |
 | **F4** | `make check-multipath-flush` | `multipath -F` is never generated anywhere in the tree. The capital letter flushes every unused map on the node, other vendors' included |
 
 F1 is the one that matters: it is the operation that could break a running guest,
