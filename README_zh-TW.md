@@ -6,7 +6,7 @@
 
 **沒有額外的 LVM 儲存層，也不需要手動管理 LUN。**
 
-支援 PVE 8 / 9、Shared Storage、Live Migration、Snapshot / Rollback、Clone、Backup / Restore 與 Multipath。
+支援 PVE 9、Shared Storage、Live Migration、Snapshot / Rollback、Clone、Backup / Restore 與 Multipath。
 
 [English](README.md) · [繁體中文](README_zh-TW.md) · **[文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh)**
 
@@ -150,7 +150,7 @@ qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 | 型號 | 支援 iSCSI target 且有足夠可用空間者。**LUN 上限是看機型的，而且某些機型很小**：DS425+ 或任何 J／Value 機型公布的是 **4 個 LUN**，也就是整個 storage 只有四顆虛擬磁碟。附出處的表格：[docs/LIMITS_zh-TW.md](docs/LIMITS_zh-TW.md) |
 | 網路 | 以 HTTPS 連到 DSM（5001）。純 HTTP 一律拒絕 |
 | 帳號 | 一個專用的 DSM 帳號——見 **[docs/DSM-ACCOUNT_zh-TW.md](docs/DSM-ACCOUNT_zh-TW.md)**，其中也說明了 DSM 唯一不讓你限制的那件事 |
-| PVE | 8.x／9.x。儲存 API 版本是協商出來的，從不寫死 |
+| PVE | **9.x**，那是它實際跑過的版本。儲存 API 版本是對節點協商出來的，從不寫死，而這個 plugin 宣告的最低是 API 10，所以 8.x 照理可以，但沒有在上面測過 |
 
 ### DSM 版本只是門檻，不是判準
 

@@ -9,7 +9,7 @@ with LVM on the PVE side.
 
 **No extra LVM storage layer, and no LUNs to manage by hand.**
 
-PVE 8 / 9 · Shared Storage · Live Migration · Snapshot / Rollback · Clone ·
+PVE 9 · Shared Storage · Live Migration · Snapshot / Rollback · Clone ·
 Backup / Restore · Multipath.
 
 [English](README.md) · [繁體中文](README_zh-TW.md) · **[Documentation site](https://jasoncheng7115.github.io/jt-pve-storage-synology/)**
@@ -238,7 +238,7 @@ rolled back repeatedly.
 | Model | One with iSCSI target support and enough free space. **The LUN ceiling is per-model and small on some of them** — a DS425+ or any J/Value model publishes **4 LUNs**, which is four virtual disks for the whole storage. Sourced table: [docs/LIMITS.md](docs/LIMITS.md) |
 | Network | HTTPS to DSM (5001). Plain HTTP is refused |
 | Account | A dedicated DSM account — see **[docs/DSM-ACCOUNT.md](docs/DSM-ACCOUNT.md)**, which also explains the one thing DSM will not let you restrict |
-| PVE | 8.x / 9.x. The storage API version is negotiated, never hardcoded |
+| PVE | **9.x**, which is what it has been run on. The storage API version is negotiated against the node and never hardcoded, and the lowest this plugin claims is API 10, so 8.x is expected to work — but it has never been tested there |
 
 ### The DSM version is a floor, not the decision
 

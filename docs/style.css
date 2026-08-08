@@ -246,10 +246,14 @@ img { max-width: 100%; height: auto; display: block; }
     font-size: 0.75rem; font-weight: 600;
     margin-bottom: 18px;
 }
+/* The rule is drawn by this box, so the element must be EMPTY: a middle dot inside a
+   1px-wide inline-block paints outside it, which reads as a stray white speck next to
+   the divider. */
 .hero__badge-sep {
     display: inline-block; width: 1px; height: 10px;
     background: rgba(165,180,252,0.35);
     margin: 0 8px; vertical-align: middle;
+    overflow: hidden;
 }
 
 .hero__title {
