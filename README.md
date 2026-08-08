@@ -36,7 +36,7 @@ not a yes say why.
 | Offline migration | ✓ | ✓ |
 | Backup and restore | ✓ | ✓ |
 | Multipath, configured for you<br>The plugin writes the multipath configuration itself and reloads multipathd when it changes. Nothing to edit by hand | ✓ | ✓ |
-| Move a disk to another storage type<br>Off and back on again, both ways | ✓ | ✓ |
+| Storage migration<br>Proxmox VE's **move disk**, and **move volume** for a container. Onto another storage type and back again, both directions | ✓ | ✓ |
 
 CHAP is a property of the storage rather than of a guest, since one iSCSI session on
 the node serves both kinds, so it is not in the table. It is verified.
