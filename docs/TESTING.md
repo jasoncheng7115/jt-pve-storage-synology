@@ -55,6 +55,52 @@ as write tests below were run on a dedicated `pvetest-` name prefix, with the
 owner's agreement, and every object created was deleted afterwards and the
 storage server confirmed back to its original contents.
 
+### LXC containers, the whole set of operations
+
+Containers do not take the same path as virtual machines: PVE makes an ext4
+filesystem on the block device this storage hands it and then mounts it, so
+`path()`, `activate_volume`, `volume_size_info` and resize are all used directly by
+the container tooling. The whole set was driven against a DS925+ (DSM 7.3.2-86009
+Update 4) on a three-node cluster, with an Ubuntu 22.04 container:
+
+| Operation | Result |
+|---|---|
+| `pct create` with the rootfs on this storage | pass. PVE makes ext4 on the LUN; `/` inside the container is `/dev/mapper/<map>` |
+| Start, and enter the container | pass |
+| Snapshot while running (`volume_snapshot_needs_fsfreeze` is true) | pass, with freeze and thaw both in the task log |
+| Rollback | pass. 32 MiB of random data written inside and its sha256 recorded, overwritten with zeros, rolled back, sha256 identical |
+| Delete a snapshot | pass |
+| `pct resize rootfs +2G` | pass, ext4 grown online, new size visible inside |
+| A second mount point (`-mp0 <storage>:2,mp=/data`) | pass: another LUN, another ext4, writable |
+| Snapshot and rollback with two disks | pass, rootfs and mount point returned together |
+| `vzdump --mode stop` | pass |
+| `vzdump --mode suspend` | pass |
+| `pct restore` into a new container | pass, marker sha256 identical |
+| `pct template` | pass, `base-<id>-disk-0` |
+| Linked clone | pass, `base-<id>-disk-0/vm-<id>-disk-0`, marker identical after boot |
+| Full clone of a stopped container | pass |
+| Offline migration to another node | pass, 3 seconds, recognised as shared storage |
+| `--restart` migration of a running container | pass, 26 seconds |
+| Destroying every container, including the template and its linked clone | pass, no disks left on the storage |
+| Node state after removing the storage | the node the operations ran on was clean. **The other node kept its session**, which is PVE's shape rather than a defect; the per-node cleanup commands in the documentation clear it, measured |
+| Storage-server side | 0 LUNs, 0 targets, 0 initiators |
+
+Two limits, both measured:
+
+1. **A container backup in `vzdump --mode snapshot` does not work.** It takes a
+   storage snapshot and then mounts it to read the files out, and a Synology LUN
+   snapshot has no device to mount. The plugin refuses in as many words:
+   `a Synology LUN cannot be addressed at a snapshot: roll back to it, or clone it
+   into a new disk`. Virtual machines are unaffected — QEMU reads the live disk.
+2. **The refused attempt leaves PVE's own `vzdump` snapshot behind.** Its cleanup
+   stops on the failed `umount -l -d /mnt/vzsnap0/`, so the snapshot it created is
+   never deleted. `pct delsnapshot <ctid> vzdump` clears it, measured.
+
+Two of PVE's own rules were confirmed in passing: a running container cannot be
+full-cloned at all (PVE says "only possible from a snapshot"), and a full clone
+from a snapshot is refused by this storage — **and the refusal left nothing behind
+at the destination**, because PVE's error handler frees the disk it had created.
+
 ### How a session is carried — the two reference clients disagree, and one is wrong here
 
 | Carrier | Result on DSM 7.1.1 |
@@ -1213,6 +1259,25 @@ verifies is the consequence — after any of it, a guest on that storage still s
 
 F1 is the one that matters: it is the operation that could break a running guest,
 so it is run **against a running guest on purpose**.
+
+
+### G — containers, which do not take the virtual-machine path
+
+PVE makes an ext4 filesystem on the device this storage hands it and mounts it, so a
+container drives `path()`, `activate_volume`, `volume_size_info` and resize directly.
+`pct` is one of the four commands that run under `perl -T`.
+
+| | Operation | Expected |
+|---|---|---|
+| **G1** | `pct create` with the rootfs on this storage, then start it | ext4 is made on the LUN and `/` inside the container is the multipath device |
+| **G2** | Snapshot while running, change a file, roll back | freeze and thaw appear in the task log, and the file's checksum returns |
+| **G3** | `pct resize rootfs +2G` | the map grows, ext4 grows online, and the new size is visible inside |
+| **G4** | Add a second mount point on this storage, then snapshot and roll back | both volumes go back together |
+| **G5** | `vzdump --mode stop` and `--mode suspend`, then `pct restore` | both modes back up, and the restored container's checksum matches |
+| **G6** | `vzdump --mode snapshot` | **Refused**, and the message says why. Then `pct delsnapshot <ctid> vzdump` — PVE's cleanup stops on the failed `umount`, so its own snapshot is left behind |
+| **G7** | `pct template`, then a linked clone; and a full clone of a stopped container | both paths work; a running container cannot be full-cloned at all, which is PVE's rule |
+| **G8** | Offline migration, and `--restart` migration of a running container | the source node is left clean |
+| **G9** | Destroy every container, including the template and its linked clone | no disks left on the storage, and the audit above is clean on every node |
 
 ---
 

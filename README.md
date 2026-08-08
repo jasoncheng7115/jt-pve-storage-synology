@@ -19,7 +19,8 @@ Backup / Restore · Multipath.
 ## Which Proxmox VE operations work
 
 Every row was driven on real hardware, from the web interface and from the
-command line. The two rows that are not a yes say so.
+command line, with virtual machines and with containers. The rows that are not a
+yes say why.
 
 | Operation | State |
 |---|---|
@@ -36,7 +37,8 @@ command line. The two rows that are not a yes say so.
 | Multipath, through a path failure | ✓ |
 | CHAP | ✓ |
 | Full clone from a snapshot<br>A full clone means PVE reads the source data itself, so it needs a readable block device at that snapshot. A Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. Use a linked clone, which this storage does support, or convert the source to a template first | Not supported |
-| LXC containers<br>Declared, but everything above was measured with virtual machines | Untested |
+| LXC containers, as the root filesystem and as a mount point | ✓ |
+| A container backup in `vzdump --mode snapshot`<br>A container backup in snapshot mode takes a storage snapshot and then mounts it to read the files out, and a Synology LUN snapshot has no device to mount. Use `--mode stop` or `--mode suspend`, both verified. Virtual machines are unaffected: QEMU reads the live disk. A refused attempt leaves PVE's own `vzdump` snapshot behind, because its cleanup stops on the failed `umount` — remove it with `pct delsnapshot <ctid> vzdump` | Not supported |
 
 > ### Status: **it is running on a production cluster.**
 >
@@ -457,7 +459,7 @@ pvesm add synologysan mysyno \
     --syno-username pve-storage \
     --syno-password '<the password>' \
     --syno-location /volume1 \
-    --content       images \
+    --content       images,rootdir \
     --nodes         pve1,pve2,pve3    # optional: restrict to these nodes
 ```
 

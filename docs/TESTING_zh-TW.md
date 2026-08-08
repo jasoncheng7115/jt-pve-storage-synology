@@ -41,6 +41,39 @@
 
 到 `dev_attribs` 表格為止的每一項都是唯讀取得的。下面標為寫入測試的部分是在專用的 `pvetest-` 名稱前置字串下、取得擁有者同意後執行，建立的每個物件事後都已刪除，並確認儲存伺服器回到原本的內容。
 
+### LXC 容器，整套操作
+
+容器和虛擬機不是同一條路徑：PVE 自己在這個 storage 給的區塊裝置上做 ext4，然後掛起來，所以 `path()`、`activate_volume`、`volume_size_info` 與擴充都是被容器工具直接使用的。整套操作在 DS925+（DSM 7.3.2-86009 Update 4）與一個三節點叢集上跑過，容器是 Ubuntu 22.04：
+
+| 操作 | 結果 |
+|---|---|
+| `pct create`，rootfs 在這個 storage | 通過。PVE 在 LUN 上建 ext4，容器內 `/` 就是 `/dev/mapper/<map>` |
+| 啟動、進入容器 | 通過 |
+| 快照（執行中，`volume_snapshot_needs_fsfreeze` 為真） | 通過，freeze 與 thaw 都出現在工作記錄裡 |
+| 倒回 | 通過。容器內寫入 32 MiB 隨機資料並記下 sha256，覆蓋成 0，倒回後 sha256 一致 |
+| 刪除快照 | 通過 |
+| `pct resize rootfs +2G` | 通過，ext4 線上長大，容器內看到新容量 |
+| 第二個掛接點（`-mp0 <storage>:2,mp=/data`） | 通過，另一個 LUN、另一個 ext4，可寫入 |
+| 兩個磁碟一起快照與倒回 | 通過，rootfs 與掛接點一起回到快照時間點 |
+| `vzdump --mode stop` | 通過 |
+| `vzdump --mode suspend` | 通過 |
+| `pct restore` 到新的容器 | 通過，記號檔的 sha256 一致 |
+| `pct template` | 通過，`base-<id>-disk-0` |
+| 連結複製 | 通過，`base-<id>-disk-0/vm-<id>-disk-0`，起來後記號一致 |
+| 停機狀態的完整複製 | 通過 |
+| 離線遷移到另一個節點 | 通過，3 秒，認得是共享 storage |
+| 執行中的容器 `--restart` 遷移 | 通過，26 秒 |
+| 刪除全部容器（含範本與它的連結複本） | 通過，storage 上一個磁碟都不剩 |
+| 移除 storage 後的節點狀態 | 執行操作的那個節點乾淨。**另一個節點還留著工作階段**，這是 PVE 的架構，不是缺陷，用文件裡的每節點清理指令處理，實測清得掉 |
+| 儲存伺服器端 | 0 個 LUN、0 個 target、0 個 initiator |
+
+兩件測出來的限制：
+
+1. **容器的 `vzdump --mode snapshot` 不能用**。它是拍一個 storage 快照，再把快照掛起來讀檔案，而 Synology LUN 的快照沒有裝置可掛。plugin 明確拒絕：`a Synology LUN cannot be addressed at a snapshot: roll back to it, or clone it into a new disk`。虛擬機不受影響，QEMU 讀的是活的磁碟。
+2. **那次失敗會留下 PVE 自己建的 `vzdump` 快照**。PVE 的清理停在失敗的 `umount -l -d /mnt/vzsnap0/` 上，所以它建的快照沒有被刪掉。用 `pct delsnapshot <ctid> vzdump` 清，實測清得掉。
+
+順帶確認了兩件 PVE 自己的規則：執行中的容器不能做完整複製（PVE 說「only possible from a snapshot」），而從快照做完整複製會被這個 storage 拒絕，**而且被拒絕之後目的端沒有留下任何東西**，PVE 的錯誤處理把它建好的那顆磁碟釋放掉了。
+
 ### 工作階段怎麼帶——兩份參考實作的做法不同，而其中一份在這裡是錯的
 
 | 載體 | 在 DSM 7.1.1 上的結果 |
@@ -801,6 +834,22 @@ NAS 上有一顆沒有任何設定引用的 LUN，或一筆指向已不存在 uu
 | **F4** | `make check-multipath-flush` | 整個原始碼樹裡絕不出現 `multipath -F`。大寫的那個會把節點上每一個未使用的 map 都 flush 掉，包含其他廠商的 |
 
 F1 是真正重要的那一項：它是唯一可能弄壞執行中 guest 的操作，所以它**刻意就是對著執行中的 guest 跑**。
+
+### G——容器，它走的不是虛擬機那條路
+
+PVE 會在這個 storage 交出的裝置上做 ext4 再掛起來，所以容器是直接用到 `path()`、`activate_volume`、`volume_size_info` 與擴充。而 `pct` 是四個在 `perl -T` 下執行的命令之一。
+
+| | 操作 | 預期 |
+|---|---|---|
+| **G1** | `pct create`，rootfs 放在這個 storage，然後啟動 | LUN 上建出 ext4，容器內的 `/` 就是那個 multipath 裝置 |
+| **G2** | 執行中拍快照、改一個檔案、倒回 | 工作記錄裡有 freeze 與 thaw，而那個檔案的檢查碼回來了 |
+| **G3** | `pct resize rootfs +2G` | map 長大、ext4 線上長大，容器內看到新容量 |
+| **G4** | 在這個 storage 上加第二個掛接點，然後快照與倒回 | 兩顆磁碟一起回到快照時間點 |
+| **G5** | `vzdump --mode stop` 與 `--mode suspend`，然後 `pct restore` | 兩種模式都備份得起來，還原後的容器檢查碼一致 |
+| **G6** | `vzdump --mode snapshot` | **被拒絕**，而且訊息說明了原因。接著 `pct delsnapshot <ctid> vzdump`：PVE 的清理停在失敗的 `umount` 上，所以它自己建的快照會留下來 |
+| **G7** | `pct template` 之後做連結複製；以及對停機的容器做完整複製 | 兩條路都可以。執行中的容器完全不能做完整複製，那是 PVE 的規則 |
+| **G8** | 離線遷移，以及對執行中的容器做 `--restart` 遷移 | 來源節點沒有殘留 |
+| **G9** | 刪掉全部容器，包含範本與它的連結複本 | storage 上一顆磁碟都不剩，而上面那份稽核在每個節點上都乾淨 |
 
 ---
 

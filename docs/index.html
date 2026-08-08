@@ -125,7 +125,7 @@
         <!-- The version sits on this line, immediately after the class, because
              <code>make release-check</code> reads it from here to prove the site has not
              drifted from the package. Do not reflow it. -->
-        <div class="hero__badge">v0.9.2 <span class="hero__badge-sep">·</span> MIT</div>
+        <div class="hero__badge">v0.9.3 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
             <span class="lang-en">Proxmox VE uses Synology SAN Manager directly as its VM storage back end.</span>
@@ -152,8 +152,8 @@
 <section class="doc-section" id="features">
     <h2 class="section-title"><span class="lang-en">Which Proxmox VE operations work</span><span class="lang-zh">支援的 Proxmox VE 操作</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">Every row was driven on real hardware, from the web interface and from the command line. The two rows that are not a yes say so.</span>
-        <span class="lang-zh">每一列都在實機上、從網頁介面和指令列各跑過一次。兩列不是「可以」的，直接寫出來。</span>
+        <span class="lang-en">Every row was driven on real hardware, from the web interface and from the command line, with virtual machines and with containers. The rows that are not a yes say why.</span>
+        <span class="lang-zh">每一列都在實機上、從網頁介面和指令列各跑過一次，虛擬機與容器都跑。不是「可以」的那幾列，都寫出原因。</span>
     </p>
 
     <div class="table-wrap">
@@ -184,12 +184,13 @@
                     </td>
                     <td class="verdict verdict--no"><span class="lang-en">Not supported</span><span class="lang-zh">不支援</span></td>
                 </tr>
+                <tr><td><span class="lang-en">LXC containers, as the root filesystem and as a mount point</span><span class="lang-zh">LXC 容器，當根檔案系統與當掛接點</span></td><td class="yes">&#10003;</td></tr>
                 <tr>
                     <td>
-                        <span class="lang-en">LXC containers</span><span class="lang-zh">LXC 容器</span>
-                        <div class="cell-note"><span class="lang-en">Declared, but everything above was measured with virtual machines.</span><span class="lang-zh">有宣告，但上面每一項都是用虛擬機量測的。</span></div>
+                        <span class="lang-en">A container backup in <code>vzdump --mode snapshot</code></span><span class="lang-zh">容器備份的 <code>vzdump --mode snapshot</code></span>
+                        <div class="cell-note"><span class="lang-en">A container backup in snapshot mode takes a storage snapshot and then <strong>mounts it</strong> to read the files out, and a Synology LUN snapshot has no device to mount. The plugin refuses with that in the message. Use <code>--mode stop</code> or <code>--mode suspend</code>, both verified. Virtual machines are unaffected: QEMU reads the live disk. A refused attempt leaves PVE&#39;s own <code>vzdump</code> snapshot behind, because its cleanup stops on the failed <code>umount</code> — remove it with <code>pct delsnapshot &lt;ctid&gt; vzdump</code>.</span><span class="lang-zh">容器的快照模式備份，是先拍一個 storage 快照，再<strong>把它掛起來</strong>讀檔案，而 Synology LUN 的快照沒有裝置可掛。plugin 會拒絕，並在訊息裡說明。請改用 <code>--mode stop</code> 或 <code>--mode suspend</code>，兩種都驗證過。虛擬機不受影響，QEMU 讀的是活的磁碟。被拒絕的那一次會留下 PVE 自己建的 <code>vzdump</code> 快照，因為它的清理卡在失敗的 <code>umount</code> 上，用 <code>pct delsnapshot &lt;ctid&gt; vzdump</code> 清掉。</span></div>
                     </td>
-                    <td class="verdict verdict--untested"><span class="lang-en">Untested</span><span class="lang-zh">未測試</span></td>
+                    <td class="verdict verdict--no"><span class="lang-en">Not supported</span><span class="lang-zh">不支援</span></td>
                 </tr>
             </tbody>
         </table>
@@ -303,6 +304,7 @@
                 <li><span class="lang-en">Backup and restore in all three <code>vzdump</code> modes</span><span class="lang-zh">三種 <code>vzdump</code> 模式的備份與還原</span></li>
                 <li><span class="lang-en">Multipath through a path failure</span><span class="lang-zh">多重路徑撐過路徑故障</span></li>
                 <li><span class="lang-en">A crashed node's LUN taken over by a surviving node</span><span class="lang-zh">節點當機後由存活節點接手 LUN</span></li>
+                <li><span class="lang-en">LXC containers: created, snapshotted, rolled back, resized, cloned, templated, backed up, restored and migrated</span><span class="lang-zh">LXC 容器：建立、快照、倒回、擴充、複製、轉範本、備份、還原、遷移都跑過</span></li>
                 <li><span class="lang-en">A whole-NAS outage, with the nodes and every other storage unaffected</span><span class="lang-zh">整台 NAS 中斷，節點和其他 storage 都不受影響</span></li>
                 <li><span class="lang-en">A DSM upgrade across it, 7.1.1 to 7.4.1, every LUN uuid intact</span><span class="lang-zh">中途跨過一次 DSM 升級，7.1.1 到 7.4.1，全部 LUN uuid 完好</span></li>
             </ul>
@@ -313,7 +315,6 @@
                 <li><span class="lang-en">Synology HA has never been tested; no such pair has been near this</span><span class="lang-zh">Synology HA 沒有測過，手上從來沒有這種機器</span></li>
                 <li><span class="lang-en">A UC dual-controller chassis has never been tested either. It is supported by design, and the plugin warns when it detects one</span><span class="lang-zh">UC 雙控制器機箱也沒有測過。設計上支援，plugin 偵測到會發出警告</span></li>
                 <li><span class="lang-en">The DSM account must be in <code>administrators</code>, because DSM offers nothing narrower</span><span class="lang-zh">DSM 帳號必須屬於 <code>administrators</code>，因為 DSM 沒有更小的選項</span></li>
-                <li><span class="lang-en">LXC containers are declared but were never tested</span><span class="lang-zh">LXC 容器有宣告，但沒有測過</span></li>
                 <li><span class="lang-en">Two models out of everything Synology sells is a small sample</span><span class="lang-zh">兩個機型，對照 Synology 賣的機型數量是很小的樣本</span></li>
                 <li><span class="lang-en">Running it found about thirty defects that reading the code never would, so assume there are more</span><span class="lang-zh">實際跑起來找到大約三十個讀程式碼讀不出來的缺陷，所以請假設還有</span></li>
             </ul>
@@ -648,8 +649,13 @@
     <span class="flag">--syno-username</span> pve-storage \
     <span class="flag">--syno-password</span> <span class="string">'&lt;the password&gt;'</span> \
     <span class="flag">--syno-location</span> /volume1 \
-    <span class="flag">--content</span>       images \
+    <span class="flag">--content</span>       images,rootdir \
     <span class="flag">--nodes</span>         pve1,pve2,pve3    <span class="comment"># optional: restrict to these nodes</span></code></pre>
+
+    <p>
+        <span class="lang-en"><code>--content</code> takes <code>images</code> for VM disks and <code>rootdir</code> for container root filesystems and mount points, and this storage supports both. <strong>Give it both unless you have a reason not to</strong>: with <code>images</code> alone, a container cannot be created on it and the storage simply does not appear in the container wizard, which reads as the plugin not working. No other content type is accepted — this storage holds disks, not ISOs, templates or backups.</span>
+        <span class="lang-zh"><code>--content</code> 可以填 <code>images</code>（VM 磁碟）與 <code>rootdir</code>（容器的根檔案系統與掛接點），這個 storage 兩種都支援。<strong>除非有理由，兩個都給</strong>：只給 <code>images</code> 的話容器建不上去，而且這個 storage 根本不會出現在建立容器的畫面上，看起來就像 plugin 沒在運作。其他內容類型都不接受，這個 storage 放的是磁碟，不是 ISO、範本或備份。</span>
+    </p>
 
     <p>
         <span class="lang-en"><code>pvesm add</code> refuses immediately if the volume is not Btrfs, if the model does not support iSCSI targets or snapshots, or if the storage id would fold onto an existing storage's LUN prefix. It is meant to fail there rather than at your first snapshot.</span>
@@ -752,6 +758,7 @@
             <th><span class="lang-en">What it is for</span><span class="lang-zh">用途</span></th>
         </tr></thead>
         <tbody>
+        <tr><td><code>content</code></td><td><code>images,rootdir</code></td><td><span class="lang-en">PVE's own property. <code>images</code> for VM disks, <code>rootdir</code> for container root filesystems. Both are supported and both are verified; nothing else is accepted</span><span class="lang-zh">PVE 自己的屬性。<code>images</code> 是 VM 磁碟，<code>rootdir</code> 是容器的根檔案系統。兩種都支援、也都驗證過；其他都不接受</span></td></tr>
         <tr><td><code>syno-portal</code></td><td><em>required</em></td><td><span class="lang-en">DSM management address. A comma-separated list is tried in order and rotated on failure</span><span class="lang-zh">DSM 管理位址。逗號分隔的清單會依序嘗試，失敗時輪替</span></td></tr>
         <tr><td><code>syno-username</code></td><td><em>required</em></td><td><span class="lang-en">DSM account. Not your <code>admin</code> account</span><span class="lang-zh">DSM 帳號。不要用你的 <code>admin</code> 帳號</span></td></tr>
         <tr><td><code>syno-password</code></td><td><em>required</em></td><td><span class="lang-en">Stored in <code>/etc/pve/priv</code>, never in the config</span><span class="lang-zh">存放在 <code>/etc/pve/priv</code>，絕不在設定檔裡</span></td></tr>

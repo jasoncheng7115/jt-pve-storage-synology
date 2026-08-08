@@ -6,6 +6,63 @@ The register of what has been verified against real hardware, and what has not,
 is [docs/TESTING.md](docs/TESTING.md) — it is more useful than this file for
 deciding whether to trust a given release.
 
+## [0.9.3] - 2026-08-08
+
+### Verified
+
+- **LXC containers, which were declared but had never been tested.** The whole set
+  was driven against a DS925+ on a three-node cluster with an Ubuntu 22.04
+  container: create with the rootfs on this storage, start, snapshot and roll back
+  while running, delete a snapshot, `pct resize +2G`, a second mount point, snapshot
+  and roll back both volumes together, `vzdump --mode stop` and `--mode suspend`,
+  `pct restore`, `pct template`, a linked clone, a full clone of a stopped
+  container, offline migration, `--restart` migration of a running one, and destroy.
+  Afterwards the storage held no disks, every node was clean, and the NAS was back
+  to 0 LUNs and 0 targets. Containers take a different path from virtual machines:
+  PVE makes ext4 on the device this storage hands it, so `path()`,
+  `activate_volume`, `volume_size_info` and resize are used directly by `pct` —
+  which is also one of the four commands that run under `perl -T`.
+
+### Documented
+
+- **A container backup in `vzdump --mode snapshot` does not work here.** Snapshot
+  mode takes a storage snapshot and then **mounts it** to read the files out, and a
+  Synology LUN snapshot has no device to mount, so the plugin refuses and the
+  message says why. Use `--mode stop` or `--mode suspend`, both verified. Virtual
+  machines are unaffected — QEMU reads the live disk.
+- **And the refused attempt leaves PVE's own `vzdump` snapshot behind**, because its
+  cleanup stops on the failed `umount -l -d /mnt/vzsnap0/`. `pct delsnapshot <ctid>
+  vzdump` clears it, measured. Written down because an operator will meet it.
+- **Every `pvesm add` example now passes `--content images,rootdir`**, and what
+  `--content` accepts is written down. With `images` alone a container cannot be
+  created and the storage does not appear in the container wizard at all, which
+  reads as the plugin not working rather than as a missing content type.
+- A full clone of a running container is refused by PVE itself, and a full clone
+  from a snapshot is refused by this storage — **and that refusal leaves nothing
+  behind at the destination**, because PVE's error handler frees the disk it created.
+
+### Changed
+
+- The documentation site says what the plugin is for before it proves how carefully
+  it was built. A new operations table, the measured numbers as cards ahead of the
+  narrative, 「狀態與風險」 becoming 「目前的驗證狀態」 with verified and not-verified
+  side by side and the same size, and 「技術上的難處」 becoming 「為什麼這個 plugin
+  需要實機驗證」. Nothing was softened; the untested HA shapes, the
+  administrator-account requirement and the thirty defects are all still there.
+- The LUN ceiling section is marked read-before-you-deploy, because it is a purchase
+  decision rather than a specification detail.
+
+### Fixed
+
+- **A section's horizontal padding vanished at certain window widths.** It was
+  `calc((100% - 920px) / 2)`, and the section is the viewport minus the sidebar, so
+  the value goes negative at about 1190 pixels of browser width — which makes the
+  whole `padding` shorthand invalid rather than merely small. Text and tables ran
+  flush into both edges. Both sides are now floored with `max()`.
+- A tinted section background left the per-model limits table unreadable, and the
+  operations table's verdict column was fixed narrow enough to wrap an explanation
+  to one character per line.
+
 ## [0.9.2] - 2026-08-08
 
 ### Fixed
