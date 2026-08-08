@@ -263,30 +263,30 @@
 
 <section class="doc-section" id="verified">
     <h2 class="section-title"><span class="lang-en">Measured on hardware, not just called through an API</span><span class="lang-zh">實機驗證過，不只是 API 呼叫得通</span></h2>
-    <div class="stat-grid">
+    <div class="stat-strip">
         <div class="stat">
-            <div class="stat__value"><span class="lang-en">5 nodes</span><span class="lang-zh">5 節點</span></div>
-            <div class="stat__label"><span class="lang-en">a production cluster, with live migration across every node</span><span class="lang-zh">正式叢集，跨全部節點的即時遷移都跑過</span></div>
+            <span class="stat__value"><span class="lang-en">5 nodes</span><span class="lang-zh">5 節點</span></span>
+            <span class="stat__label"><span class="lang-en">production cluster, live migration across all of them</span><span class="lang-zh">正式叢集，跨節點即時遷移</span></span>
         </div>
         <div class="stat">
-            <div class="stat__value"><span class="lang-en">3.6 s</span><span class="lang-zh">3.6 秒</span></div>
-            <div class="stat__label"><span class="lang-en">for a surviving node to take over a crashed node's LUN, data intact</span><span class="lang-zh">節點當機後，存活節點接手它的 LUN 所花的時間，資料完整</span></div>
+            <span class="stat__value"><span class="lang-en">3.6 s</span><span class="lang-zh">3.6 秒</span></span>
+            <span class="stat__label"><span class="lang-en">to take over a crashed node's LUN, data intact</span><span class="lang-zh">接手當機節點的 LUN，資料完整</span></span>
         </div>
         <div class="stat">
-            <div class="stat__value"><span class="lang-en">60 / 0</span><span class="lang-zh">60 / 0</span></div>
-            <div class="stat__label"><span class="lang-en">reads and failures through a multipath path failure</span><span class="lang-zh">多重路徑故障期間的讀取次數與失敗次數</span></div>
+            <span class="stat__value"><span class="lang-en">60 / 0</span><span class="lang-zh">60 / 0</span></span>
+            <span class="stat__label"><span class="lang-en">reads and failures through a path failure</span><span class="lang-zh">路徑故障期間的讀取與失敗</span></span>
         </div>
         <div class="stat">
-            <div class="stat__value"><span class="lang-en">3</span><span class="lang-zh">3 種</span></div>
-            <div class="stat__label"><span class="lang-en"><code>vzdump</code> modes, every restore byte-identical</span><span class="lang-zh"><code>vzdump</code> 備份模式，還原後位元組完全相同</span></div>
+            <span class="stat__value"><span class="lang-en">3</span><span class="lang-zh">3 種</span></span>
+            <span class="stat__label"><span class="lang-en"><code>vzdump</code> modes, restores byte-identical</span><span class="lang-zh"><code>vzdump</code> 模式，還原位元組相同</span></span>
         </div>
         <div class="stat">
-            <div class="stat__value stat__value--sm"><span class="lang-en">7.1.1 &rarr; 7.4.1</span><span class="lang-zh">7.1.1 → 7.4.1</span></div>
-            <div class="stat__label"><span class="lang-en">a DSM upgrade carried across mid-test, every LUN uuid intact</span><span class="lang-zh">測試途中跨過的一次 DSM 升級，全部 LUN uuid 完好</span></div>
+            <span class="stat__value stat__value--sm"><span class="lang-en">7.1.1 &rarr; 7.4.1</span><span class="lang-zh">7.1.1 → 7.4.1</span></span>
+            <span class="stat__label"><span class="lang-en">a DSM upgrade mid-test, every LUN uuid intact</span><span class="lang-zh">測試途中的 DSM 升級，LUN uuid 完好</span></span>
         </div>
         <div class="stat">
-            <div class="stat__value"><span class="lang-en">0</span><span class="lang-zh">0</span></div>
-            <div class="stat__label"><span class="lang-en">processes left in uninterruptible sleep by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後，節點上卡在不可中斷睡眠的行程數</span></div>
+            <span class="stat__value"><span class="lang-en">0</span><span class="lang-zh">0</span></span>
+            <span class="stat__label"><span class="lang-en">processes stuck by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後卡住的行程</span></span>
         </div>
     </div>
 
