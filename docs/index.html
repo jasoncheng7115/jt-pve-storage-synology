@@ -180,9 +180,9 @@
                 <tr>
                     <td>
                         <span class="lang-en">Full clone from a snapshot</span><span class="lang-zh">從<strong>快照</strong>做完整複製</span>
-                        <div class="cell-note"><span class="lang-en">A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first.</span><span class="lang-zh">Synology LUN 在快照上沒有可讀取的裝置，PVE 會做到一半才失敗。請用連結複製，或先把來源轉成範本。</span></div>
+                        <div class="cell-note"><span class="lang-en">A full clone means PVE reads the source data itself, so it needs a readable block device <em>at that snapshot</em>. A Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. Use a linked clone, which this storage does support, or convert the source to a template first.</span><span class="lang-zh">完整複製是由 PVE 自己讀取來源資料，所以它需要<strong>在那個快照上</strong>有一個可以讀取的區塊裝置。Synology 的 LUN 快照給不了這個：快照必須先倒回，或先用 reflink 複製成另一個 LUN，才會有裝置可以讀。請改用連結複製，這個 storage 支援；或先把來源轉成範本。</span></div>
                     </td>
-                    <td class="verdict verdict--no"><span class="lang-en">Refused</span><span class="lang-zh">拒絕</span></td>
+                    <td class="verdict verdict--no"><span class="lang-en">Not supported</span><span class="lang-zh">不支援</span></td>
                 </tr>
                 <tr>
                     <td>

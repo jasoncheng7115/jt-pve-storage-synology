@@ -35,7 +35,7 @@ command line. The two rows that are not a yes say so.
 | Moving a disk to another storage type | ✓ |
 | Multipath, through a path failure | ✓ |
 | CHAP | ✓ |
-| Full clone from a snapshot<br>A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first | Refused |
+| Full clone from a snapshot<br>A full clone means PVE reads the source data itself, so it needs a readable block device at that snapshot. A Synology LUN snapshot does not provide one: it has to be rolled back, or reflinked into another LUN, before there is any device to read. Use a linked clone, which this storage does support, or convert the source to a template first | Not supported |
 | LXC containers<br>Declared, but everything above was measured with virtual machines | Untested |
 
 > ### Status: **it is running on a production cluster.**
