@@ -172,6 +172,13 @@
                     <td class="yes">&#10003;</td>
                 </tr>
                 <tr>
+                    <td><span class="lang-en">Thin provisioning</span><span class="lang-zh">精簡配置</span>
+                        <div class="cell-note"><span class="lang-en">Every disk is a Btrfs thin LUN, so it occupies what has been written rather than what it was created as. Because that can overcommit the DSM volume, <code>syno-min-free</code> refuses to allocate once the volume&#39;s free space falls below it.</span><span class="lang-zh">每一顆磁碟都是 Btrfs thin LUN，所以它佔用的是已經寫入的量，不是建立時的大小。因為這樣可以超額配置 DSM 儲存空間，所以儲存空間的剩餘空間低於 <code>syno-min-free</code> 時會拒絕配置。</span></div>
+                    </td>
+                    <td class="yes">&#10003;</td>
+                    <td class="yes">&#10003;</td>
+                </tr>
+                <tr>
                     <td><span class="lang-en">Resize</span><span class="lang-zh">擴充容量</span>
                         <div class="cell-note"><span class="lang-en">For a container the filesystem grows online too.</span><span class="lang-zh">容器的檔案系統也是線上長大。</span></div>
                     </td>

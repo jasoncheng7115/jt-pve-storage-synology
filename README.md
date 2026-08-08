@@ -25,6 +25,7 @@ not a yes say why.
 | Operation | VM | Container |
 |---|---|---|
 | Create and remove a disk | ✓ | ✓ |
+| Thin provisioning<br>Every disk is a Btrfs thin LUN, so it occupies what has been written rather than what it was created as. Because that can overcommit the DSM volume, `syno-min-free` refuses to allocate once the volume's free space falls below it | ✓ | ✓ |
 | Resize<br>For a container the filesystem grows online too | ✓ | ✓ |
 | Snapshot and rollback<br>Verified at the block level: written data, snapshot, overwritten with zeros, rolled back, the original checksum returned | ✓ | ✓ |
 | A snapshot including memory<br>Proxmox VE does not snapshot a container's memory at all | ✓ | n/a |
