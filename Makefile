@@ -21,7 +21,7 @@ GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
 .PHONY: all install uninstall test syntax unit unit-nopve nopve-stub \
-        check-multipath-flush check-secrets check-tool-paths check-zh zh-normalise critic check-doc-urls check-docs-public \
+        check-multipath-flush check-secrets check-tool-paths check-zh zh-normalise critic check-doc-urls check-docs-public check-bilingual \
         og-image check-og-image \
         check-release-archive \
         release-check deb deb-clean clean
@@ -271,6 +271,10 @@ check-secrets:
 # mainland wording. All four were real on the site and in the README until they
 # were swept out; this is what stops them drifting back. Shown to fail on a line
 # carrying all three of the first kind.
+check-bilingual:
+	@echo "Checking that both halves of every bilingual pair agree..."
+	@perl tools/check-bilingual.pl docs/index.html
+
 check-docs-public:
 	@echo "Checking the published documents..."
 	@perl tools/check-docs-public.pl docs/*.md docs/index.html README.md README_zh-TW.md \
@@ -372,7 +376,7 @@ check-zh:
 # as satisfied and the drift was invisible. It was invisible on the worst possible
 # script: the reaper is the documented step after a node crash, so `--version` was
 # lying on the one output an operator reads during an incident.
-release-check: check-multipath-flush check-secrets check-tool-paths check-zh check-og-image check-docs-public syntax unit unit-nopve critic \
+release-check: check-multipath-flush check-secrets check-tool-paths check-zh check-og-image check-docs-public check-bilingual syntax unit unit-nopve critic \
                check-doc-urls \
                check-release-archive
 	@echo "Checking version consistency..."

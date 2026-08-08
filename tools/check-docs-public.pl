@@ -28,6 +28,13 @@ my @RULES = (
     [ 'a date',
       qr{\b20\d\d-\d\d-\d\d\b},
       'that it was measured is the claim; the day belongs in the changelog' ],
+    # Everything this has ever run on is Proxmox VE 9. A claim of 8 AND 9 in one
+    # breath reads as a measurement; the requirements table is allowed to say 8.x
+    # is expected to work provided it says in the same sentence that it was never
+    # tested, which this pattern does not match.
+    [ 'a support claim for Proxmox VE 8, which nothing has run on',
+      qr{(?:PVE|Proxmox\s*VE)\s*8\s*(?:/|／)\s*9 | 8\.x\s*(?:/|／)\s*9\.x | 支援\s*(?:PVE|Proxmox\s*VE)\s*8}x,
+      'say 9, and say separately that 8.x is expected to work but was never tested' ],
     # strip_code: a term inside backticks is being CITED, not used. The changelog
     # says «`登記簿` reads as mainland usage and is now `驗證紀錄`», and a guard that
     # cannot tell a thing from prose about the thing is the seventh instance of
