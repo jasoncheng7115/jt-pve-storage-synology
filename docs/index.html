@@ -1072,8 +1072,9 @@
     <details>
         <summary><span class="lang-en">Proxmox VE and DSM disagree about the capacity</span><span class="lang-zh">Proxmox VE 和 DSM 顯示的容量不一致</span></summary>
         <div class="detail-content">
-            <span class="lang-en">Both are right. Proxmox VE labels the number in SI units and DSM in binary ones, and the plugin passes the byte count through untouched. The percentages agree, which is the quickest check.</span>
-            <span class="lang-zh">兩邊都對。Proxmox VE 用 SI 單位標示，DSM 用二進位單位，而 plugin 是把位元組數原封不動傳過去。百分比會一致，那是最快的檢查點。</span>
+            <p><span class="lang-en">Both are right. They are the same number of bytes divided by different amounts, and both label the answer TB.</span><span class="lang-zh">兩邊都對。那是<strong>同一個位元組數</strong>，只是除的東西不一樣，而兩邊都把答案寫成 TB。</span></p>
+            <p><span class="lang-en">Proxmox VE divides by 1000 for each step &mdash; KB, MB, GB, TB &mdash; which is how disks are sold. DSM divides by 1024 each time, which is how a computer counts. Four steps of that is about 10% apart, so the same volume reads as 15.36 TB in one place and 14 TB in the other.</span><span class="lang-zh">Proxmox VE 每一級除以 1000（KB、MB、GB、TB），那是硬碟標容量的算法。DSM 每一級除以 1024，那是電腦內部計數的算法。連除四級之後差距大約 10%，所以同一個儲存空間，一邊顯示 15.36 TB、另一邊顯示 14 TB。</span></p>
+            <p><span class="lang-en">The plugin does no arithmetic at all: it hands Proxmox VE the byte counts DSM reported. So the percentage used is the same on both screens, and that is the quickest way to confirm they are looking at the same volume.</span><span class="lang-zh">plugin 完全沒有做換算，它把 DSM 回報的位元組數直接交給 Proxmox VE。所以兩邊的<strong>使用百分比會一樣</strong>，那也是確認它們看的是同一個儲存空間最快的方法。</span></p>
         </div>
     </details>
 

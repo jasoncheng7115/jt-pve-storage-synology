@@ -499,9 +499,10 @@ It does — the two count in different units and both call them TB.
 
 The plugin reports the DSM volume's `size_total_byte` and `size_free_byte`
 **verbatim, in bytes**, and does no arithmetic on either. Everything after that
-is display. Proxmox VE's storage summary formats bytes with SI units, dividing
-by 1000; DSM's Storage Manager divides by 1024 and still writes "TB". So the
-same volume reads:
+is display. Proxmox VE divides by 1000 at each step — KB, MB, GB, TB — which is
+how disks are sold; DSM's Storage Manager divides by 1024 each time, which is how
+a computer counts, and both write "TB". Four steps of that is about 10% apart, so
+the same volume reads:
 
 ![Proxmox VE reporting 28.12% (4.32 TB of 15.36 TB) above, DSM Storage Manager reporting 3.9 TB / 14 TB and 28% below — the same volume, the same bytes](docs/images/capacity-units-en.png)
 
