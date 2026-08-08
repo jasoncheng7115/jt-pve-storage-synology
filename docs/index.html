@@ -276,7 +276,7 @@
 
     <div class="alert alert--success">
         <span class="lang-en">The second row is why the related projects <strong>refuse</strong> a rollback past newer snapshots: on those arrays the newer ones are destroyed, so letting PVE do it silently would delete snapshots the user could still see. Here nothing is destroyed, so that restriction is not needed and a disk can be rolled back repeatedly.</span>
-        <span class="lang-zh">第二列說明了相關專案為什麼<strong>拒絕</strong>越過較新的快照倒回：在那些陣列上較新的快照會被銷毀，所以讓 PVE 默默做那件事，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
+        <span class="lang-zh">第二列說明了相關專案為什麼<strong>拒絕</strong>越過較新的快照倒回：在那些陣列上較新的快照會被銷毀，所以在不告知的情況下讓 PVE 執行那個操作，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。</span>
     </div>
 </section>
 
@@ -992,7 +992,7 @@
 
     <div class="alert alert--info">
         <span class="lang-en">Where nothing could be established, this plugin <strong>refuses the operation</strong> rather than guessing. A storage plugin that quietly guesses is worse than one that says no.</span>
-        <span class="lang-zh">凡是無法確認的地方，這個 plugin <strong>拒絕該操作</strong>，而不是猜。一個會默默猜測的 storage plugin 比一個會說不的更糟。</span>
+        <span class="lang-zh">凡是無法確認的地方，這個 plugin <strong>拒絕該操作</strong>，而不是自行推測。無法確認卻仍然推測的 storage plugin，比明確拒絕的更糟。</span>
     </div>
 
     <p>

@@ -305,9 +305,20 @@ img { max-width: 100%; height: auto; display: block; }
 .content-wrap { max-width: none; padding: 0; margin: 0; }
 
 .doc-section {
-    padding: 56px calc((100% - var(--content-w)) / 2);
     padding-top: 56px;
     padding-bottom: 56px;
+    /* A gutter that cannot vanish.
+     *
+     * This was `calc((100% - var(--content-w)) / 2)`, which goes NEGATIVE as soon
+     * as the section is narrower than 920px — and the section is the viewport
+     * minus the 272px sidebar, not the viewport, so that happens at about 1190px
+     * of browser width. A negative length makes the whole `padding` shorthand
+     * invalid, so the horizontal padding was not reduced, it was DROPPED: text and
+     * tables ran flush into both edges. The media queries below could not save it
+     * because they trigger on the viewport, several hundred pixels later.
+     */
+    padding-left:  max(28px, (100% - var(--content-w)) / 2);
+    padding-right: max(28px, (100% - var(--content-w)) / 2);
     min-height: 0;
 }
 @media (max-width: 1024px) {
