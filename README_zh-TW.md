@@ -1,10 +1,37 @@
 # jt-pve-storage-synology
 
-透過 iSCSI 連接 Synology NAS 的 Proxmox VE 儲存 plugin。**一顆 VM 磁碟就是 NAS 上一個精簡配置 LUN**，所以 DSM 自己的快照、複本與容量都作用在操作者心裡想的那個單位上——沒有 LVM 夾層，也不把一個共用 LUN 在本機切開。
+**讓 Proxmox VE 直接把 Synology SAN Manager 當成 VM 儲存後端。**
+
+每一顆 Proxmox VE VM 磁碟，直接對應 Synology NAS 上的一個 thin LUN。因此 VM 的建立、刪除、擴充、Clone、Snapshot 與 Rollback，都可以直接操作 NAS 原生的 LUN 能力，而不是先建立一個大型共用 LUN，再交給 PVE 用 LVM 切割。
+
+**沒有額外的 LVM 儲存層，也不需要手動管理 LUN。**
+
+支援 PVE 8 / 9、Shared Storage、Live Migration、Snapshot / Rollback、Clone、Backup / Restore 與 Multipath。
 
 [English](README.md) · [繁體中文](README_zh-TW.md) · **[文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh)**
 
 ---
+
+## 支援的 Proxmox VE 操作
+
+每一列都在實機上、從網頁介面和指令列各跑過一次。兩列不是「可以」的，直接寫出來。
+
+| 操作 | 狀態 |
+|---|---|
+| 建立、移除 VM 磁碟 | ✓ |
+| 擴充容量 | ✓ |
+| 快照、倒回 | ✓ |
+| 含記憶體的快照 | ✓ |
+| 完整複製 | ✓ |
+| 連結複製 | ✓ |
+| 轉換為範本 | ✓ |
+| 即時遷移、離線遷移 | ✓ |
+| 備份、還原，三種 `vzdump` 模式 | ✓ |
+| 把磁碟搬到其他 storage 型別 | ✓ |
+| 多重路徑，含路徑故障 | ✓ |
+| CHAP 驗證 | ✓ |
+| 從**快照**做完整複製 | 直接拒絕。Synology LUN 在快照上沒有可讀取的裝置，PVE 會做到一半才失敗。請用連結複製，或先把來源轉成範本 |
+| LXC 容器 | 有宣告，但沒有測過。上面每一項都是用虛擬機量測的 |
 
 > ### 狀態：**它已經在正式環境的叢集上運作。**
 >

@@ -421,6 +421,73 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* ============================================================
+   Hero capability line, measured-number cards, verified/not split
+   ============================================================ */
+
+/* The one line that answers "what does it do" before any prose. */
+.hero__caps {
+    font-size: 0.86rem;
+    color: rgba(255,255,255,0.82);
+    margin-bottom: 22px;
+    line-height: 1.7;
+}
+
+/* The measured numbers, above the prose that explains them: a reader deciding
+   whether to try this wants the evidence before the narrative. */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+    margin: 4px 0 20px;
+}
+.stat {
+    background: var(--surface-0);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--indigo);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+}
+.stat__value {
+    font-size: 1.5rem; font-weight: 700;
+    color: var(--navy); line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+}
+.stat__label {
+    font-size: 0.78rem; color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Verified and not verified, side by side and the same size, so neither half
+   is easier to skip than the other. */
+.split-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 14px;
+    margin: 14px 0 16px;
+}
+.split-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px 8px;
+    background: var(--surface-0);
+}
+.split-card--yes { border-top: 3px solid var(--green); }
+.split-card--no  { border-top: 3px solid var(--amber); }
+.split-card__head {
+    font-size: 0.86rem; font-weight: 700;
+    color: var(--navy); margin-bottom: 8px;
+}
+.split-card ul { margin: 0 0 8px 18px; }
+.split-card li { font-size: 0.84rem; line-height: 1.6; margin-bottom: 5px; }
+
+/* A yes in the operations table is a mark, not a sentence. */
+td.yes {
+    color: var(--green); font-weight: 700;
+    font-size: 1rem; text-align: center; width: 12%;
+}
+
+/* ============================================================
    Tables
    ============================================================ */
 .table-wrap {

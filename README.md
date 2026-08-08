@@ -1,13 +1,42 @@
 # jt-pve-storage-synology
 
-A Proxmox VE storage plugin for Synology NAS over iSCSI. One VM disk is one
-thin LUN on the NAS, so DSM's own snapshots, clones and capacity act on the
-unit an operator actually thinks about — no LVM layer, no shared LUN carved up
-locally.
+**Proxmox VE uses Synology SAN Manager directly as its VM storage back end.**
+
+Every Proxmox VE VM disk maps to one thin LUN on the Synology NAS. So
+creating, removing, resizing, cloning, snapshotting and rolling back a VM all
+drive the NAS's own LUN features, instead of carving one large shared LUN up
+with LVM on the PVE side.
+
+**No extra LVM storage layer, and no LUNs to manage by hand.**
+
+PVE 8 / 9 · Shared Storage · Live Migration · Snapshot / Rollback · Clone ·
+Backup / Restore · Multipath.
 
 [English](README.md) · [繁體中文](README_zh-TW.md) · **[Documentation site](https://jasoncheng7115.github.io/jt-pve-storage-synology/)**
 
 ---
+
+## Which Proxmox VE operations work
+
+Every row was driven on real hardware, from the web interface and from the
+command line. The two rows that are not a yes say so.
+
+| Operation | State |
+|---|---|
+| Create and remove a VM disk | ✓ |
+| Resize | ✓ |
+| Snapshot and rollback | ✓ |
+| A snapshot including memory | ✓ |
+| Full clone | ✓ |
+| Linked clone | ✓ |
+| Convert to a template | ✓ |
+| Live migration and offline migration | ✓ |
+| Backup and restore, all three `vzdump` modes | ✓ |
+| Moving a disk to another storage type | ✓ |
+| Multipath, through a path failure | ✓ |
+| CHAP | ✓ |
+| Full clone *from a snapshot* | Refused up front. A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first |
+| LXC containers | Declared, never tested. Everything above was measured with virtual machines |
 
 > ### Status: **it is running on a production cluster.**
 >

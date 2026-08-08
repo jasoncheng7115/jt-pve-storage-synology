@@ -70,23 +70,23 @@
             <span class="lang-en">Start here</span><span class="lang-zh">從這裡開始</span>
         </div>
         <a href="#hero" class="sidebar__link"><span class="lang-en">Overview</span><span class="lang-zh">概覽</span></a>
-        <a href="#status" class="sidebar__link"><span class="lang-en">Status &amp; risk</span><span class="lang-zh">狀態與風險</span></a>
-        <a href="#why" class="sidebar__link"><span class="lang-en">Why this is awkward</span><span class="lang-zh">技術上的難處</span></a>
+        <a href="#features" class="sidebar__link"><span class="lang-en">Which operations work</span><span class="lang-zh">支援的操作</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
             <span class="lang-en">What has been measured</span><span class="lang-zh">實測結果</span>
         </div>
-        <a href="#verified" class="sidebar__link"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></a>
+        <a href="#verified" class="sidebar__link"><span class="lang-en">Measured on hardware</span><span class="lang-zh">實機驗證</span></a>
         <a href="#rollback" class="sidebar__link"><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照倒回</span></a>
+        <a href="#status" class="sidebar__link"><span class="lang-en">Verified and not verified</span><span class="lang-zh">目前的驗證狀態</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
             <span class="lang-en">Before you start</span><span class="lang-zh">開始之前</span>
         </div>
+        <a href="#limits" class="sidebar__link"><span class="lang-en">The LUN ceiling</span><span class="lang-zh">LUN 數量上限</span></a>
         <a href="#requirements" class="sidebar__link"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></a>
         <a href="#account" class="sidebar__link"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></a>
-        <a href="#limits" class="sidebar__link"><span class="lang-en">The LUN ceiling</span><span class="lang-zh">LUN 數量上限</span></a>
         <a href="#ha" class="sidebar__link"><span class="lang-en">HA &amp; dual controllers</span><span class="lang-zh">HA 與雙控制器</span></a>
     </div>
     <div class="sidebar__section">
@@ -98,6 +98,12 @@
         <a href="#reap" class="sidebar__link"><span class="lang-en">The cleanup tool</span><span class="lang-zh">清理工具</span></a>
         <a href="#probe" class="sidebar__link"><span class="lang-en">The discovery tool</span><span class="lang-zh">探索工具</span></a>
         <a href="#trouble" class="sidebar__link"><span class="lang-en">When something goes wrong</span><span class="lang-zh">故障處理</span></a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Going deeper</span><span class="lang-zh">深入了解</span>
+        </div>
+        <a href="#why" class="sidebar__link"><span class="lang-en">Why hardware verification</span><span class="lang-zh">為什麼需要實機驗證</span></a>
     </div>
     <div class="sidebar__section">
         <div class="sidebar__heading">
@@ -122,12 +128,16 @@
         <div class="hero__badge">v0.9.2 <span class="hero__badge-sep">·</span> MIT</div>
         <h1 class="hero__title">jt-pve-storage-synology</h1>
         <p class="hero__subtitle">
-            <span class="lang-en">A Proxmox VE storage plugin for Synology NAS over iSCSI.</span>
-            <span class="lang-zh">透過 iSCSI 連接 Synology NAS 的 Proxmox VE 儲存 plugin。</span>
+            <span class="lang-en">Proxmox VE uses Synology SAN Manager directly as its VM storage back end.</span>
+            <span class="lang-zh">讓 Proxmox VE 直接把 Synology SAN Manager 當成 VM 儲存後端。</span>
         </p>
         <p class="hero__project-desc">
-            <span class="lang-en">One VM disk is one thin LUN on the NAS, so DSM's own snapshots, clones and capacity act on the unit an operator actually thinks about —no LVM layer, and no shared LUN carved up locally.</span>
-            <span class="lang-zh">一顆 VM 磁碟就是 NAS 上一個精簡配置 LUN，所以 DSM 自己的快照、複本與容量都作用在操作者心裡想的那個單位上，沒有 LVM 夾層，也不把一個共用 LUN 在本機切開。</span>
+            <span class="lang-en">Every Proxmox VE VM disk maps to one thin LUN on the Synology NAS. So creating, removing, resizing, cloning, snapshotting and rolling back a VM all drive the NAS's own LUN features, instead of carving one large shared LUN up with LVM on the PVE side. <strong>No extra LVM storage layer, and no LUNs to manage by hand.</strong></span>
+            <span class="lang-zh">每一顆 Proxmox VE VM 磁碟，直接對應 Synology NAS 上的一個 thin LUN。因此 VM 的建立、刪除、擴充、Clone、Snapshot 與 Rollback，都可以直接操作 NAS 原生的 LUN 能力，而不是先建立一個大型共用 LUN，再交給 PVE 用 LVM 切割。<strong>沒有額外的 LVM 儲存層，也不需要手動管理 LUN。</strong></span>
+        </p>
+        <p class="hero__caps">
+            <span class="lang-en">PVE 8 / 9 · Shared Storage · Live Migration · Snapshot / Rollback · Clone · Backup / Restore · Multipath</span>
+            <span class="lang-zh">支援 PVE 8 / 9、Shared Storage、Live Migration、Snapshot / Rollback、Clone、Backup / Restore 與 Multipath。</span>
         </p>
         <div class="hero__actions">
             <a href="#install" class="btn btn--primary"><span class="lang-en">Installation guide</span><span class="lang-zh">安裝指南</span></a>
@@ -139,53 +149,77 @@
 </section>
 
 <div class="content-wrap">
-
-<section class="doc-section" id="status">
-    <h2 class="section-title"><span class="lang-en">Status and risk</span><span class="lang-zh">狀態與風險</span></h2>
-
-    <details class="alert alert--warning">
-        <summary><strong><span class="lang-en">It is running on a production cluster.</span><span class="lang-zh">它已經在正式環境的叢集上運作。</span></strong></summary>
-        <span class="lang-en"><strong>Driven on hardware:</strong> a guest booting from the NAS, backups in all three <code>vzdump</code> modes restored byte-identical, live migration across five nodes, and two-portal multipath through a path failure —<strong>60 reads, 0 failures</strong>. A crashed node's LUN was taken over by a surviving node in <strong>3.6&nbsp;s</strong>. A whole-NAS outage left the nodes untouched: nothing in uninterruptible sleep, every other storage still active.</span>
-        <span class="lang-zh"><strong>已在實機上跑過：</strong>guest 從 NAS 開機、三種 <code>vzdump</code> 模式備份還原後位元組完全相同、跨五個節點即時遷移，以及雙 portal multipath 撐過一次路徑故障：<strong>60 次讀取，0 次失敗</strong>。節點當掉時，存活節點在 <strong>3.6&nbsp;秒</strong>內接手它的 LUN。整台 NAS 中斷時，節點毫髮無傷：沒有行程卡在不可中斷睡眠，其他 storage 全部照常。</span>
-        <span class="lang-en"><strong>Two models, three DSM versions:</strong> a DS918+ carried from 7.1.1 across an upgrade to <strong>7.4.1</strong> with every LUN uuid intact, and a DS925+ on <strong>7.3.2</strong> end to end.</span>
-        <span class="lang-zh"><strong>兩個機型、三個 DSM 版本：</strong>DS918+ 從 7.1.1 升到 <strong>7.4.1</strong>，全部 LUN uuid 完好；DS925+ 在 <strong>7.3.2</strong> 上完整跑過一輪。</span>
-        <span class="lang-en"><strong>Still honest to say:</strong> no Synology HA or dual-controller chassis has been near it, and the DSM account must be an administrator because DSM offers nothing narrower. Running it found about <strong>thirty</strong> defects that reading never would, so assume there are more. Where something cannot be established the plugin <strong>refuses</strong> rather than guesses. What is and is not verified is listed in the <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#not-verified">test record</a>.</span>
-        <span class="lang-zh"><strong>還是要老實說：</strong>沒有任何 Synology HA 或雙控制器機箱測過，而 DSM 帳號必須是管理員，因為 DSM 沒有更小的選項。實際跑起來找到大約<strong>三十個</strong>讀程式碼永遠讀不出來的缺陷，所以請假設還有。凡是無法確認的，plugin 一律<strong>拒絕</strong>，不猜。哪些驗證過、哪些沒有，列在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#尚未驗證">驗證紀錄</a>。</span>
-    </details>
-
-    <div class="alert alert--warning">
-        <strong><span class="lang-en">Start with a non-critical system</span><span class="lang-zh">建議先從非核心系統開始測試</span></strong>
-        <span class="lang-en">Everything above was measured, and none of it replaces your own hardware and your own DSM version. Begin with a non-critical guest: take a snapshot, roll it back, run a backup, and let it run for a few days before you move anything important onto it. Two models and three DSM versions is a small sample of what Synology sells.</span>
-        <span class="lang-zh">上面每一項都是量測出來的，但那都不能取代你自己的硬體和你自己的 DSM 版本。請先用一台非核心的 guest 開始：拍一次快照、倒回一次、跑一次備份，讓它運行幾天，再把重要的東西搬上來。兩個機型、三個 DSM 版本，對照 Synology 賣的機型數量只是很小的樣本。</span>
-    </div>
-
-    <p>
-        <span class="lang-en">It is public because the discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers —and because the record of what is and is not known about that API is worth reading before trusting any plugin built on it, including this one.</span>
-        <span class="lang-zh">會公開，是因為探索工具本身就對想知道自己的 DSM 的 SAN API 提供什麼的人有用；也因為那份「哪些知道、哪些不知道」的紀錄，值得在信任任何建立在它之上的 plugin 之前先讀，包括這一個。</span>
+<section class="doc-section" id="features">
+    <h2 class="section-title"><span class="lang-en">Which Proxmox VE operations work</span><span class="lang-zh">支援的 Proxmox VE 操作</span></h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Every row was driven on real hardware, from the web interface and from the command line. The two rows that are not a yes say so.</span>
+        <span class="lang-zh">每一列都在實機上、從網頁介面和指令列各跑過一次。兩列不是「可以」的，直接寫出來。</span>
     </p>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th><span class="lang-en">Operation</span><span class="lang-zh">操作</span></th>
+                    <th><span class="lang-en">State</span><span class="lang-zh">狀態</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><span class="lang-en">Create and remove a VM disk</span><span class="lang-zh">建立、移除 VM 磁碟</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Resize</span><span class="lang-zh">擴充容量</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Snapshot and rollback</span><span class="lang-zh">快照、倒回</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">A snapshot including memory</span><span class="lang-zh">含記憶體的快照</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Full clone</span><span class="lang-zh">完整複製</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Linked clone</span><span class="lang-zh">連結複製</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Convert to a template</span><span class="lang-zh">轉換為範本</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Live migration and offline migration</span><span class="lang-zh">即時遷移、離線遷移</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Backup and restore, all three <code>vzdump</code> modes</span><span class="lang-zh">備份、還原，三種 <code>vzdump</code> 模式</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Moving a disk to another storage type</span><span class="lang-zh">把磁碟搬到其他 storage 型別</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">Multipath, through a path failure</span><span class="lang-zh">多重路徑，含路徑故障</span></td><td class="yes">&#10003;</td></tr>
+                <tr><td><span class="lang-en">CHAP</span><span class="lang-zh">CHAP 驗證</span></td><td class="yes">&#10003;</td></tr>
+                <tr>
+                    <td><span class="lang-en">Full clone <em>from a snapshot</em></span><span class="lang-zh">從<strong>快照</strong>做完整複製</span></td>
+                    <td><span class="lang-en">Refused up front. A Synology LUN has no readable device at a snapshot, so PVE would fail partway through. Use a linked clone, or convert the source to a template first.</span><span class="lang-zh">直接拒絕。Synology LUN 在快照上沒有可讀取的裝置，PVE 會做到一半才失敗。請用連結複製，或先把來源轉成範本。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">LXC containers</span><span class="lang-zh">LXC 容器</span></td>
+                    <td><span class="lang-en">Declared, never tested. Everything above was measured with virtual machines.</span><span class="lang-zh">有宣告，但沒有測過。上面每一項都是用虛擬機量測的。</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </section>
 
-<section class="doc-section doc-section--accent" id="why">
-    <h2 class="section-title"><span class="lang-en">Why this is awkward</span><span class="lang-zh">技術上的難處</span></h2>
-
-    <p>
-        <span class="lang-en">Synology publishes no specification for the SAN Manager Web API. The only official document covers logging in and discovering APIs —it documents no LUN, target, mapping or snapshot call at all. So every array-facing fact in this plugin had to be established against real hardware, and cross-checked against the two implementations that talk to that API in production: Synology's own CSI driver and OpenStack Cinder's Synology driver. Where those two differed, the NAS decided.</span>
-        <span class="lang-zh">Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件只涵蓋登入與 API 探索，完全沒有記載任何 LUN、target、對應或快照的呼叫。所以這個 plugin 每一項對儲存伺服器的認知，都必須在實機上確認，並與兩份在生產環境使用該 API 的實作互相對照：Synology 官方的 CSI driver，以及 OpenStack Cinder 的 Synology driver。兩份不一致的地方，由 NAS 決定。</span>
-    </p>
-
-    <div class="alert alert--info">
-        <span class="lang-en">Where nothing could be established, this plugin <strong>refuses the operation</strong> rather than guessing. A storage plugin that quietly guesses is worse than one that says no.</span>
-        <span class="lang-zh">凡是無法確認的地方，這個 plugin <strong>拒絕該操作</strong>，而不是猜。一個會默默猜測的 storage plugin 比一個會說不的更糟。</span>
-    </div>
-
-    <p>
-        <span class="lang-en">Only protocol facts are taken from those projects —API names, method names, parameters, error codes. No code is derived from either; this is Perl and its structure is its own.</span>
-        <span class="lang-zh">從那兩個專案取用的只有協定事實：API 名稱、方法名稱、參數、錯誤碼。沒有任何程式碼衍生自它們；本專案是 Perl，結構是自己的。</span>
-    </p>
-</section>
 
 <section class="doc-section" id="verified">
-    <h2 class="section-title"><span class="lang-en">Verified on hardware</span><span class="lang-zh">實機已驗證</span></h2>
+    <h2 class="section-title"><span class="lang-en">Measured on hardware, not just called through an API</span><span class="lang-zh">實機驗證過，不只是 API 呼叫得通</span></h2>
+    <div class="stat-grid">
+        <div class="stat">
+            <div class="stat__value">5</div>
+            <div class="stat__label"><span class="lang-en">node production cluster, live migration across all of them</span><span class="lang-zh">節點的正式叢集，跨全部節點即時遷移</span></div>
+        </div>
+        <div class="stat">
+            <div class="stat__value">3.6 s</div>
+            <div class="stat__label"><span class="lang-en">for a surviving node to take over a crashed node's LUN, data intact</span><span class="lang-zh">存活節點接手當掉節點的 LUN，資料完整</span></div>
+        </div>
+        <div class="stat">
+            <div class="stat__value">60 / 0</div>
+            <div class="stat__label"><span class="lang-en">reads and failures through a multipath path failure</span><span class="lang-zh">多重路徑故障期間的讀取次數與失敗次數</span></div>
+        </div>
+        <div class="stat">
+            <div class="stat__value">3</div>
+            <div class="stat__label"><span class="lang-en"><code>vzdump</code> modes, every restore byte-identical</span><span class="lang-zh">種 <code>vzdump</code> 模式，每次還原都位元組相同</span></div>
+        </div>
+        <div class="stat">
+            <div class="stat__value">2 &times; 3</div>
+            <div class="stat__label"><span class="lang-en">models and DSM versions: DS918+ on 7.1.1 and 7.4.1, DS925+ on 7.3.2</span><span class="lang-zh">個機型、個 DSM 版本：DS918+ 的 7.1.1 與 7.4.1，DS925+ 的 7.3.2</span></div>
+        </div>
+        <div class="stat">
+            <div class="stat__value">0</div>
+            <div class="stat__label"><span class="lang-en">processes left in uninterruptible sleep by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後卡在不可中斷睡眠的行程數</span></div>
+        </div>
+    </div>
+
     <p class="section-subtitle">
         <span class="lang-en">Against a <strong>DS918+</strong> —read-only discovery first, then writes, then a guest, then a five-node cluster with node failures, and finally that NAS carried across a <strong>DSM 7.1.1 &rarr; 7.4.1 upgrade with every LUN uuid intact</strong>. Then a second model and a second DSM version: a <strong>DS925+ on DSM 7.3.2</strong>, driven end to end over a VPN —storage added, LUN and target created, guest booted, snapshot, rollback, and the storage removed leaving nothing behind on either side. Full detail in the register.</span>
         <span class="lang-zh">對一台 <strong>DS918+</strong>：先唯讀探索，然後寫入，然後一台 guest，然後一個五節點叢集加上節點故障，最後那台 NAS 還帶著<strong>全部 LUN uuid 完好地跨過 DSM 7.1.1 → 7.4.1 升級</strong>。接著是第二個機型與第二個 DSM 版本：一台 <strong>DS925+，DSM 7.3.2</strong>，透過 VPN 完整跑過一輪：加入 storage、建立 LUN 與 target、guest 開機、快照、倒回，以及移除 storage 之後兩邊都沒有留下東西。完整細節在驗證紀錄裡。</span>
@@ -246,78 +280,59 @@
     </div>
 </section>
 
-<section class="doc-section" id="requirements">
-    <h2 class="section-title"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></h2>
-
-    <div class="table-wrap">
-    <table>
-        <tbody>
-        <tr>
-            <td><strong>DSM</strong></td>
-            <td><span class="lang-en"><strong>7.0 or later</strong>. <strong>7.1.1</strong>, <strong>7.3.2</strong> and <strong>7.4.1</strong> are verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，已驗證 <strong>7.1.1</strong>、<strong>7.3.2</strong> 與 <strong>7.4.1</strong>。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs，而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
-        </tr>
-        <tr>
-            <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
-            <td><span class="lang-en"><strong>Btrfs.</strong> Snapshots exist only for a thin LUN on Btrfs, so an ext4 volume is refused when the storage is added rather than failing at the first snapshot</span><span class="lang-zh"><strong>Btrfs。</strong>快照只存在於 Btrfs 上的精簡 LUN，所以 ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗</span></td>
-        </tr>
-        <tr>
-            <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
-            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> —and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>，而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
-        </tr>
-        <tr>
-            <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
-            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused —DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕：DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
-        </tr>
-        <tr>
-            <td><strong>Proxmox VE</strong></td>
-            <td><span class="lang-en">8.x / 9.x. The storage API version is negotiated against the node, never hardcoded</span><span class="lang-zh">8.x／9.x。儲存 API 版本是對節點協商出來的，從不寫死</span></td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
-</section>
-
-<section class="doc-section" id="account">
-    <h2 class="section-title"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></h2>
-
+<section class="doc-section" id="status">
+    <h2 class="section-title"><span class="lang-en">What is verified, and what is not</span><span class="lang-zh">目前的驗證狀態</span></h2>
     <p class="section-subtitle">
-        <span class="lang-en">Create a dedicated account for the plugin. It has to be in <code>administrators</code>, and everything else can be taken away.</span>
-        <span class="lang-zh">為這個 plugin 建立一個專用帳號。它必須在 <code>administrators</code> 群組裡，而其他一切都可以拿掉。</span>
+        <span class="lang-en">The same list in both directions, so neither half is easier to find than the other.</span>
+        <span class="lang-zh">兩個方向都列出來，哪一半都不會比另一半難找。</span>
     </p>
 
-    <pre><code><span class="comment"># DSM → Control Panel → User &amp; Group → Create</span>
-<span class="cmd">Name</span>              pve-storage        <span class="comment"># this is what --syno-username gets</span>
-<span class="cmd">Groups</span>            <span class="string">administrators</span>     <span class="comment"># REQUIRED — DSM has nothing smaller, see below</span>
-<span class="cmd">Shared folders</span>    No access          <span class="comment"># to every one of them</span>
-<span class="cmd">Home folder</span>       not created
-<span class="cmd">Applications</span>      Deny all except <span class="string">DSM</span>   <span class="comment"># the API logs in through DSM itself</span>
-<span class="cmd">Quota</span>             none
-<span class="cmd">Speed limit</span>       none
-<span class="cmd">2FA</span>               optional           <span class="comment"># the plugin can carry the device token</span>
+    <div class="split-grid">
+        <div class="split-card split-card--yes">
+            <div class="split-card__head"><span class="lang-en">Verified on hardware</span><span class="lang-zh">已在實機驗證</span></div>
+            <ul>
+                <li><span class="lang-en">A guest booting from the NAS, on a production five-node cluster</span><span class="lang-zh">guest 從 NAS 開機，在一個五節點的正式叢集上</span></li>
+                <li><span class="lang-en">Live migration and offline migration</span><span class="lang-zh">即時遷移與離線遷移</span></li>
+                <li><span class="lang-en">Snapshot and rollback, confirmed at the block level</span><span class="lang-zh">快照與倒回，在 block 層確認過</span></li>
+                <li><span class="lang-en">Backup and restore in all three <code>vzdump</code> modes</span><span class="lang-zh">三種 <code>vzdump</code> 模式的備份與還原</span></li>
+                <li><span class="lang-en">Multipath through a path failure</span><span class="lang-zh">多重路徑撐過路徑故障</span></li>
+                <li><span class="lang-en">A crashed node's LUN taken over by a surviving node</span><span class="lang-zh">節點當機後由存活節點接手 LUN</span></li>
+                <li><span class="lang-en">A whole-NAS outage, with the nodes and every other storage unaffected</span><span class="lang-zh">整台 NAS 中斷，節點和其他 storage 都不受影響</span></li>
+                <li><span class="lang-en">A DSM upgrade across it, 7.1.1 to 7.4.1, every LUN uuid intact</span><span class="lang-zh">中途跨過一次 DSM 升級，7.1.1 到 7.4.1，全部 LUN uuid 完好</span></li>
+            </ul>
+        </div>
+        <div class="split-card split-card--no">
+            <div class="split-card__head"><span class="lang-en">Not verified, and known limits</span><span class="lang-zh">尚未驗證，以及已知的限制</span></div>
+            <ul>
+                <li><span class="lang-en">Synology HA has never been tested; no such pair has been near this</span><span class="lang-zh">Synology HA 沒有測過，手上從來沒有這種機器</span></li>
+                <li><span class="lang-en">A UC dual-controller chassis has never been tested either. It is supported by design, and the plugin warns when it detects one</span><span class="lang-zh">UC 雙控制器機箱也沒有測過。設計上支援，plugin 偵測到會發出警告</span></li>
+                <li><span class="lang-en">The DSM account must be in <code>administrators</code>, because DSM offers nothing narrower</span><span class="lang-zh">DSM 帳號必須屬於 <code>administrators</code>，因為 DSM 沒有更小的選項</span></li>
+                <li><span class="lang-en">LXC containers are declared but were never tested</span><span class="lang-zh">LXC 容器有宣告，但沒有測過</span></li>
+                <li><span class="lang-en">Two models out of everything Synology sells is a small sample</span><span class="lang-zh">兩個機型，對照 Synology 賣的機型數量是很小的樣本</span></li>
+                <li><span class="lang-en">Running it found about thirty defects that reading the code never would, so assume there are more</span><span class="lang-zh">實際跑起來找到大約三十個讀程式碼讀不出來的缺陷，所以請假設還有</span></li>
+            </ul>
+        </div>
+    </div>
 
-<span class="comment"># then, still in Control Panel</span>
-<span class="cmd">Security</span> → Firewall   allow the DSM port only from your PVE node addresses
-<span class="cmd">Security</span> → Account    leave <span class="string">Auto Block</span> on — the plugin is written not to trip it</code></pre>
-
-
-    <p>
-        <span class="lang-en">Never the built-in <code>admin</code>. And one thing DSM will not let you narrow, worth knowing before you plan the NAS's network: <strong>there is no "manage LUNs" privilege</strong> —no SAN operator role, and SAN Manager is not in the per-user Applications list— so the account must be an administrator. Everything else can still be taken away, and should be: every shared folder, every application but DSM, every address that is not a PVE node. A leaked credential then cannot read your files over SMB.</span>
-        <span class="lang-zh">絕對不要用內建的 <code>admin</code>。而且在規劃 NAS 的網路之前，有一件 DSM 不讓你收窄的事最好先知道：<strong>沒有「管理 LUN」這種權限</strong>（沒有 SAN 操作員角色，應用程式權限清單裡也沒有 SAN Manager）所以帳號必須是管理員。其他一切仍然拿得掉，也應該拿掉：每一個共用資料夾、除 DSM 以外的每一個應用程式、每一個不屬於 PVE 節點的位址。這樣一組洩漏的憑證就翻不了你的檔案。</span>
+    <p class="muted">
+        <span class="lang-en">Item by item, with what was measured and what was not: <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING.md#not-verified">the test record</a>.</span>
+        <span class="lang-zh">逐項的量測結果，以及哪些還沒有量測過，都在<a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/blob/main/docs/TESTING_zh-TW.md#尚未驗證">驗證紀錄</a>裡。</span>
     </p>
 
-    <div class="alert alert--info">
-        <strong><span class="lang-en">Read from DSM, not assumed</span><span class="lang-zh">這是讀 DSM 得到的，不是猜的</span></strong>
-        <span class="lang-en">On 7.1.1 there are three groups and none is iSCSI-specific; an account outside <code>administrators</code> is refused <strong>at login</strong> with <strong>402</strong>. On 7.4.1 the account's <strong>Applications</strong> tab lists twenty applications and <strong>not one is SAN Manager</strong>.</span>
-        <span class="lang-zh">7.1.1 上只有三個群組，沒有一個是 iSCSI 專用的；不在 <code>administrators</code> 裡的帳號在<strong>登入</strong>就被 <strong>402</strong> 拒絕。7.4.1 上那個帳號的<strong>應用程式</strong>分頁列出二十個應用程式，<strong>沒有一項是 SAN Manager</strong>。</span>
+    <div class="alert alert--warning">
+        <strong><span class="lang-en">Start with a non-critical system</span><span class="lang-zh">建議先從非核心系統開始測試</span></strong>
+        <span class="lang-en">Everything above was measured, and none of it replaces your own hardware and your own DSM version. Begin with a non-critical guest: take a snapshot, roll it back, run a backup, and let it run for a few days before you move anything important onto it. Two models and three DSM versions is a small sample of what Synology sells.</span>
+        <span class="lang-zh">上面每一項都是量測出來的，但那都不能取代你自己的硬體和你自己的 DSM 版本。請先用一台非核心的 guest 開始：拍一次快照、倒回一次、跑一次備份，讓它運行幾天，再把重要的東西搬上來。兩個機型、三個 DSM 版本，對照 Synology 賣的機型數量只是很小的樣本。</span>
     </div>
 
     <p>
-        <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
+        <span class="lang-en">It is public because the discovery tool is useful on its own to anyone who wants to know what their DSM's SAN API offers —and because the record of what is and is not known about that API is worth reading before trusting any plugin built on it, including this one.</span>
+        <span class="lang-zh">會公開，是因為探索工具本身就對想知道自己的 DSM 的 SAN API 提供什麼的人有用；也因為那份「哪些知道、哪些不知道」的紀錄，值得在信任任何建立在它之上的 plugin 之前先讀，包括這一個。</span>
     </p>
 </section>
 
-<section class="doc-section" id="limits">
-    <h2 class="section-title"><span class="lang-en">The LUN ceiling, and what happens when you reach it</span><span class="lang-zh">LUN 數量上限，以及達到上限時的行為</span></h2>
+<section class="doc-section doc-section--accent" id="limits">
+    <h2 class="section-title"><span class="lang-en">Read before you deploy: the LUN ceiling, and what happens when you reach it</span><span class="lang-zh">部署前必讀：LUN 數量上限，以及達到上限時的行為</span></h2>
     <p class="section-subtitle">
         <span class="lang-en">One VM disk is one LUN, so this is a real capacity limit —and on some models it is very small.</span>
         <span class="lang-zh">一顆 VM 磁碟就是一個 LUN，所以這是實實在在的容量限制，而在某些機型上它非常小。</span>
@@ -403,6 +418,76 @@
         <span class="lang-en">A DS918+ and a DS925+ both publish <code>max_snapshot_per_lun</code> <strong>256</strong> and <code>max_snapshot_per_lun_v2</code> <strong>128</strong> —the identical pair, so it is not a quirk of one model. Which one DSM enforces cannot be read out of the API; it would take a 129th snapshot on one LUN to find out. The plugin therefore guards at the <strong>lower</strong> one, because a guard that lets the storage server refuse first has failed at its only job. If you are refused at 128 the message names both numbers. The ceiling is also <strong>shared with any snapshot schedule you set in SAN Manager</strong>, and those count.</span>
         <span class="lang-zh">DS918+ 與 DS925+ 都公布 <code>max_snapshot_per_lun</code> <strong>256</strong> 與 <code>max_snapshot_per_lun_v2</code> <strong>128</strong>，一模一樣的一對，所以這不是某個機型的怪癖。DSM 實際執行哪一個，從 API 讀不出來；要在同一顆 LUN 上拍到第 129 張才知道。因此 plugin 守在<strong>較小</strong>的那個，因為一道讓儲存伺服器先拒絕的守門，等於沒有做到它唯一的工作。如果你在 128 被拒絕，訊息會把兩個數字都寫出來。這個上限也<strong>和你在 SAN Manager 裡設的快照排程共用</strong>，那些也算在內。</span>
     </div>
+</section>
+
+<section class="doc-section" id="requirements">
+    <h2 class="section-title"><span class="lang-en">Requirements</span><span class="lang-zh">系統需求</span></h2>
+
+    <div class="table-wrap">
+    <table>
+        <tbody>
+        <tr>
+            <td><strong>DSM</strong></td>
+            <td><span class="lang-en"><strong>7.0 or later</strong>. <strong>7.1.1</strong>, <strong>7.3.2</strong> and <strong>7.4.1</strong> are verified. Dual-controller DSM UC is <strong>refused</strong>, not approximated. The version is a floor, not the decision: the capability gates, the advertised API set and a Btrfs volume are what actually decide, and <strong>Btrfs support is model-dependent</strong> —an entry-level NAS on 7.2 may still be unusable</span><span class="lang-zh"><strong>7.0 以上</strong>，已驗證 <strong>7.1.1</strong>、<strong>7.3.2</strong> 與 <strong>7.4.1</strong>。雙控制器的 DSM UC 會被<strong>拒絕</strong>，不會假裝支援。版本號只是門檻不是判準：真正決定的是能力閘門、公佈的 API 範圍，以及儲存空間是不是 Btrfs，而 <strong>Btrfs 支援是看機型的</strong>，一台跑 7.2 的入門機仍然可能不能用</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Volume</span><span class="lang-zh">儲存空間</span></strong></td>
+            <td><span class="lang-en"><strong>Btrfs.</strong> Snapshots exist only for a thin LUN on Btrfs, so an ext4 volume is refused when the storage is added rather than failing at the first snapshot</span><span class="lang-zh"><strong>Btrfs。</strong>快照只存在於 Btrfs 上的精簡 LUN，所以 ext4 的儲存空間在加入 storage 時就被拒絕，而不是等到第一次拍快照才失敗</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Model</span><span class="lang-zh">型號</span></strong></td>
+            <td><span class="lang-en">One with iSCSI target support. <strong>The LUN ceiling is per-model and the NAS reports it</strong> —and on a DS425+ or any J/Value model it is <strong>4</strong>, which is four virtual disks for the whole storage</span><span class="lang-zh">支援 iSCSI target 的機型。<strong>LUN 上限是看機型的，而且 NAS 會回報它</strong>，而在 DS425+ 或任何 J／Value 機型上它是 <strong>4</strong>，也就是整個 storage 只有四顆虛擬磁碟</span></td>
+        </tr>
+        <tr>
+            <td><strong><span class="lang-en">Network</span><span class="lang-zh">網路</span></strong></td>
+            <td><span class="lang-en">HTTPS to DSM. Plain HTTP is refused —DSM would accept the login with the password in a URL, and that writes it into the NAS's own access log</span><span class="lang-zh">以 HTTPS 連到 DSM。純 HTTP 一律拒絕：DSM 會接受把密碼放在 URL 裡的登入，而那會把它寫進 NAS 自己的存取記錄</span></td>
+        </tr>
+        <tr>
+            <td><strong>Proxmox VE</strong></td>
+            <td><span class="lang-en">8.x / 9.x. The storage API version is negotiated against the node, never hardcoded</span><span class="lang-zh">8.x／9.x。儲存 API 版本是對節點協商出來的，從不寫死</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+</section>
+
+<section class="doc-section" id="account">
+    <h2 class="section-title"><span class="lang-en">The DSM account</span><span class="lang-zh">DSM 帳號</span></h2>
+
+    <p class="section-subtitle">
+        <span class="lang-en">Create a dedicated account for the plugin. It has to be in <code>administrators</code>, and everything else can be taken away.</span>
+        <span class="lang-zh">為這個 plugin 建立一個專用帳號。它必須在 <code>administrators</code> 群組裡，而其他一切都可以拿掉。</span>
+    </p>
+
+    <pre><code><span class="comment"># DSM → Control Panel → User &amp; Group → Create</span>
+<span class="cmd">Name</span>              pve-storage        <span class="comment"># this is what --syno-username gets</span>
+<span class="cmd">Groups</span>            <span class="string">administrators</span>     <span class="comment"># REQUIRED — DSM has nothing smaller, see below</span>
+<span class="cmd">Shared folders</span>    No access          <span class="comment"># to every one of them</span>
+<span class="cmd">Home folder</span>       not created
+<span class="cmd">Applications</span>      Deny all except <span class="string">DSM</span>   <span class="comment"># the API logs in through DSM itself</span>
+<span class="cmd">Quota</span>             none
+<span class="cmd">Speed limit</span>       none
+<span class="cmd">2FA</span>               optional           <span class="comment"># the plugin can carry the device token</span>
+
+<span class="comment"># then, still in Control Panel</span>
+<span class="cmd">Security</span> → Firewall   allow the DSM port only from your PVE node addresses
+<span class="cmd">Security</span> → Account    leave <span class="string">Auto Block</span> on — the plugin is written not to trip it</code></pre>
+
+
+    <p>
+        <span class="lang-en">Never the built-in <code>admin</code>. And one thing DSM will not let you narrow, worth knowing before you plan the NAS's network: <strong>there is no "manage LUNs" privilege</strong> —no SAN operator role, and SAN Manager is not in the per-user Applications list— so the account must be an administrator. Everything else can still be taken away, and should be: every shared folder, every application but DSM, every address that is not a PVE node. A leaked credential then cannot read your files over SMB.</span>
+        <span class="lang-zh">絕對不要用內建的 <code>admin</code>。而且在規劃 NAS 的網路之前，有一件 DSM 不讓你收窄的事最好先知道：<strong>沒有「管理 LUN」這種權限</strong>（沒有 SAN 操作員角色，應用程式權限清單裡也沒有 SAN Manager）所以帳號必須是管理員。其他一切仍然拿得掉，也應該拿掉：每一個共用資料夾、除 DSM 以外的每一個應用程式、每一個不屬於 PVE 節點的位址。這樣一組洩漏的憑證就翻不了你的檔案。</span>
+    </p>
+
+    <div class="alert alert--info">
+        <strong><span class="lang-en">Read from DSM, not assumed</span><span class="lang-zh">這是讀 DSM 得到的，不是猜的</span></strong>
+        <span class="lang-en">On 7.1.1 there are three groups and none is iSCSI-specific; an account outside <code>administrators</code> is refused <strong>at login</strong> with <strong>402</strong>. On 7.4.1 the account's <strong>Applications</strong> tab lists twenty applications and <strong>not one is SAN Manager</strong>.</span>
+        <span class="lang-zh">7.1.1 上只有三個群組，沒有一個是 iSCSI 專用的；不在 <code>administrators</code> 裡的帳號在<strong>登入</strong>就被 <strong>402</strong> 拒絕。7.4.1 上那個帳號的<strong>應用程式</strong>分頁列出二十個應用程式，<strong>沒有一項是 SAN Manager</strong>。</span>
+    </div>
+
+    <p>
+        <a href="DSM-ACCOUNT.md" class="btn btn--outline"><span class="lang-en">The account, its privileges, Auto Block, 2FA and TLS</span><span class="lang-zh">帳號、權限、自動封鎖、2FA 與 TLS</span></a>
+    </p>
 </section>
 
 <section class="doc-section" id="ha">
@@ -895,6 +980,25 @@
             <span class="lang-zh">兩邊都對。Proxmox VE 用 SI 單位標示，DSM 用二進位單位，而 plugin 是把位元組數原封不動傳過去。百分比會一致，那是最快的檢查點。</span>
         </div>
     </details>
+</section>
+
+<section class="doc-section doc-section--accent" id="why">
+    <h2 class="section-title"><span class="lang-en">Why this plugin had to be verified on hardware</span><span class="lang-zh">為什麼這個 plugin 需要實機驗證</span></h2>
+
+    <p>
+        <span class="lang-en">Synology publishes no specification for the SAN Manager Web API. The only official document covers logging in and discovering APIs —it documents no LUN, target, mapping or snapshot call at all. So every array-facing fact in this plugin had to be established against real hardware, and cross-checked against the two implementations that talk to that API in production: Synology's own CSI driver and OpenStack Cinder's Synology driver. Where those two differed, the NAS decided.</span>
+        <span class="lang-zh">Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件只涵蓋登入與 API 探索，完全沒有記載任何 LUN、target、對應或快照的呼叫。所以這個 plugin 每一項對儲存伺服器的認知，都必須在實機上確認，並與兩份在生產環境使用該 API 的實作互相對照：Synology 官方的 CSI driver，以及 OpenStack Cinder 的 Synology driver。兩份不一致的地方，由 NAS 決定。</span>
+    </p>
+
+    <div class="alert alert--info">
+        <span class="lang-en">Where nothing could be established, this plugin <strong>refuses the operation</strong> rather than guessing. A storage plugin that quietly guesses is worse than one that says no.</span>
+        <span class="lang-zh">凡是無法確認的地方，這個 plugin <strong>拒絕該操作</strong>，而不是猜。一個會默默猜測的 storage plugin 比一個會說不的更糟。</span>
+    </div>
+
+    <p>
+        <span class="lang-en">Only protocol facts are taken from those projects —API names, method names, parameters, error codes. No code is derived from either; this is Perl and its structure is its own.</span>
+        <span class="lang-zh">從那兩個專案取用的只有協定事實：API 名稱、方法名稱、參數、錯誤碼。沒有任何程式碼衍生自它們；本專案是 Perl，結構是自己的。</span>
+    </p>
 </section>
 
 <section class="doc-section" id="roadmap">
