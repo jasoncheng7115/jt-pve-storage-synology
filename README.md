@@ -74,11 +74,8 @@ plugin is most likely to get wrong:
   clone here, and Proxmox VE stops you — it asks the storage, and this one
   correctly says there is nothing to protect.
 
-**Five defects were found by running it, and all five are fixed** — in 0.6.6
-through 0.6.13, each with a test that fails without the fix. Every one had the
-same shape: code that worked when driven from a shell and failed when driven from
-the interface an operator actually uses. The register of what is and is not
-verified is [docs/TESTING.md](docs/TESTING.md).
+Every fix carries a test that fails without it. What is and is not verified is
+recorded in [docs/TESTING.md](docs/TESTING.md).
 
 ## Why this exists, and what makes it awkward
 
@@ -95,9 +92,7 @@ production:
 
 This project's facts come from reading those two **against each other**, and
 then from asking real hardware. That last part matters: the two disagree, and
-where they disagree at least one of them is wrong on any given DSM. On the
-DSM 7.1.1 used for testing, Cinder's way of carrying a session does not work at
-all, and neither client sends the token a DSM with anti-CSRF enabled requires.
+where they differ the NAS decided.
 
 Where nothing could be established, this plugin **refuses the operation**
 rather than guessing. `docs/TESTING.md` is the register of exactly what that
@@ -298,9 +293,8 @@ problems with different answers. **Both are supported.**
 | Closest analogue | Pure Storage's `vir0` | PowerVault ME's two controller addresses |
 
 `syno-portal` takes a list, tried in order and rotated on failure. The rotation
-happens **inside** the login and the request URL is built after it — a related
-project shipped a bug where the URL was built first, so every retry went on
-travelling to the address that had just been found dead.
+happens **inside** the login and the request URL is built after it, so a retry
+goes to the next address rather than the one that just failed.
 
 For a UC chassis the second address does not have to be configured:
 `SYNO.Core.Network.Interface` accepts `relay_node=node0` and `node1`, which
@@ -524,15 +518,7 @@ pve-syno-reap --all --remove                 # every synologysan storage on this
 - **A hard-reset node never runs `deactivate_volume` at all**, so its tracking
   file keeps an entry for a LUN it is no longer attached to. This is what the
   tool is for, and it is still true.
-- **Migration used to be the second reason, and it is not any more.** A VM
-  migrated `pve1 → pve2 → pve3` and destroyed on pve3 once left pve1 and pve2
-  each holding a map for a LUN that no longer existed. Re-measured across two
-  nodes, offline and online, in both directions: the node
-  a VM leaves is left with **no maps, no devices and an empty tracking file**.
-  `vm_stop_cleanup` calls `deactivate_volumes` when the VM stops on the source
-  after the switch, so the source node *is* told. The original measurement
-  predates a fix to `_detach_local`, which used to stop at the first flush and
-  leave a map behind.
+
 
 Neither is dangerous — every consumer re-checks for a device before acting, and
 device identity always comes from the kernel's WWID — but they accumulate. The

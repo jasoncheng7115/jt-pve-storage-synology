@@ -746,3 +746,23 @@ mark.search-hl {
 }
 .muted a { color: var(--text-muted); text-decoration: underline; }
 .muted a:hover { color: var(--text); }
+
+/* A warning callout is collapsed by default: the summary carries the title so the
+   reader still sees what it is about, and the body only appears when asked for.
+   The generic `details` rules above give a neutral surface — these put the alert's
+   own colour back and align the marker with the text rather than with the box. */
+details.alert { padding: 0; }
+details.alert > summary {
+    padding: 12px 14px;
+    color: inherit;
+    font-weight: 600;
+}
+details.alert > summary::before {
+    border-right-color: currentColor;
+    border-bottom-color: currentColor;
+    opacity: 0.55;
+}
+details.alert > summary > strong { font-weight: 600; }
+details.alert > *:not(summary) { padding: 0 14px; }
+details.alert > *:not(summary):last-child { padding-bottom: 12px; }
+details.alert[open] > summary { padding-bottom: 6px; }

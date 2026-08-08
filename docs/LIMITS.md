@@ -68,7 +68,7 @@ had never been checked on a second DSM version until now.
 
 ### There is no discrepancy between the datasheet and the API
 
-This project previously documented one, and was wrong. The test NAS is a DS918+:
+The test NAS is a DS918+:
 
 | Source | Max LUNs | Max targets |
 |---|---|---|

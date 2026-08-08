@@ -38,7 +38,7 @@
 - **兩邊都沒有留下任何東西**。上面全部做完之後，NAS 上有五顆 LUN 與五筆 target 對應，每一筆都對得上一個 VM 設定——沒有孤兒 LUN，沒有失效對應。節點上有五個 multipath map 與五筆追蹤記錄，也對得上。
 - **刪掉範本不會弄壞它的連結複本**。在複本執行中把範本的 LUN 移除，複本照樣跑：DSM 的複製是 reflink，沒有相依關係可以壞。多數 storage 在這裡會失去複本，而 Proxmox VE 會擋住你——它會去問 storage，而這個 storage 正確地回答「沒有東西需要保護」。
 
-**實際運行找出五個缺陷，五個都修好了**——在 0.6.6 到 0.6.13 之間，每一個都附帶一個「拿掉修正就會失敗」的測試。它們的形狀完全一樣：從 shell 驅動時可以動，從操作者真正使用的介面驅動時就壞掉。哪些驗證過、哪些沒有，驗證紀錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)。
+每一個修正都附帶一個「拿掉修正就會失敗」的測試。哪些驗證過、哪些沒有，驗證紀錄在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md)。
 
 ## 為什麼有這個專案，以及技術上的難處
 
@@ -49,7 +49,7 @@ Synology 沒有公開 SAN Manager Web API 的規格。唯一的官方文件—�
 - **Synology 官方的 CSI driver**，[SynologyOpenSource/synology-csi](https://github.com/SynologyOpenSource/synology-csi)（Apache-2.0）
 - **OpenStack Cinder 內建的 Synology driver**，在 [Cinder](https://github.com/openstack/cinder) 的原始碼樹裡（Apache-2.0）
 
-這個專案的事實來自**把這兩份互相對讀**，然後再去問實機。最後那一步很重要：兩份的做法有出入，而只要有出入，在任一台特定的 DSM 上至少有一份是錯的。在用來測試的 DSM 7.1.1 上，**Cinder 帶工作階段的方式完全不能用**，而在開啟防 CSRF 的 DSM 上 **兩份都沒有送 NAS 要求的那個 token**。
+這個專案的事實來自**把這兩份互相對讀**，然後再去問實機。最後那一步很重要：兩份的做法有出入，而不一致的地方由 NAS 決定。
 
 凡是無法確認的地方，這個 plugin **拒絕該操作**，而不是猜。`docs/TESTING_zh-TW.md` 就是那份驗證紀錄，而且它會被誠實地維護。
 
@@ -152,7 +152,7 @@ qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 
 ### 達到上限時會發生什麼
 
-DSM 會乾淨地拒絕——LUN 是 **18990541**、target 是 **18990542**、快照是 **18990543**。什麼都不會壞。但那個拒絕到操作者眼前是「配置失敗」加一個五位數字，而 `pvesm status` 還繼續顯示好幾 TB 可用——因為可用空間不是問題所在，加硬碟也解決不了。
+DSM 會明確拒絕並回報錯誤碼——LUN 是 **18990541**、target 是 **18990542**、快照是 **18990543**。什麼都不會壞。但那個拒絕到操作者眼前是「配置失敗」加一個五位數字，而 `pvesm status` 還繼續顯示好幾 TB 可用——因為可用空間不是問題所在，加硬碟也解決不了。
 
 ### 所以 plugin 會先拒絕
 
@@ -178,7 +178,7 @@ Synology 有兩種都被叫做「HA」的架構，但它們是兩個不同的問
 | 設定方式 | `--syno-portal <叢集 IP>` | `--syno-portal <控制器 A>,<控制器 B>` |
 | 最接近的類比 | Pure Storage 的 `vir0` | PowerVault ME 的兩個控制器位址 |
 
-`syno-portal` 收一份清單，依序嘗試、失敗就輪替。輪替發生在登入**裡面**，而請求的 URL 是在輪替之後才組——相關專案出過一個缺陷：URL 先組好了，所以每次重試都繼續送往剛剛才被判定死掉的那個位址。
+`syno-portal` 收一份清單，依序嘗試、失敗就輪替。輪替發生在登入**裡面**，而請求的 URL 是在輪替之後才組，所以重試會送往下一個位址，不會繼續送往剛剛才失敗的那一個。
 
 UC 機箱的第二個位址不必手動設定：`SYNO.Core.Network.Interface` 接受 `relay_node=node0` 與 `node1`，可以列舉對側控制器的介面。在單控制器的 NAS 上兩者回傳相同的介面，所以這個機制在不需要它的地方是無害的。那些機型上，target 的 `network_portals` 還會帶 `controller_id`，而單控制器的 NAS 完全不回傳這個欄位。
 
@@ -325,7 +325,7 @@ pve-syno-reap --all --remove                 # 本節點上每一個 synologysan
 **節點當機之後請執行它，移除 storage 之前也請在每個節點上執行**。
 
 - **被硬重置的節點根本不會執行 `deactivate_volume`**，所以它的追蹤檔會留著一筆對應「已不再掛載」LUN 的記錄。這是這個工具存在的理由，而且仍然成立。
-- **遷移本來是第二個理由，現在不是了**。一台 VM 從 `pve1 → pve2 → pve3` 遷移後在 pve3 上被銷毀，曾經讓 pve1 和 pve2 各自留著一個對應已不存在 LUN 的 map。在兩個節點上、離線與線上、兩個方向重新量測：VM 離開的那個節點**沒有 map、沒有裝置、追蹤檔是空的**。切換之後 VM 在來源節點停止時，`vm_stop_cleanup` 會呼叫 `deactivate_volumes`，所以來源節點「是」有被通知的。原本那次量測早於 `_detach_local` 的修正——舊版停在第一次 flush，會留下一個正確的卸離不會留下的 map。
+
 
 兩者都不危險——每個使用者在動作之前都會重新檢查裝置，而裝置身分一律來自核心的 WWID——但它們會累積。這個工具絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。
 

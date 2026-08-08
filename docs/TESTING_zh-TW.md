@@ -126,7 +126,7 @@ type 295，VDISK_BLUN，120 GiB —— 一個 Virtual Machine Manager 的虛擬�
 
 ### 建立回報失敗，卻還是把 LUN 建出來了
 
-可穩定重現。名稱剛好 **255 個字元**的 LUN 會被錯誤碼 **18990068** 拒絕——而 LUN 還是被建立了：完整名稱、正確容量、`status: normal`，完全可用。到 256 個字元時拒絕是乾淨的（**18990503**，名稱不合法），什麼都不會建。
+可穩定重現。名稱剛好 **255 個字元**的 LUN 會被錯誤碼 **18990068** 拒絕——而 LUN 還是被建立了：完整名稱、正確容量、`status: normal`，完全可用。到 256 個字元時是明確拒絕（**18990503**，名稱不合法），什麼都不會建。
 
 ```
 建立，255 字元名稱  ->  REFUSED 18990068
@@ -300,7 +300,7 @@ pvesm remove <storage>
 
 它原本也是為了第二種情況而寫，而**那種情況已經重新量測過，不再發生**——見下面「遷移不再留下 map」。
 
-留下來的是一個死掉的工作階段和一個失敗的 map，指向一個已經不存在的 target。無害，但會累積。**要乾淨地移除一個 storage：**
+留下來的是一個死掉的工作階段和一個失敗的 map，指向一個已經不存在的 target。無害，但會累積。**要完整移除一個 storage：**
 
 ```bash
 pvesm set <storage> --disable 1     # 每個節點會在下一次輪詢時停用
@@ -343,11 +343,9 @@ size=1.0G features='1 queue_if_no_path' hwhandler='1 alua' wp=rw
 
 **管理連線中斷不會把資料一起帶走**。只擋 DSM 的 5001 連接埠、放行 3260：storage 回報 `inactive`，節點上其他 storage 不受影響，`pvesm status` 只增加大約一個 `syno-status-timeout` 的時間，警告只出現**一次**而不是每次輪詢都出現，磁碟仍然可讀，而解除封鎖後它自己恢復了。
 
-#### 憑證鎖定原本沒有作用，而查出這件事的代價是一次真實的封鎖
+#### 憑證鎖定
 
-被拒絕的憑證只能試**一次**。那個鎖定原本是一個物件欄位——而 plugin 每次呼叫都建立新的 API 物件，所以它跟著物件一起消失了。三次輪詢就是三次失敗登入。
-
-它現在是 `/run` 底下的一個檔案，而且驗證過了：五次輪詢之中，只有一次真的送到 NAS，另外四次在本地就被拒絕。
+被拒絕的憑證只能試**一次**。它是 `/run` 底下的一個檔案，而且驗證過了：五次輪詢之中，只有一次真的送到 NAS，另外四次在本地就被拒絕。
 
 **但這個測試本身觸發了自動封鎖**，而這件事值得盡可能直白地記下來：
 
@@ -365,7 +363,7 @@ iSCSI 資料路徑：  不受影響——既有工作階段與 I/O 都繼續
 
 | | |
 |---|---|
-| 長度 | 200 字元完全接受。255 會「被拒絕但仍建立」，256 以上乾淨拒絕。200 到 255 之間的確切上限沒有再往下釘，因為這裡沒有任何東西需要那麼長的名稱 |
+| 長度 | 200 字元完全接受。255 會「被拒絕但仍建立」，256 以上明確拒絕。200 到 255 之間的確切上限沒有再往下釘，因為這裡沒有任何東西需要那麼長的名稱 |
 | 合法 | `-` 連字號、`.` 點、`:` 冒號、大寫、數字 |
 | **被拒絕**（18990503）| **`_` 底線**、空格、`+`、`@` |
 
@@ -623,7 +621,7 @@ missing value for required option 'syno-password'
 
 **CHAP 只在 target 被建立時才會套用**。實測：`pvesm set --syno-chap-username` 成功了，下一次啟用沒有拒絕任何事，而 NAS 上那個 target 仍然回報 `auth_type=0`。一個把 CHAP 加到已有 storage 上的管理者，既沒有得到錯誤，也沒有得到存取控制——這比它旁邊那個空密鑰的問題更糟，因為完全沒有任何可以察覺的跡象。現在 `ensure` 會拿儲存伺服器回報的狀態來對照 CHAP，而更新 hook 會把密鑰推送到這個 storage 擁有的**每一個** target，因為在 `per-volume` 模式下每顆磁碟各有一個。
 
-**設定了 CHAP 帳號但沒有密鑰，原本會被接受、只是警告一下**。拒絕必須發生在狀態改變之前，所以現在會拒絕——而 `pvesm set` 完全不會動到設定。
+**設定了 CHAP 帳號但沒有密鑰會被拒絕**。拒絕必須發生在狀態改變之前——而 `pvesm set` 完全不會動到設定。
 
 **在更新 hook 裡拿 `$scfg` 來驗證是錯的**。PVE 會在 hook 回傳**之後**才套用 `$delete`，所以 `$scfg` 仍然帶著管理者正在移除的屬性，而憑證儲存區已經照著刪除做了。`pvesm set --delete syno-chap-username,syno-chap-password` 於是拒絕了自己。現在 hook 會算出「有效設定」——目前的設定，減去刪除，加上新值——也就是 PVE 接下來真的會寫進去的東西。
 
@@ -681,7 +679,7 @@ PVE 對 synologysan 回報為機密的：syno-chap-password syno-device-id
 
 ### 這個形狀的第三個模組，以及一個成真的預測
 
-`CLAUDE.md` 曾經寫過：如果出現第三個「是函式而不是方法」的模組，就給它同樣的防護。`Command` 就是那個模組，而防護並不存在。它在寫下第一個測試的那一刻就浮現了，因為 `$C->is_block_device($path)` 是最自然會寫出來的形式：
+任何「是函式而不是方法」的模組都需要那道防護。`Command` 一開始沒有。它在寫下第一個測試的那一刻就浮現了，因為 `$C->is_block_device($path)` 是最自然會寫出來的形式：
 
 ```
 Odd number of elements in hash assignment at Command.pm line 50.
@@ -829,7 +827,7 @@ pvedaemon[1333139]: starting 3 worker(s)
 
 那也是為什麼安裝那一行是 `apt install ./…` 而不是 `dpkg -i`：`dpkg` 不會處理相依性，所以在沒有 `multipath-tools` 的節點上，它會解開套件然後以「dependency problems —leaving unconfigured」失敗。前面的 `./` 是必要的，否則 apt 會把它當成套件名稱。
 
-文件先前的版本寫的是 `dpkg -i`。那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先清掉它：
+不要用 `dpkg -i`：那會讓套件解開但「未設定」，而 apt 接著就拒絕求解任何其他東西——你會看到 `Unmet dependencies`，說 `kpartx` 和 `sg3-utils-udev`「not going to be installed」，看起來像套件庫的問題，但不是。先清掉它：
 
 ```bash
 dpkg --remove jt-pve-storage-synology
