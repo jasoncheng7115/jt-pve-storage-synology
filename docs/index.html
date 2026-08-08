@@ -188,7 +188,7 @@
                 <tr>
                     <td>
                         <span class="lang-en">A container backup <em>in snapshot mode</em> (<code>vzdump --mode snapshot</code>)</span><span class="lang-zh">容器備份的 snapshot <strong>模式</strong>（<code>vzdump --mode snapshot</code>）</span>
-                        <div class="cell-note"><span class="lang-en">A container's own snapshots are fine — that is the row above. This is the backup <em>mode</em>: it takes a storage snapshot and then <strong>mounts it</strong> to read the files out, and a Synology LUN snapshot has no device to mount, so the plugin refuses and says so. Use <code>--mode stop</code> or <code>--mode suspend</code>, both verified; a container in suspend mode keeps running apart from a brief pause. Virtual machines are unaffected, because QEMU reads the live disk. A refused attempt leaves PVE&#39;s own <code>vzdump</code> snapshot behind: its cleanup unmounts before it deletes, and the unmount of something never mounted fails first. Remove it with <code>pct delsnapshot &lt;ctid&gt; vzdump</code>.</span><span class="lang-zh">容器自己的快照沒有問題，那是上面那一列。這裡講的是備份的<strong>模式</strong>：它先拍一個 storage 快照，再<strong>把它掛起來</strong>讀檔案，而 Synology LUN 的快照沒有裝置可掛，所以 plugin 明確拒絕並說明原因。請改用 <code>--mode stop</code> 或 <code>--mode suspend</code>，兩種都驗證過；suspend 模式的容器除了短暫暫停以外會繼續執行。虛擬機不受影響，因為 QEMU 讀的是活的磁碟。被拒絕的那一次會留下 PVE 自己建的 <code>vzdump</code> 快照：它的清理是先卸載再刪除，而卸載一個從未掛上的東西會先失敗。用 <code>pct delsnapshot &lt;ctid&gt; vzdump</code> 清掉。</span></div>
+                        <div class="cell-note"><span class="lang-en">Snapshot mode <strong>mounts</strong> the snapshot to read the files out, and a Synology LUN snapshot has no device to mount. Use <code>--mode suspend</code> or <code>--mode stop</code>. Virtual machines are unaffected.</span><span class="lang-zh">快照模式要<strong>把快照掛起來</strong>讀檔案，而 Synology LUN 的快照沒有裝置可掛。請改用 <code>--mode suspend</code> 或 <code>--mode stop</code>。虛擬機不受影響。</span></div>
                     </td>
                     <td class="verdict verdict--no"><span class="lang-en">Not supported</span><span class="lang-zh">不支援</span></td>
                 </tr>
@@ -915,6 +915,14 @@
         <span class="lang-en">Every entry here is a failure this plugin has actually produced, with what it means and what to do.</span>
         <span class="lang-zh">這裡每一項都是這個 plugin 真的產生過的失敗，附上它的意思和該怎麼做。</span>
     </p>
+
+    <details>
+        <summary><span class="lang-en">A container has a snapshot called <code>vzdump</code> that nothing created on purpose</span><span class="lang-zh">容器上有一個沒人刻意建立的 <code>vzdump</code> 快照</span></summary>
+        <div class="detail-content">
+            <span class="lang-en">A container backup in <code>--mode snapshot</code> was attempted and refused. PVE takes that snapshot itself, and its cleanup unmounts before it deletes, so the unmount of something never mounted fails first and the deletion never runs. Remove it with <code>pct delsnapshot &lt;ctid&gt; vzdump</code>, and back up in <code>--mode suspend</code> or <code>--mode stop</code>.</span>
+            <span class="lang-zh">有人用 <code>--mode snapshot</code> 備份容器而被拒絕了。那個快照是 PVE 自己建的，而它的清理是先卸載再刪除，所以卸載一個從未掛上的東西會先失敗，後面的刪除就沒有執行。用 <code>pct delsnapshot &lt;ctid&gt; vzdump</code> 清掉，並改用 <code>--mode suspend</code> 或 <code>--mode stop</code> 備份。</span>
+        </div>
+    </details>
 
     <details>
         <summary><span class="lang-en">The storage does not appear in the web interface at all</span><span class="lang-zh">這個 storage 在網頁介面上完全看不到</span></summary>
