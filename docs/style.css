@@ -464,9 +464,11 @@ img { max-width: 100%; height: auto; display: block; }
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    border-top: 2px solid var(--indigo);
+    /* The gap shows this through, so the separators are the accent colour rather
+       than another grey line on a page that already has plenty. */
+    background: var(--indigo-light);
+    border: 1px solid var(--indigo-light);
+    border-top: 3px solid var(--indigo);
     border-radius: var(--radius-lg);
     overflow: hidden;
     margin: 8px 0 22px;
@@ -477,25 +479,40 @@ img { max-width: 100%; height: auto; display: block; }
 .stat {
     background: var(--surface-0);
     padding: 15px 20px 17px;
+    transition: background 0.15s;
 }
+.stat:hover { background: var(--indigo-subtle); }
 
 .stat__cap {
-    font-size: 0.73rem; color: var(--text-muted);
+    font-size: 0.73rem; color: var(--text-secondary);
     line-height: 1.45; letter-spacing: 0.01em;
-    margin-bottom: 7px;
+    margin-bottom: 8px;
     min-height: 2.1em;
+    padding-left: 10px;
+    position: relative;
+}
+/* A small mark in the accent colour, so each tile has a starting point for the eye. */
+.stat__cap::before {
+    content: ""; position: absolute;
+    left: 0; top: 0.45em;
+    width: 4px; height: 4px;
+    border-radius: 1px;
+    background: var(--indigo);
 }
 .stat__cap code { font-size: 0.95em; }
 
 .stat__value {
     font-size: 1.85rem; font-weight: 700;
-    color: var(--navy); line-height: 1;
+    /* White on this is 5.14:1 and it is the site's primary, so the figure carries it:
+       the caption grey then reads as a caption instead of as the same ink twice. */
+    color: var(--indigo); line-height: 1;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
+    padding-left: 10px;
 }
 .stat__unit {
-    font-size: 0.85rem; font-weight: 500;
-    color: var(--text-secondary);
+    font-size: 0.85rem; font-weight: 600;
+    color: var(--navy);
     letter-spacing: 0;
     margin-left: 5px;
 }
