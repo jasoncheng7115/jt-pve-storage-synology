@@ -462,7 +462,7 @@ img { max-width: 100%; height: auto; display: block; }
  */
 .stat-strip {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1px;
     /* The gap shows this through, so the separators are the accent colour rather
        than another grey line on a page that already has plenty. */
@@ -473,7 +473,7 @@ img { max-width: 100%; height: auto; display: block; }
     overflow: hidden;
     margin: 8px 0 22px;
 }
-@media (max-width: 860px) { .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1180px) { .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .stat-strip { grid-template-columns: 1fr; } }
 
 .stat {
