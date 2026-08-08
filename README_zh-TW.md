@@ -1,6 +1,6 @@
 # jt-pve-storage-synology
 
-**讓 Proxmox VE 直接把 Synology SAN Manager 當成 VM 儲存後端。**
+**讓 Proxmox VE 透過 iSCSI，直接把 Synology SAN Manager 當成 VM 儲存後端。**
 
 每一顆 Proxmox VE VM 磁碟，直接對應 Synology NAS 上的一個 thin LUN。因此 VM 的建立、刪除、擴充、Clone、Snapshot 與 Rollback，都可以直接操作 NAS 原生的 LUN 能力，而不是先建立一個大型共用 LUN，再交給 PVE 用 LVM 切割。
 
@@ -42,7 +42,7 @@
 >
 > 有些事沒有在那台上重複做：**擴充、複製、備份、還原、遷移、雙 portal multipath 與 HA 只在 DS918+ 上跑過**。而那台是透過 VPN 連的，測試沒問題，但**不是**正式環境 guest 磁碟該待的地方——隧道斷掉等於拔掉排線。
 >
-> 仍然該誠實說的是：從來沒有任何 Synology HA 或雙控制器機箱接近過這個東西，而那個 DSM 帳號需要管理員權限，因為 DSM 沒有更窄的選擇，非管理員連登入都過不了。從實際運行中找出大約三十個「讀程式碼永遠讀不出來」的缺陷，所以請假設還有更多。
+> 仍然該誠實說的是：從來沒有任何 Synology HA 或雙控制器機箱接近過這個東西，而那個 DSM 帳號需要管理員權限，因為 DSM 沒有更窄的選擇，非管理員連登入都過不了。
 >
 > `1.0.0` 在等的是：確定最小的 DSM 權限，以及剩下那些操作也在第二個機型上重複一次。[docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 是那份「哪些驗證過、哪些沒有」的驗證紀錄，在信任這個東西之前值得讀一遍。
 
@@ -139,7 +139,7 @@ qm clone 146 149 --name from-snapshot --snapname mysnapshot --full 0
 | 比快照時間點更新的快照必須存活 | **會存活**。還原到三個之中最舊的那一個，三個都還在 |
 | 事後必須看得出來 | `restored_time` 會記錄還原當下的 epoch 秒 |
 
-第二件說明了相關專案為什麼**拒絕**越過較新的快照倒回：在那些陣列上較新的快照會被銷毀，所以在不告知的情況下讓 PVE 執行那個操作的 plugin，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。
+第二件說明了相關專案為什麼**拒絕**越過較新的快照倒回：在那些儲存伺服器上較新的快照會被銷毀，所以在不告知的情況下讓 PVE 執行那個操作的 plugin，等於刪掉使用者還看得到的快照。這裡什麼都不會被銷毀，所以那道限制不需要，一顆磁碟也可以反覆倒回。
 
 ## 需求
 
@@ -417,7 +417,7 @@ iscsiadm -m node -T <iqn> -p <portal> -o delete
 
 ## 相關專案
 
-其他陣列的 Proxmox VE 儲存 plugin，與本專案共用主機端的架構與它繼承的維運規則：
+其他儲存伺服器的 Proxmox VE 儲存 plugin，與本專案共用主機端的架構與它繼承的維運規則：
 
 - [jt-pve-storage-dellemc](https://github.com/jasoncheng7115/jt-pve-storage-dellemc) —Dell EMC PowerStore、PowerVault ME、PowerFlex、Unity XT
 - [jt-pve-storage-netapp](https://github.com/jasoncheng7115/jt-pve-storage-netapp) —NetApp ONTAP

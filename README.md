@@ -1,6 +1,6 @@
 # jt-pve-storage-synology
 
-**Proxmox VE uses Synology SAN Manager directly as its VM storage back end.**
+**Proxmox VE uses Synology SAN Manager over iSCSI directly as its VM storage back end.**
 
 Every Proxmox VE VM disk maps to one thin LUN on the Synology NAS. So
 creating, removing, resizing, cloning, snapshotting and rolling back a VM all
@@ -65,9 +65,7 @@ not a yes say why.
 >
 > What is still honest to say: no Synology HA or dual-controller chassis has ever
 > been near this, and the DSM account needs administrator rights because DSM
-> offers no narrower one — a non-administrator cannot even log in. Around thirty
-> defects were found by running it that no amount of reading had shown, so assume
-> there are more.
+> offers no narrower one — a non-administrator cannot even log in.
 >
 > `1.0.0` waits on the minimum DSM privileges being settled, and on the remaining
 > operations being repeated on a second model. [docs/TESTING.md](docs/TESTING.md) is the register of what is
