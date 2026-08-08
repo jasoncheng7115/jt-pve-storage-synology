@@ -162,7 +162,7 @@ iscsi_target_type          lio4x
 
 Synology 對 LUN 類型的相依性只針對**功能**做了記載，從來不是針對數量。摘自 SAN Manager 規格頁面：
 
-- 快照與空間回收在**厚配置 LUN 上不支援**
+- 快照與空間回收在**非精簡配置的 LUN 上不支援**
 - **只有 Btrfs 儲存空間上的精簡配置 LUN，在 DSM 6.2 以上，才支援即時快照與還原**
 - 只有 Btrfs 精簡配置 LUN 支援磁碟重組
 - iSCSI LUN 複製／快照只在特定機型上可用

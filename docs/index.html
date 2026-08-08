@@ -749,13 +749,13 @@
     </div>
 
     <p>
-        <span class="lang-en">Every snapshot also carries <code>taken_by</code>, set to <code>jt-pve-storage-synology</code>. That marker is the ownership gate: the plugin only ever lists, deletes or rolls back snapshots carrying it, so a schedule you set up in SAN Manager cannot be touched by a VM operation. Descriptions are written when the snapshot is taken and DSM never rewrites them, so snapshots taken by an older version keep the older text.</span>
-        <span class="lang-zh">每個快照同時帶著 <code>taken_by</code>，值是 <code>jt-pve-storage-synology</code>。那個標記就是所有權閘門：plugin 只會列出、刪除、倒回帶它的快照，所以你在 SAN Manager 設的排程不會被任何 VM 操作動到。描述是拍快照當下寫進去的，DSM 不會回頭改寫，所以舊版拍的快照會保留舊的文字。</span>
+        <span class="lang-en">Every snapshot also carries <code>taken_by</code>, set to <code>jt-pve-storage-synology</code>. The plugin only ever lists, deletes or rolls back snapshots carrying that marker, so a schedule you set up in SAN Manager cannot be touched by a VM operation. A description is written when the snapshot is taken and never updated afterwards, so a snapshot taken by an older version keeps the text of its day.</span>
+        <span class="lang-zh">每個快照都帶著 <code>taken_by</code>，值是 <code>jt-pve-storage-synology</code>。plugin 只會列出、刪除、倒回帶這個標記的快照，所以你自己在 SAN Manager 排的快照，不會被任何 VM 操作動到。描述是拍快照的當下寫進去的，之後不會再更新，所以舊版本拍的快照會留著當時的文字。</span>
     </p>
 
     <p>
-        <span class="lang-en">The same page is a quick way to confirm the storage is working: a LUN this plugin created shows <strong>Btrfs, second-level snapshot</strong>, while a thick-provisioned one shows <em>Thick Provisioning LUN does not support snapshot</em>.</span>
-        <span class="lang-zh">同一個頁面也可以快速確認 storage 運作正常：這個 plugin 建立的 LUN 會顯示 <strong>Btrfs、秒級快照</strong>，而厚配置的 LUN 會顯示「Thick Provisioning LUN 不支援快照功能」。</span>
+        <span class="lang-en">The same page is a quick way to confirm the storage is right: a LUN this plugin created shows <strong>Btrfs, second-level snapshot</strong>. A LUN that is not thin provisioned shows <em>Thick Provisioning LUN does not support snapshot</em> instead.</span>
+        <span class="lang-zh">這一頁也可以順手確認 storage 是對的：這個 plugin 建立的 LUN 會顯示 <strong>Btrfs、秒級快照</strong>。如果那顆 LUN 不是精簡配置，DSM 會改成顯示「Thick Provisioning LUN 不支援快照功能」。</span>
     </p>
 
     <div class="diagram">
@@ -1086,13 +1086,6 @@
         </div>
     </details>
 
-    <details>
-        <summary><span class="lang-en">A container has a snapshot called <code>vzdump</code> that nothing created on purpose</span><span class="lang-zh">容器上有一個沒人刻意建立的 <code>vzdump</code> 快照</span></summary>
-        <div class="detail-content">
-            <span class="lang-en">A container backup in <code>--mode snapshot</code> was attempted and refused. PVE takes that snapshot itself, and its cleanup unmounts before it deletes, so the unmount of something never mounted fails first and the deletion never runs. Remove it with <code>pct delsnapshot &lt;ctid&gt; vzdump</code>, and back up in <code>--mode suspend</code> or <code>--mode stop</code>.</span>
-            <span class="lang-zh">有人用 <code>--mode snapshot</code> 備份容器而被拒絕了。那個快照是 PVE 自己建的，而它的清理是先卸載再刪除，所以卸載一個從未掛上的東西會先失敗，後面的刪除就沒有執行。用 <code>pct delsnapshot &lt;ctid&gt; vzdump</code> 清掉，並改用 <code>--mode suspend</code> 或 <code>--mode stop</code> 備份。</span>
-        </div>
-    </details>
 </section>
 
 <section class="doc-section doc-section--accent" id="why">
