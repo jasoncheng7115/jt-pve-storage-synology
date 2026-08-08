@@ -331,6 +331,43 @@ pve-syno-reap --all --remove                 # 本節點上每一個 synologysan
 
 Proxmox VE 裡沒有任何東西會呼叫 `deactivate_storage`（對整個 `/usr/share/perl5/PVE` 目錄樹驗證過），所以這個清理工作屬於管理者，不屬於 PVE。
 
+### 哪些是殘留，哪些只是看起來像
+
+**每個節點都看得到這個 storage 的每一顆 LUN，那不是殘留**。target 是 `shared` 模式，所以 NAS 把這個 storage 的每一顆 LUN 都映射到同一個 target，而任何登入該 target 的節點都會把它們全部看成 `/dev/disk/by-path/` 底下的 `sd` 裝置。storage 上有六顆磁碟，就代表每一個已登入的節點上有六個 `sd` 裝置，不論那個節點有沒有在跑那些 guest。去數它們、然後發現比這個節點需要的多，不是故障。
+
+會跟著「使用」而變動的是 **multipath map**：plugin 只為它啟用的磁碟建立一個，停用時移除。所以要看的數字是 `multipath -ll`，不是 by-path 清單。
+
+三種情況，依照你可能遇到的順序：
+
+```bash
+# 1. 節點當機之後 —— 那個節點沒有機會執行 deactivate_volume，所以
+#    「已經不再使用的 LUN」可能還留著一筆追蹤記錄和一個 map
+pve-syno-reap --all                 # 試跑：只說它會清什麼
+pve-syno-reap --all --remove        # 然後才動手
+
+# 2. 移除 storage 之前 —— 在「每一個」節點上執行，而且要趁 storage 還存在
+pve-syno-reap --storage mysyno --remove
+pvesm remove mysyno                 # 然後在其中一個節點上執行一次
+
+# 3. storage「已經」從設定中移除了，所以工具再也找不到它，只能手動。
+#    動手 flush 之前，先確認：
+
+multipath -ll <map>              # 必須顯示 SYNOLOGY，而且 wwid 是你預期的那個
+dmsetup info <map> | grep Open   # Open count 必須是 0，不是 0 就代表有人在用
+lsof /dev/mapper/<map>           # 而且不能有任何行程持有它
+
+#    確認過之後，才一次一個 map、一次一個工作階段，而且絕不用 -F：
+multipathd disablequeueing map <map>
+dmsetup message <map> 0 fail_if_no_path
+multipath -f <map>
+iscsiadm -m node -T <iqn> -p <portal> --logout
+iscsiadm -m node -T <iqn> -p <portal> -o delete
+```
+
+**絕不要用 `multipath -F`**。大寫的那個會把節點上每一個未使用的 map 都 flush 掉，包含其他廠商的 storage。也絕不要 flush 一個 `Open count` 不是 0 的 map：執行中的 guest 會持有它的磁碟，把它 flush 掉等於在 guest 底下把磁碟抽走。`pve-syno-reap` 讓這兩種錯誤都不可能發生——它一次只指名一個 map，而且遇到「無法確定狀態」的裝置就拒絕，這正是它才是正式做法、而上面這段只用於「storage 已經不在了」的原因。
+
+`pve-syno-reap` 清的是「NAS 上已經不存在」的東西。至於「LUN 還在、只是換到別的節點」的 map，不在它的職責範圍，而在正常的節點上也不會出現：停止 guest 或把它遷移走，來源節點上的 map 就會被移除。
+
 ## 文件
 
 | | |

@@ -1198,6 +1198,23 @@ A LUN on the NAS that no configuration references, or a target mapping pointing
 at a uuid that no longer exists, is a leak that succeeded silently. That check is
 how `flush_map` was found to have never removed a map.
 
+### F — cleanup, which must never take a disk away from a running guest
+
+CLI only: none of this is reachable from the web interface. What the web interface
+verifies is the consequence — after any of it, a guest on that storage still starts.
+
+| | Operation | Expected |
+|---|---|---|
+| **F1** | With a guest **running** on the storage, `pve-syno-reap --all --remove` | The guest keeps running, its map survives, and the tool reports nothing left behind. A device in use is refused, and so is one whose state cannot be established |
+| **F2** | Stop that guest | Its multipath map and its tracking entry both disappear |
+| **F3** | A map for a LUN that still exists but is unused on this node — the case an older version could leave behind | `dmsetup info -o open` is **0** and `lsof` shows no holder, the named `multipath -f <wwid>` removes it, and the guest still starts afterwards with the map rebuilt |
+| **F4** | `make check-multipath-flush` | `multipath -F` is never generated anywhere in the tree. The capital letter flushes every unused map on the node, other vendors' included |
+
+F1 is the one that matters: it is the operation that could break a running guest,
+so it is run **against a running guest on purpose**.
+
+---
+
 ## Reporting
 
 If you run any of this on your own NAS, the results are worth more than

@@ -528,6 +528,58 @@ whose state it cannot establish.
 Nothing in Proxmox VE calls `deactivate_storage` (verified across the whole
 `/usr/share/perl5/PVE` tree), so this cleanup is the operator's, not PVE's.
 
+### What is a leftover, and what only looks like one
+
+**Every node sees every LUN of the storage, and that is not a leftover.** The
+target is `shared`, so the NAS maps every LUN of the storage to one target, and
+any node logged in to it sees them all as `sd` devices under
+`/dev/disk/by-path/`. Six disks on the storage means six `sd` devices on every
+logged-in node, whether or not that node runs the guests. Counting those and
+finding more than the node needs is not a fault.
+
+A **multipath map** is what follows use: the plugin builds one only for a volume
+it activates and removes it on deactivate. So the number to look at is
+`multipath -ll`, not the by-path list.
+
+Three cases, in the order you are likely to meet them:
+
+```bash
+# 1. after a node crash — the node never ran deactivate_volume, so a tracking
+#    entry and a map can survive for a LUN it is no longer using
+pve-syno-reap --all                 # dry run: says what it would clear
+pve-syno-reap --all --remove        # then act
+
+# 2. before removing a storage — on EVERY node, while the storage still exists
+pve-syno-reap --storage mysyno --remove
+pvesm remove mysyno                 # then once, on one node
+
+# 3. the storage is ALREADY gone from the configuration, so the tool cannot find
+#    it any more, and this is by hand. CHECK BEFORE YOU FLUSH:
+
+multipath -ll <map>              # must say SYNOLOGY, and be the wwid you expect
+dmsetup info <map> | grep Open   # Open count MUST be 0 — anything else is in use
+lsof /dev/mapper/<map>           # and nothing may hold it
+
+#    only then, one map and one session at a time, and never -F:
+multipathd disablequeueing map <map>
+dmsetup message <map> 0 fail_if_no_path
+multipath -f <map>
+iscsiadm -m node -T <iqn> -p <portal> --logout
+iscsiadm -m node -T <iqn> -p <portal> -o delete
+```
+
+**Never `multipath -F`.** The capital letter flushes every unused map on the node,
+including other vendors' storage. And never flush a map whose `Open count` is not
+zero: a running guest holds its disk open, and flushing it takes the disk away from
+underneath the guest. `pve-syno-reap` makes both mistakes impossible — it names one
+map at a time and refuses on a device whose state it cannot establish — which is why
+it is the path and this sequence is only for when the storage is already gone.
+
+`pve-syno-reap` clears what the NAS no longer has. A map for a LUN that still
+exists but has moved to another node is not in its remit, and on a healthy node
+it does not arise: stopping a guest or migrating it away removes the map on the
+source.
+
 ## Documentation
 
 | | |

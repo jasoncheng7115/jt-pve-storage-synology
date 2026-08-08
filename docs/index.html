@@ -103,7 +103,7 @@
             <span class="lang-en">Project</span><span class="lang-zh">專案</span>
         </div>
         <a href="#roadmap" class="sidebar__link"><span class="lang-en">Roadmap</span><span class="lang-zh">開發階段</span></a>
-        <a href="#contribute" class="sidebar__link"><span class="lang-en">How to help</span><span class="lang-zh">如何協助</span></a>
+        <a href="#contribute" class="sidebar__link"><span class="lang-en">How to help</span><span class="lang-zh">協助這個專案</span></a>
         <a href="#related" class="sidebar__link"><span class="lang-en">Related projects</span><span class="lang-zh">相關專案</span></a>
     </div>
 </nav>
@@ -210,6 +210,7 @@
         <tr><td><strong>C1–C5</strong></td><td><span class="lang-en">Snapshot running and stopped · <strong>roll back</strong> · delete · the name visible in SAN Manager</span><span class="lang-zh">執行中與關機拍快照 · <strong>倒回</strong> · 刪除 · 名稱在 SAN Manager 看得到</span></td><td><strong><span class="lang-en">Web UI + CLI</span><span class="lang-zh">網頁介面 + 指令列</span></strong></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         <tr><td><strong>D1–D5</strong></td><td><span class="lang-en">Stop and start · migrate away and back, offline and online · full clone · clone from a snapshot · template, then linked and full clone from it</span><span class="lang-zh">關機與啟動 · 遷移離開再遷回（離線與線上）· 完整複製 · 從快照複製 · 轉範本再做連結與完整複製</span></td><td><strong><span class="lang-en">Web UI + CLI</span><span class="lang-zh">網頁介面 + 指令列</span></strong></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
         <tr><td><strong>E1–E5</strong></td><td><span class="lang-en">Backup in all three <code>vzdump</code> modes · restore to a new VM ID · restore overwriting the original</span><span class="lang-zh"><code>vzdump</code> 三種模式的備份 · 還原到新的 VM ID · 覆蓋原本的 VM</span></td><td><span class="lang-en">CLI</span><span class="lang-zh">指令列</span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
+        <tr><td><strong>F1–F4</strong></td><td><span class="lang-en"><strong>Cleanup safety</strong>: the reaper run against a <em>running</em> guest · a map and its tracking entry gone on stop · an unused map removed by name · <code>multipath -F</code> never in the tree</span><span class="lang-zh"><strong>清理安全性</strong>：對<strong>執行中</strong>的 guest 跑一次回收工具 · 停機後 map 與追蹤記錄都消失 · 指名移除未使用的 map · 樹裡絕不出現 <code>multipath -F</code></span></td><td><span class="lang-en">CLI<br><small>the web interface verifies the consequence: the guest still starts</small></span><span class="lang-zh">指令列<br><small>網頁介面驗證的是後果：guest 還是開得起來</small></span></td><td><span class="lang-en">pass</span><span class="lang-zh">通過</span></td></tr>
             </tbody>
     </table>
 
@@ -701,6 +702,52 @@
         <span class="lang-en"><strong>Nothing in Proxmox VE calls <code>deactivate_storage</code></strong> —verified across the whole <code>/usr/share/perl5/PVE</code> tree —so this cleanup is the operator's, not PVE's. Neither leftover is dangerous: every consumer re-checks for a device before acting, and device identity always comes from the kernel's WWID. But they accumulate. The tool never touches a device that is in use, and skips rather than assumes anything whose state it cannot establish.</span>
         <span class="lang-zh"><strong>Proxmox VE 裡沒有任何東西會呼叫 <code>deactivate_storage</code></strong>，對整個 <code>/usr/share/perl5/PVE</code> 目錄樹驗證過，所以這個清理工作屬於管理者，不屬於 PVE。兩種殘留都不危險：每個使用者在動作之前都會重新檢查裝置，而裝置身分一律來自核心的 WWID。但它們會累積。這個工具絕不動到正在使用中的裝置，而且對任何無法確定狀態的東西是跳過，不是假設。</span>
     </div>
+
+    <h3 class="subsection-title"><span class="lang-en">What is a leftover, and what only looks like one</span><span class="lang-zh">哪些是殘留，哪些只是看起來像</span></h3>
+
+    <details class="alert alert--warning">
+        <summary><strong><span class="lang-en">Every node sees every LUN of the storage. That is not a leftover.</span><span class="lang-zh">每個節點都看得到這個 storage 的每一顆 LUN。那不是殘留。</span></strong></summary>
+        <span class="lang-en">The target is <code>shared</code>, so the NAS maps every LUN of the storage to one target, and any node logged in to it sees them all as <code>sd</code> devices under <code>/dev/disk/by-path/</code>. Six disks on the storage means six <code>sd</code> devices on every logged-in node, whether or not that node runs the guests. Counting those and finding more than the node needs is not a fault.<br><br>A <strong>multipath map</strong> is the thing that follows use: the plugin builds one only for a volume it activates, and removes it on deactivate. So the number to look at is <code>multipath -ll</code>, not the by-path list.</span>
+        <span class="lang-zh">target 是 <code>shared</code> 模式，所以 NAS 把這個 storage 的每一顆 LUN 都映射到同一個 target，而任何登入該 target 的節點都會把它們全部看成 <code>/dev/disk/by-path/</code> 底下的 <code>sd</code> 裝置。storage 上有六顆磁碟，就代表每一個已登入的節點上有六個 <code>sd</code> 裝置，不論那個節點有沒有在跑那些 guest。去數它們、然後發現「比這個節點需要的多」，不是故障。<br><br>會跟著「使用」而變動的是 <strong>multipath map</strong>：plugin 只為它啟用的磁碟建立一個，停用時移除。所以要看的數字是 <code>multipath -ll</code>，不是 by-path 清單。</span>
+    </details>
+
+    <p>
+        <span class="lang-en">Three cases, in the order you are likely to meet them:</span>
+        <span class="lang-zh">三種情況，依照你可能遇到的順序：</span>
+    </p>
+
+    <pre><code><span class="comment"># 1. after a node crash — the node never ran deactivate_volume, so a tracking</span>
+<span class="comment">#    entry and a map can survive for a LUN it is no longer using</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span>                 <span class="comment"># dry run: says what it would clear</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span> <span class="flag">--remove</span>        <span class="comment"># then act</span>
+
+<span class="comment"># 2. before removing a storage — on EVERY node, while the storage still exists</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> mysyno <span class="flag">--remove</span>
+<span class="cmd">pvesm</span> remove mysyno              <span class="comment"># then once, on one node</span>
+
+<span class="comment"># 3. the storage is ALREADY gone from the configuration, so this is by hand.</span>
+<span class="comment">#    CHECK BEFORE YOU FLUSH:</span>
+<span class="cmd">multipath</span> <span class="flag">-ll</span> &lt;map&gt;              <span class="comment"># must say SYNOLOGY, and be the wwid you expect</span>
+<span class="cmd">dmsetup</span> info &lt;map&gt; | <span class="cmd">grep</span> Open   <span class="comment"># Open count MUST be 0 — anything else is in use</span>
+<span class="cmd">lsof</span> /dev/mapper/&lt;map&gt;           <span class="comment"># and nothing may hold it</span>
+
+<span class="comment">#    only then, one map and one session at a time, and never -F:</span>
+<span class="cmd">multipathd</span> disablequeueing map &lt;map&gt;
+<span class="cmd">dmsetup</span> message &lt;map&gt; 0 fail_if_no_path
+<span class="cmd">multipath</span> <span class="flag">-f</span> &lt;map&gt;
+<span class="cmd">iscsiadm</span> <span class="flag">-m</span> node <span class="flag">-T</span> &lt;iqn&gt; <span class="flag">-p</span> &lt;portal&gt; <span class="flag">--logout</span>
+<span class="cmd">iscsiadm</span> <span class="flag">-m</span> node <span class="flag">-T</span> &lt;iqn&gt; <span class="flag">-p</span> &lt;portal&gt; <span class="flag">-o</span> delete</code></pre>
+
+    <div class="alert alert--danger">
+        <strong><span class="lang-en">Never flush a map that is in use, and never <code>multipath -F</code></span><span class="lang-zh">絕不要 flush 還在使用中的 map，也絕不要用 <code>multipath -F</code></span></strong>
+        <span class="lang-en">A running guest holds its disk open, and flushing that map takes the disk away from underneath it. Check <code>dmsetup info</code> first: an <strong>Open count that is not zero means it is in use</strong>. And the capital <code>-F</code> flushes every unused map on the node, including other vendors' storage. <code>pve-syno-reap</code> makes both mistakes impossible —it names one map at a time and refuses on a device whose state it cannot establish— which is why it is the path, and the sequence above is only for a storage that is already gone.</span>
+        <span class="lang-zh">執行中的 guest 會持有它的磁碟，把那個 map flush 掉等於在它底下把磁碟抽走。動手前先看 <code>dmsetup info</code>：<strong>Open count 不是 0 就代表有人在用</strong>。而大寫的 <code>-F</code> 會把節點上每一個未使用的 map 都 flush 掉，包含其他廠商的 storage。<code>pve-syno-reap</code> 讓這兩種錯誤都不可能發生，它一次只指名一個 map，遇到無法確定狀態的裝置就拒絕，這正是它才是正式做法、而上面那段只用於「storage 已經不在了」的原因。</span>
+    </div>
+
+    <p>
+        <span class="lang-en"><code>pve-syno-reap</code> clears what the NAS no longer has. A map for a LUN that still exists but has moved to another node is not in its remit, and on a healthy node it does not arise: stopping a guest or migrating it away removes the map on the source.</span>
+        <span class="lang-zh"><code>pve-syno-reap</code> 清的是「NAS 上已經不存在」的東西。至於「LUN 還在、只是換到別的節點」的 map，不在它的職責範圍，而在正常的節點上也不會出現：停止 guest 或把它遷移走，來源節點上的 map 就會被移除。</span>
+    </p>
 </section>
 
 <section class="doc-section" id="probe">
@@ -780,19 +827,23 @@
 </section>
 
 <section class="doc-section doc-section--accent" id="contribute">
-    <h2 class="section-title"><span class="lang-en">How to help</span><span class="lang-zh">如何協助</span></h2>
+    <h2 class="section-title"><span class="lang-en">How to help this project</span><span class="lang-zh">如何協助這個專案</span></h2>
 
     <p class="section-subtitle">
-        <span class="lang-en">Everything below is something a second machine can answer and this one cannot.</span>
-        <span class="lang-zh">下面每一項，都是「另一台機器答得出來、而我們這台答不出來」的東西。</span>
+        <span class="lang-en">What this project needs is not code. It is other people's Synology hardware, because Synology publishes no specification and each model reports different limits.</span>
+        <span class="lang-zh">這個專案缺的不是程式，是別人手上的 Synology 機器。Synology 沒有公開規格，而每個機型回報的上限都不一樣。</span>
     </p>
 
     <ul>
-        <li><span class="lang-en"><strong>Run the discovery tool on a Synology this page has not seen.</strong> It only reads —it creates nothing and deletes nothing— and it prints what your DSM's SAN API actually offers. Two models have been tested; there are a lot more, and Synology publishes different limits for almost every one.</span><span class="lang-zh"><strong>在本頁沒測過的 Synology 上跑一次探索工具。</strong>它只讀取（不建立也不刪除任何東西）而且會印出你的 DSM 的 SAN API 實際提供什麼。目前測過兩個機型，而機型還有很多，Synology 幾乎為每一台公布不同的上限。</span></li>
-        <li><span class="lang-en"><strong>Tell us what broke if you run it for real.</strong> About thirty defects in this project were found by using it, not by reading it, and every one of them looked fine in the code.</span><span class="lang-zh"><strong>如果你真的拿它上線，告訴我們哪裡壞了。</strong>這個專案大約三十個缺陷是「用出來的」，不是「讀出來的」，而它們在程式碼裡每一個看起來都沒問題。</span></li>
-        <li><span class="lang-en"><strong>A Synology HA pair, or a dual-controller chassis.</strong> Both are supported by design and <em>neither has ever been tested</em> —no such hardware has been near this. If you have one, even a report that it simply worked is new information.</span><span class="lang-zh"><strong>一組 Synology HA，或一台雙控制器機箱。</strong>兩種在設計上都支援，而且<strong>兩種都沒有被測試過</strong>，從來沒有這樣的硬體接近過它。如果你手上有，就算只是回報「它就這樣正常運作」，那也是新的資訊。</span></li>
-        <li><span class="lang-en"><strong>Anything the tool reports that contradicts this page.</strong> That is the most useful bug report there is, because it means something written here is wrong.</span><span class="lang-zh"><strong>探索工具回報的任何與本頁矛盾的內容。</strong>那是最有價值的一種回報，因為它代表這裡寫的某句話是錯的。</span></li>
+        <li><span class="lang-en"><strong>Run the discovery tool on a model this page has not tested.</strong> It only reads: it creates nothing, deletes nothing, and prints what your DSM's SAN API offers. Two models have been tested so far.</span><span class="lang-zh"><strong>在本頁沒測過的機型上跑一次探索工具。</strong>它只讀取，不建立也不刪除任何東西，並印出你的 DSM 的 SAN API 提供什麼。目前測過兩個機型。</span></li>
+        <li><span class="lang-en"><strong>Report what broke if you run it in production.</strong> The useful details are the model, the DSM version, what you were doing, and the error as it appeared.</span><span class="lang-zh"><strong>如果你拿它上線，回報壞在哪裡。</strong>有用的細節是機型、DSM 版本、當時在做什麼，以及錯誤訊息原本的樣子。</span></li>
+        <li><span class="lang-en"><strong>A Synology HA pair, or a dual-controller chassis.</strong> Both are supported by design and neither has ever been tested, because no such hardware has been near this. Even a report that it simply worked is new information.</span><span class="lang-zh"><strong>一組 Synology HA，或一台雙控制器機箱。</strong>兩種在設計上都支援，而兩種都沒有被測試過，因為從來沒有這樣的硬體接近過它。就算只是回報「它就這樣正常運作」，那也是新的資訊。</span></li>
+        <li><span class="lang-en"><strong>Anything that contradicts this page.</strong> That means something written here is wrong, which is worth more than a feature request.</span><span class="lang-zh"><strong>任何與本頁矛盾的地方。</strong>那代表這裡寫的某句話是錯的，而那比一個功能請求有價值。</span></li>
     </ul>
+
+    <p>
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-synology/issues" class="btn btn--primary" target="_blank" rel="noopener"><span class="lang-en">Open an issue on GitHub</span><span class="lang-zh">到 GitHub 開一個 issue</span></a>
+    </p>
 </section>
 
 <section class="doc-section" id="related">
