@@ -269,15 +269,15 @@
     <h2 class="section-title"><span class="lang-en">Measured on hardware, not just called through an API</span><span class="lang-zh">實機驗證過，不只是 API 呼叫得通</span></h2>
     <div class="stat-strip">
         <div class="stat">
-            <div class="stat__cap"><span class="lang-en">Production cluster, migrated across it</span><span class="lang-zh">正式叢集，跨節點遷移過</span></div>
+            <div class="stat__cap"><span class="lang-en">Production cluster, with guests live-migrated across it</span><span class="lang-zh">正式叢集，guest 在節點間即時遷移過</span></div>
             <div class="stat__value"><span class="lang-en">5</span><span class="lang-zh">5</span><span class="stat__unit"><span class="lang-en">nodes</span><span class="lang-zh">節點</span></span></div>
         </div>
         <div class="stat">
-            <div class="stat__cap"><span class="lang-en">Takeover after a crash, data intact</span><span class="lang-zh">當機接手，資料完整</span></div>
+            <div class="stat__cap"><span class="lang-en">For a surviving node to start the VM after a node was crashed, data intact</span><span class="lang-zh">一台節點硬當機，另一台把它的 VM 開起來，資料完整</span></div>
             <div class="stat__value"><span class="lang-en">3.6</span><span class="lang-zh">3.6</span><span class="stat__unit"><span class="lang-en">s</span><span class="lang-zh">秒</span></span></div>
         </div>
         <div class="stat">
-            <div class="stat__cap"><span class="lang-en">Reads / failures through a path failure</span><span class="lang-zh">路徑故障期間的讀取／失敗</span></div>
+            <div class="stat__cap"><span class="lang-en">Reads / failures in the guest while one path was pulled</span><span class="lang-zh">拔掉一條路徑期間，guest 的讀取／失敗</span></div>
             <div class="stat__value"><span class="lang-en">60 / 0</span><span class="lang-zh">60 / 0</span></div>
         </div>
         <div class="stat">
