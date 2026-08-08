@@ -25,9 +25,9 @@
 
 ## 為什麼必須是管理員群組，以及那代表什麼、不代表什麼
 
-SAN Manager 的 Web API——`SYNO.Core.ISCSI.LUN`、`SYNO.Core.ISCSI.Target`、`SYNO.Core.ISCSI.Host`、`SYNO.Core.Storage.Volume`——屬於 DSM 核心，不屬於套件。**DSM 沒有任何一個可以單獨授予的「管理 LUN」權限**。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager。所以非管理員帳號沒有任何有文件依據的方式能呼叫這些 API。
+SAN Manager 的 Web API：`SYNO.Core.ISCSI.LUN`、`SYNO.Core.ISCSI.Target`、`SYNO.Core.ISCSI.Host`、`SYNO.Core.Storage.Volume`——屬於 DSM 核心，不屬於套件。**DSM 沒有任何一個可以單獨授予的「管理 LUN」權限**。沒有 SAN 操作員角色，每位使用者的「應用程式權限」清單裡也沒有 SAN Manager。所以非管理員帳號沒有任何有文件依據的方式能呼叫這些 API。
 
-**這是 DSM 的限制，不是本 plugin 便宜行事**。和相關專案面對的那些陣列相比——那些可以建立範圍限定在儲存區的角色——這確實是一個退步，而你在決定 NAS 的網路配置之前應該先知道這件事。
+**這是 DSM 的限制，不是本 plugin 便宜行事**。和相關專案面對的那些陣列相比（那些可以建立範圍限定在儲存區的角色）這確實是一個退步，而你在決定 NAS 的網路配置之前應該先知道這件事。
 
 在管理員群組裡**不代表**也必須給的東西：
 
@@ -84,7 +84,7 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 
 更麻煩的是，被封鎖之後的症狀**不是**「認證失敗」，而是連線被拒絕——看起來像網路故障，或像 NAS 掛了。
 
-**所以這個 plugin 在第一次憑證失敗就停**。被拒絕的憑證——DSM 錯誤碼 400、402、403、404——只記錄一次，把 storage 標成需要人介入，在設定被改過之前不再重試。這是刻意訂下的設計規則，不是實作細節，也正是你可以安心讓自動封鎖保持開啟的原因。
+**所以這個 plugin 在第一次憑證失敗就停**。被拒絕的憑證（DSM 錯誤碼 400、402、403、404）只記錄一次，把 storage 標成需要人介入，在設定被改過之前不再重試。這是刻意訂下的設計規則，不是實作細節，也正是你可以安心讓自動封鎖保持開啟的原因。
 
 若真的被封鎖了：控制台 → 安全性 → 帳號 → 自動封鎖 → 允許／封鎖清單，把位址移除。
 
@@ -96,9 +96,9 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 
 **已量測，而答案並不好看：這件事沒有被縮小到一個最小集合**。以下是在硬體上確立的，使用一個在擁有者同意下建立並刪除的臨時帳號：
 
-- DSM 7.1.1 只提供三個群組——`administrators`、`http`、`users`——而**其中沒有任何一個是 iSCSI 或 SAN 專用的**。沒有「儲存操作員」這種角色可以授予。
+- DSM 7.1.1 只提供三個群組（`administrators`、`http`、`users`）而**其中沒有任何一個是 iSCSI 或 SAN 專用的**。沒有「儲存操作員」這種角色可以授予。
 - **完全沒有群組**的帳號在登入時被拒，錯誤 **402**。
-- 在 **`users`** 裡的帳號**也**在登入時被拒，**402**。所以並不是「普通使用者可以登入、然後被拒絕儲存呼叫」——它根本無法認證。
+- 在 **`users`** 裡的帳號**也**在登入時被拒，**402**。所以並不是「普通使用者可以登入、然後被拒絕儲存呼叫」。它根本無法認證。
 - `SYNO.Core.User get` 只回傳 `name` 和 `uid`。權限模型不在那裡公開。
 - `SYNO.Core.Group.Member add` 到 `administrators` 回報 `success: true` 卻什麼都沒改，所以連「測試管理員這個情況」都無法用 API 做到。
 
@@ -110,7 +110,7 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 
 > AFP · Active Backup for Business（三項）· Audio Station · Central Management System · Cloud Sync · DSM · Download Station · FTP · File Station · Notification Center · Note Station · SFTP · SMB · Synology Photos · Surveillance Station · Synology Drive · Universal Search · rsync · 文字編輯器
 
-**其中沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI**。所以這個 plugin 需要的存取權不能以「應用程式」的形式允許或拒絕：它是隨 `administrators` 一起來的，沒有更小的東西可以發放。加上前面那些 API 的發現——沒有群組的帳號和放在 `users` 裡的帳號都在登入時被 402 拒絕——這個問題就結束了。這是讀 DSM 自己的介面得到的結論，不是從 API 的沉默推論出來的。
+**其中沒有任何一項是 SAN Manager、儲存空間管理員或 iSCSI**。所以這個 plugin 需要的存取權不能以「應用程式」的形式允許或拒絕：它是隨 `administrators` 一起來的，沒有更小的東西可以發放。加上前面那些 API 的發現（沒有群組的帳號和放在 `users` 裡的帳號都在登入時被 402 拒絕）這個問題就結束了。這是讀 DSM 自己的介面得到的結論，不是從 API 的沉默推論出來的。
 
 #### 這代表你該做什麼
 
@@ -122,7 +122,7 @@ plugin 從不呼叫 `SYNO.Core.Share`、`SYNO.FileStation`、`SYNO.Core.User`、
 4. 開 2FA——前提是你接受在 `/etc/pve/priv/storage/<id>.syno` 裡存放一個常設的裝置權杖。
 5. 在控制台 → 安全性 → 防火牆裡以 IP 限制，鎖到那幾個節點。
 
-在這個 DSM 版本上能縮到的就是這樣，而且值得做——這個發現的重點正是：即使非管理員不可行，第 1 到第 5 步仍然是可用的。
+在這個 DSM 版本上能縮到的就是這樣，而且值得做。這個發現的重點正是：即使非管理員不可行，第 1 到第 5 步仍然是可用的。
 
 在那之前，請把這個帳號視為有特權的：專供這個 plugin 使用、沒有共用資料夾、沒有其他應用程式、如果你接受常設裝置權杖就開 2FA，並且在防火牆中以 IP 鎖定。
 
@@ -150,10 +150,10 @@ DSM 預設會把工作階段綁在用戶端的 IP 位址上（測試機上 `skip
 
 DSM 出廠是自簽憑證，所以本 plugin **預設不驗證憑證**（`syno-ssl-verify 0`）。預設為「驗證」會讓幾乎每一台新安裝的 DSM 根本加不進來，而一個沒有人能用的預設值保護不了任何人。
 
-如果你有節點驗證得過的憑證——DSM 內建的 Let's Encrypt，或你自己的 CA——就打開它：
+如果你有節點驗證得過的憑證（DSM 內建的 Let's Encrypt，或你自己的 CA）就打開它：
 
 ```bash
 pvesm set <storage> --syno-ssl-verify 1 --syno-tls-ca /etc/ssl/certs/your-ca.pem
 ```
 
-純 HTTP 一律拒絕。DSM 允許把登入寫成 GET、密碼放在 query string 裡——Synology 自己的 CSI driver 就是那樣登入的——而這個 plugin 不那樣做：那會把密碼寫進 NAS 自己的存取記錄，以及中間每一個代理伺服器。
+純 HTTP 一律拒絕。DSM 允許把登入寫成 GET、密碼放在 query string 裡（Synology 自己的 CSI driver 就是那樣登入的）而這個 plugin 不那樣做：那會把密碼寫進 NAS 自己的存取記錄，以及中間每一個代理伺服器。

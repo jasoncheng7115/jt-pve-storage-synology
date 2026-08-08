@@ -39,6 +39,14 @@ use utf8;
 # attached, which is noise on top of a real finding.
 binmode(STDOUT, ':encoding(UTF-8)');
 
+# Rule 6 is per-file rather than per-line, so it is counted here and reported at
+# the end. Jason's own writing chains short clauses with commas and uses 「（）」 for
+# an aside; the em-dash is this project's habit, not his. A sample of his prose
+# ~250 characters long contained none, while this documentation was running at one
+# every 200 characters.
+my %DASHES;
+my $DASH_PER_1K = 1.5;
+
 my @files = @ARGV;
 # docs/index.html was NOT on this list, and it is the Chinese document with the
 # most readers. Both of the Latin-adjacency misses that prompted rule 5 were on
@@ -98,6 +106,10 @@ for my $file (@files) {
         $bare =~ s/^(?:>\s*)+//;
 
         if ($bare =~ /^```/) { $in_fence = !$in_fence; next }
+        if (!$in_fence) {
+            $DASHES{$file}{dash}  += () = ($bare =~ /——/g);
+            $DASHES{$file}{chars} += length($bare);
+        }
         next if $in_fence;
         next if $bare =~ /^\s*$/;
         next if $bare =~ /^[#|]/;                       # heading or table row
@@ -292,6 +304,17 @@ if (-e 'docs/index.html') {
         }
     }
     close($fh);
+}
+
+for my $f (sort keys %DASHES) {
+    my ($d, $c) = @{ $DASHES{$f} }{qw(dash chars)};
+    next if !$c || !$d;
+    my $per = $d / $c * 1000;
+    next if $per <= $DASH_PER_1K;
+    complain($f, 0,
+        sprintf('%d em-dashes in %d characters (%.1f per 1000)', $d, $c, $per),
+        'chain short clauses with 、and ，and put an aside in 「（）」.'
+        . " Above $DASH_PER_1K per 1000 it is a habit rather than a device.");
 }
 
 if ($fail) {

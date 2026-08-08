@@ -2,7 +2,7 @@
 
 [English](LIMITS.md) · [繁體中文](LIMITS_zh-TW.md) · [文件網站](https://jasoncheng7115.github.io/jt-pve-storage-synology/?lang=zh)
 
-**在這個 plugin 裡，一顆 VM 磁碟就是一個 LUN**。所以 LUN 上限不是註腳——它就是這個 storage 能容納的虛擬磁碟數量上限，而在某些機型上，這個數字會比其他任何限制更早成為瓶頸。
+**在這個 plugin 裡，一顆 VM 磁碟就是一個 LUN**。所以 LUN 上限不是註腳。它就是這個 storage 能容納的虛擬磁碟數量上限，而在某些機型上，這個數字會比其他任何限制更早成為瓶頸。
 
 有三個容易被忽略的後果，而且三個講的都是「數量」而不是「容量」：
 
@@ -26,7 +26,7 @@ Synology 的 **SAN Manager 技術規格**頁面寫著：
 | 每個 LUN 最大快照數 | **256**（見限制 1）|
 | 最小 LUN 大小 | **1 GB** |
 
-> **限制 1**——「LUN、target 與快照的最大數量會依機型而異（請參閱您 Synology 產品的軟體規格）」
+> **限制 1**：「LUN、target 與快照的最大數量會依機型而異（請參閱您 Synology 產品的軟體規格）」
 
 ——[SAN Manager 技術規格，DSM 7.1](https://www.synology.com/zh-tw/dsm/7.1/software_spec/san_manager)（[DSM 7.3](https://www.synology.com/zh-tw/dsm/7.3/software_spec/san_manager) 頁面文字相同）
 
@@ -34,7 +34,7 @@ Synology 的 **SAN Manager 技術規格**頁面寫著：
 
 ### 第二個機型、第二個 DSM 版本，回報方式完全一樣
 
-從一台 **DS925+**（DSM 7.3.2-86009 Update 4）讀取 `SYNO.Core.System info type=define`——那是與本專案其餘部分所依據的 DS918+／7.1.1 不同的機型，也是不同的 DSM 主版本：
+從一台 **DS925+**（DSM 7.3.2-86009 Update 4）讀取 `SYNO.Core.System info type=define`。那是與本專案其餘部分所依據的 DS918+／7.1.1 不同的機型，也是不同的 DSM 主版本：
 
 | | DS918+ · DSM 7.1.1 | DS925+ · DSM 7.3.2 |
 |---|---|---|
@@ -57,7 +57,7 @@ Synology 的 **SAN Manager 技術規格**頁面寫著：
 | [DS918+ 產品規格](https://global.download.synology.com/download/Document/Hardware/ProductSpec/DiskStation/18-year/DS918+/enu/Product_Spec_DS918+_enu.pdf) | **256** | **128** |
 | 該機器上的 `SYNO.Core.System info type=define` | **256** | **128** |
 
-機型的規格表和 NAS 自己的 API **完全一致**。不一致的是這份文件——它拿機型去比對一個產品線層級的數字。
+機型的規格表和 NAS 自己的 API **完全一致**。不一致的是這份文件。它拿機型去比對一個產品線層級的數字。
 
 ---
 
@@ -127,14 +127,14 @@ iscsi_target_type          lio4x
 | 上限 | plugin 的行為 |
 |---|---|
 | LUN | 拒絕配置，並在剩下 16 個時開始警告。計數包含 NAS 上**每一顆** LUN，包括這個 storage 不擁有的 |
-| 每個 LUN 的快照 | 拒絕快照。計數包含該 LUN 上**每一個**快照，包括 SAN Manager 排程拍的——這個上限是共用的 |
+| 每個 LUN 的快照 | 拒絕快照。計數包含該 LUN 上**每一個**快照，包括 SAN Manager 排程拍的。這個上限是共用的 |
 | target | 拒絕建立 target。只有在 `syno-target-mode=per-volume` 時才會走到；`shared` 整個 storage 只用一個 target，而這正是它作為預設值的理由 |
 
 三者任一回傳 `undef` 代表 NAS 沒有回報，而防護會退下，不會自己編一個數字。它永遠不代表「沒有上限」。
 
 ### 為什麼 `shared` 是預設的 target 模式
 
-在一台公布 256 個 LUN、128 個 target 的機型上，`per-volume` 會讓每顆磁碟各有一個 target——所以 target 上限會在 **128 顆磁碟時就到，只有 LUN 允許數量的一半**。`shared` 每個 storage 只用一個 target，讓 LUN 上限成為唯一的限制。
+在一台公布 256 個 LUN、128 個 target 的機型上，`per-volume` 會讓每顆磁碟各有一個 target，所以 target 上限會在 **128 顆磁碟時就到，只有 LUN 允許數量的一半**。`shared` 每個 storage 只用一個 target，讓 LUN 上限成為唯一的限制。
 
 ---
 
@@ -178,15 +178,15 @@ Synology 對 LUN 類型的相依性只針對**功能**做了記載，從來不�
 - **每個 target 的最大工作階段數沒有公布**。官方沒有任何地方說明預設值或上限。預設值只容許一個節點、而叢集需要 `max_sessions=0`，這些只有實機量測——見 `TESTING_zh-TW.md`。
 - **沒有「最大 LUN 數量是多少」這種形式的知識中心文章**。SAN Manager 的說明頁面存在，而且會叫你去看自己機型的規格表，但它的內文是用戶端算繪的，並沒有被直接讀取：[LUN](https://kb.synology.com/zh-tw/DSM/help/ScsiTarget/lun?version=7) · [iSCSI](https://kb.synology.com/zh-tw/DSM/help/ScsiTarget/iscsi?version=7) · [快照](https://kb.synology.com/zh-tw/DSM/help/ScsiTarget/snapshot?version=7)
 - **上限和 DSM 版本或記憶體容量沒有任何關聯**。檢視過的每一份規格表都查過有沒有這樣的註腳，都沒有。唯一和記憶體有關的數字是 SMB 同時連線數。
-- **DS423+ 根本沒有公布數字**。它不等於 DS423——它是未知。
+- **DS423+ 根本沒有公布數字**。它不等於 DS423。它是未知。
 - **UC3200、SA3400 以及最新的 XS+ 機架機型**沒有取得；它們的規格表網址在其他機型可用的規則下無法解析。是未知，而不是不存在，而這和 `TESTING_zh-TW.md` 裡未驗證的 UC 支援有關。
 
 ---
 
 ## 官方參考資料
 
-- [SAN Manager 技術規格——DSM 7.1](https://www.synology.com/zh-tw/dsm/7.1/software_spec/san_manager)
-- [SAN Manager 技術規格——DSM 7.3](https://www.synology.com/zh-tw/dsm/7.3/software_spec/san_manager)
+- [SAN Manager 技術規格：DSM 7.1](https://www.synology.com/zh-tw/dsm/7.1/software_spec/san_manager)
+- [SAN Manager 技術規格：DSM 7.3](https://www.synology.com/zh-tw/dsm/7.3/software_spec/san_manager)
 - [DS918+ 產品規格（PDF）](https://global.download.synology.com/download/Document/Hardware/ProductSpec/DiskStation/18-year/DS918+/enu/Product_Spec_DS918+_enu.pdf)
 - [DS923+ 規格表（PDF）](https://global.download.synology.com/download/Document/Hardware/DataSheet/DiskStation/23-year/DS923+/enu/Synology_DS923+_Data_Sheet_enu.pdf)
 - [DS1825+ 規格表（PDF）](https://global.download.synology.com/download/Document/Hardware/DataSheet/DiskStation/25-year/DS1825+/enu/Synology_DS1825+_Data_Sheet_enu.pdf)
