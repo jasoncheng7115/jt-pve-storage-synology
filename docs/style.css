@@ -698,6 +698,14 @@ details .detail-content {
     font-size: 0.87rem; color: var(--text-secondary);
     line-height: 1.65;
 }
+/* An answer long enough to need paragraphs gets them: the section's own `p` rule
+   sets a smaller font, and without this the last paragraph carries a margin the
+   box's padding already provides. */
+details .detail-content p {
+    font-size: inherit; color: inherit; line-height: inherit;
+    margin: 0 0 0.7em;
+}
+details .detail-content p:last-child { margin-bottom: 0; }
 
 /* ============================================================
    Changelog
