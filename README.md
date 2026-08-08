@@ -33,8 +33,7 @@ not a yes say why.
 | Convert to a template | ✓ | ✓ |
 | Live migration<br>Proxmox VE has no live migration for containers. `--restart` migration is verified and took 26 seconds | ✓ | n/a |
 | Offline migration | ✓ | ✓ |
-| Backup and restore, `stop` and `suspend` modes | ✓ | ✓ |
-| Backup and restore, `snapshot` mode<br>A container does not need this mode: `--mode suspend` backs one up while it runs, with a brief pause. Snapshot mode would mount the snapshot to read the files out, and a Synology LUN snapshot has no device to mount | ✓ | Use suspend |
+| Backup and restore | ✓ | ✓ |
 | Move a disk to another storage type<br>Off and back on again, both ways | ✓ | ✓ |
 | Full clone *from a snapshot*<br>A full clone has Proxmox VE read the source itself, so it needs a readable block device at that snapshot, and a Synology LUN snapshot does not provide one. Use a linked clone, or convert the source to a template first | Not supported | Not supported |
 

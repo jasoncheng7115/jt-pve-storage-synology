@@ -225,17 +225,10 @@
                     <td class="yes">&#10003;</td>
                 </tr>
                 <tr>
-                    <td><span class="lang-en">Backup and restore, <code>stop</code> and <code>suspend</code> modes</span><span class="lang-zh">備份、還原，<code>stop</code> 與 <code>suspend</code> 模式</span>
+                    <td><span class="lang-en">Backup and restore</span><span class="lang-zh">備份、還原</span>
                     </td>
                     <td class="yes">&#10003;</td>
                     <td class="yes">&#10003;</td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Backup and restore, <code>snapshot</code> mode</span><span class="lang-zh">備份、還原，<code>snapshot</code> 模式</span>
-                        <div class="cell-note"><span class="lang-en">A container does not need this mode: <code>--mode suspend</code> backs one up while it runs, with a brief pause. Snapshot mode would <strong>mount</strong> the snapshot to read the files out, and a Synology LUN snapshot has no device to mount.</span><span class="lang-zh">容器不需要這個模式：<code>--mode suspend</code> 可以在容器執行中備份，只有短暫暫停。快照模式則要<strong>把快照掛起來</strong>讀檔案，而 Synology LUN 的快照沒有裝置可掛。</span></div>
-                    </td>
-                    <td class="yes">&#10003;</td>
-                    <td class="verdict verdict--part"><span class="lang-en">Use suspend</span><span class="lang-zh">用 suspend</span></td>
                 </tr>
                 <tr>
                     <td><span class="lang-en">Move a disk to another storage type</span><span class="lang-zh">把磁碟搬到其他 storage 型別</span>
