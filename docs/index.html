@@ -639,7 +639,8 @@
   <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
 <span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
 
-<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{print $3}'</span>   <span class="comment"># check what you got</span></code></pre>
+<span class="comment"># check what you got</span>
+<span class="cmd">dpkg</span> <span class="flag">-l</span> jt-pve-storage-synology | <span class="cmd">awk</span> <span class="string">'/^ii/{print $3}'</span></code></pre>
 
     <p>
         <span class="lang-en"><strong>The filename carries no version on purpose.</strong> <code>releases/latest/download/…</code> always resolves to the newest release, so this command line stays correct after every release. If you want a specific version instead, the release page also carries the versioned file, <code>jt-pve-storage-synology_&lt;version&gt;-1_all.deb</code>.</span>
@@ -670,7 +671,8 @@
     </p>
 
     <pre><code><span class="cmd">cd</span> /tmp
-<span class="cmd">rm</span> <span class="flag">-f</span> jt-pve-storage-synology_all.deb*   <span class="comment"># the line that matters — see above</span>
+<span class="comment"># the line that matters, see above</span>
+<span class="cmd">rm</span> <span class="flag">-f</span> jt-pve-storage-synology_all.deb*
 <span class="cmd">wget</span> <span class="flag">-O</span> jt-pve-storage-synology_all.deb \
   <span class="string">https://github.com/jasoncheng7115/jt-pve-storage-synology/releases/latest/download/jt-pve-storage-synology_all.deb</span>
 <span class="cmd">apt</span> install <span class="flag">-y</span> ./jt-pve-storage-synology_all.deb
@@ -703,13 +705,14 @@
         <span class="lang-zh">這不是偏好，是要求。在 Synology 上，thin LUN <strong>只有</strong>在 Btrfs 儲存空間上才有快照與還原，而這個 storage 就是建立在那兩個操作上。開始之前先在<strong>儲存空間管理員 → 儲存空間</strong>確認；<code>pvesm add</code> 會去讀 <code>fs_type</code>，遇到 ext4 儲存空間會直接拒絕。</span>
     </details>
 
-    <pre><code><span class="cmd">pvesm</span> add synologysan mysyno \
+    <pre><code><span class="comment"># --nodes is optional: it restricts the storage to these nodes</span>
+<span class="cmd">pvesm</span> add synologysan mysyno \
     <span class="flag">--syno-portal</span>   192.0.2.10 \
     <span class="flag">--syno-username</span> pve-storage \
     <span class="flag">--syno-password</span> <span class="string">'&lt;the password&gt;'</span> \
     <span class="flag">--syno-location</span> /volume1 \
     <span class="flag">--content</span>       images,rootdir \
-    <span class="flag">--nodes</span>         pve1,pve2,pve3    <span class="comment"># optional: restrict to these nodes</span></code></pre>
+    <span class="flag">--nodes</span>         pve1,pve2,pve3</code></pre>
 
     <p>
         <span class="lang-en"><code>--content</code> takes <code>images</code> for VM disks and <code>rootdir</code> for container root filesystems and mount points, and this storage supports both. <strong>Give it both unless you have a reason not to</strong>: with <code>images</code> alone, a container cannot be created on it and the storage simply does not appear in the container wizard, which reads as the plugin not working. No other content type is accepted — this storage holds disks, not ISOs, templates or backups.</span>
@@ -859,9 +862,14 @@
         <span class="lang-zh">節點當機之後執行它，移除 storage 之前也在每個節點上執行。預設是試跑。</span>
     </p>
 
-    <pre><code><span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> &lt;storage&gt;            <span class="comment"># show what is left behind</span>
-<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> &lt;storage&gt; <span class="flag">--remove</span>   <span class="comment"># then act</span>
-<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span> <span class="flag">--remove</span>                 <span class="comment"># every synologysan storage on this node</span></code></pre>
+    <pre><code><span class="comment"># show what is left behind</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> &lt;storage&gt;
+
+<span class="comment"># then act</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> &lt;storage&gt; <span class="flag">--remove</span>
+
+<span class="comment"># every synologysan storage on this node</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span> <span class="flag">--remove</span></code></pre>
 
     <p>
         <span class="lang-en"><code>pve-syno-reap</code> clears multipath maps this node holds for LUNs the NAS no longer has, and tracking entries left by a crash. A hard-reset node never runs <code>deactivate_volume</code> at all, so its tracking file keeps an entry for a LUN it is not attached to —measured on a three-node cluster.</span>
@@ -888,18 +896,24 @@
 
     <pre><code><span class="comment"># 1. after a node crash — the node never ran deactivate_volume, so a tracking</span>
 <span class="comment">#    entry and a map can survive for a LUN it is no longer using</span>
-<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span>                 <span class="comment"># dry run: says what it would clear</span>
-<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span> <span class="flag">--remove</span>        <span class="comment"># then act</span>
+<span class="comment">#    dry run: says what it would clear</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span>
+<span class="comment">#    then act</span>
+<span class="cmd">pve-syno-reap</span> <span class="flag">--all</span> <span class="flag">--remove</span>
 
 <span class="comment"># 2. before removing a storage — on EVERY node, while the storage still exists</span>
 <span class="cmd">pve-syno-reap</span> <span class="flag">--storage</span> mysyno <span class="flag">--remove</span>
-<span class="cmd">pvesm</span> remove mysyno              <span class="comment"># then once, on one node</span>
+<span class="comment">#    then once, on one node</span>
+<span class="cmd">pvesm</span> remove mysyno
 
 <span class="comment"># 3. the storage is ALREADY gone from the configuration, so this is by hand.</span>
 <span class="comment">#    CHECK BEFORE YOU FLUSH:</span>
-<span class="cmd">multipath</span> <span class="flag">-ll</span> &lt;map&gt;              <span class="comment"># must say SYNOLOGY, and be the wwid you expect</span>
-<span class="cmd">dmsetup</span> info &lt;map&gt; | <span class="cmd">grep</span> Open   <span class="comment"># Open count MUST be 0 — anything else is in use</span>
-<span class="cmd">lsof</span> /dev/mapper/&lt;map&gt;           <span class="comment"># and nothing may hold it</span>
+<span class="comment">#    it must say SYNOLOGY, and be the wwid you expect</span>
+<span class="cmd">multipath</span> <span class="flag">-ll</span> &lt;map&gt;
+<span class="comment">#    the Open count MUST be 0, anything else is in use</span>
+<span class="cmd">dmsetup</span> info &lt;map&gt; | <span class="cmd">grep</span> Open
+<span class="comment">#    and nothing may hold it</span>
+<span class="cmd">lsof</span> /dev/mapper/&lt;map&gt;
 
 <span class="comment">#    only then, one map and one session at a time, and never -F:</span>
 <span class="cmd">multipathd</span> disablequeueing map &lt;map&gt;
@@ -1233,6 +1247,55 @@ document.querySelectorAll('.sidebar__link').forEach(function (a) {
     a.addEventListener('click', function () {
         if (window.innerWidth <= 1024) { toggleSidebar(); }
     });
+});
+
+// A copy button on every code block. The button is added here rather than written
+// into the markup so that a block added later gets one without anyone remembering.
+document.querySelectorAll('pre').forEach(function (pre) {
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.setAttribute('aria-label', 'Copy to clipboard');
+    var idle = '<span class="lang-en">Copy</span><span class="lang-zh">複製</span>';
+    var done = '<span class="lang-en">Copied</span><span class="lang-zh">已複製</span>';
+    btn.innerHTML = idle;
+
+    btn.addEventListener('click', function () {
+        var text = (pre.querySelector('code') || pre).innerText;
+        var ok = function () {
+            btn.innerHTML = done;
+            btn.classList.add('copy-btn--done');
+            setTimeout(function () {
+                btn.innerHTML = idle;
+                btn.classList.remove('copy-btn--done');
+            }, 1600);
+        };
+        // navigator.clipboard needs a secure context; the fallback covers a page
+        // opened over plain HTTP or from a file.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(ok, fallback);
+        } else {
+            fallback();
+        }
+        function fallback() {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); ok(); } catch (e) { /* nothing to do */ }
+            document.body.removeChild(ta);
+        }
+    });
+
+    wrap.appendChild(btn);
 });
 </script>
 

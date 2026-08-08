@@ -666,6 +666,32 @@ pre {
     line-height: 1.65; margin: 14px 0;
     border: 1px solid rgba(255,255,255,0.04);
 }
+/* The copy button sits over the block's top-right corner. `pre` keeps its own
+   margin, so the wrapper is positioning only and adds no spacing of its own. */
+.code-wrap { position: relative; }
+.copy-btn {
+    position: absolute; top: 14px; right: 12px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: #cbd5e1;
+    font: inherit; font-size: 0.72rem; font-weight: 600;
+    padding: 4px 10px; border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+}
+.code-wrap:hover .copy-btn,
+.copy-btn:focus-visible { opacity: 1; }
+.copy-btn:hover { background: rgba(255,255,255,0.16); color: #fff; }
+.copy-btn--done {
+    opacity: 1;
+    background: rgba(22,163,74,0.22);
+    border-color: rgba(22,163,74,0.5);
+    color: #86efac;
+}
+/* On a touch screen there is no hover, so it is always there. */
+@media (hover: none) { .copy-btn { opacity: 1; } }
+
 pre .comment { color: #6b7280; }
 pre .keyword { color: #a78bfa; }
 pre .string  { color: #6ee7b7; }
