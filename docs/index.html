@@ -245,6 +245,13 @@
                     <td class="yes">&#10003;</td>
                 </tr>
                 <tr>
+                    <td><span class="lang-en">CHAP authentication</span><span class="lang-zh">CHAP 驗證</span>
+                        <div class="cell-note"><span class="lang-en">Set it at any time, not only when the storage is created. Changing the secret pushes it to every target the storage owns and to the node&#39;s own iSCSI record.</span><span class="lang-zh">隨時都可以設，不必在建立 storage 的時候。改密碼會一併寫到這個 storage 擁有的每一個 target，以及節點自己的 iSCSI 記錄。</span></div>
+                    </td>
+                    <td class="yes">&#10003;</td>
+                    <td class="yes">&#10003;</td>
+                </tr>
+                <tr>
                     <td><span class="lang-en">Storage migration</span><span class="lang-zh">儲存遷移</span>
                         <div class="cell-note"><span class="lang-en">Proxmox VE&#39;s <strong>move disk</strong>, and <strong>move volume</strong> for a container. Onto another storage type and back again, both directions.</span><span class="lang-zh">Proxmox VE 的 <strong>move disk</strong>，容器是 <strong>move volume</strong>。搬到其他 storage 型別再搬回來，兩個方向都測。</span></div>
                     </td>
@@ -255,9 +262,6 @@
         </table>
     </div>
 
-    <p class="muted">
-        <span class="lang-en">CHAP is a property of the storage rather than of a guest, since one iSCSI session on the node serves both kinds, so it is not in the table. It is verified.</span><span class="lang-zh">CHAP 是這個 storage 的性質，不是 guest 的，因為節點上同一個 iSCSI 工作階段同時服務兩種 guest，所以沒有放進表格。它驗證過。</span>
-    </p>
 </section>
 
 
@@ -265,28 +269,28 @@
     <h2 class="section-title"><span class="lang-en">Measured on hardware, not just called through an API</span><span class="lang-zh">實機驗證過，不只是 API 呼叫得通</span></h2>
     <div class="stat-strip">
         <div class="stat">
-            <span class="stat__value"><span class="lang-en">5 nodes</span><span class="lang-zh">5 節點</span></span>
-            <span class="stat__label"><span class="lang-en">production cluster, live migration across all of them</span><span class="lang-zh">正式叢集，跨節點即時遷移</span></span>
+            <div class="stat__cap"><span class="lang-en">Production cluster, migrated across it</span><span class="lang-zh">正式叢集，跨節點遷移過</span></div>
+            <div class="stat__value"><span class="lang-en">5</span><span class="lang-zh">5</span><span class="stat__unit"><span class="lang-en">nodes</span><span class="lang-zh">節點</span></span></div>
         </div>
         <div class="stat">
-            <span class="stat__value"><span class="lang-en">3.6 s</span><span class="lang-zh">3.6 秒</span></span>
-            <span class="stat__label"><span class="lang-en">to take over a crashed node's LUN, data intact</span><span class="lang-zh">接手當機節點的 LUN，資料完整</span></span>
+            <div class="stat__cap"><span class="lang-en">Takeover after a crash, data intact</span><span class="lang-zh">當機接手，資料完整</span></div>
+            <div class="stat__value"><span class="lang-en">3.6</span><span class="lang-zh">3.6</span><span class="stat__unit"><span class="lang-en">s</span><span class="lang-zh">秒</span></span></div>
         </div>
         <div class="stat">
-            <span class="stat__value"><span class="lang-en">60 / 0</span><span class="lang-zh">60 / 0</span></span>
-            <span class="stat__label"><span class="lang-en">reads and failures through a path failure</span><span class="lang-zh">路徑故障期間的讀取與失敗</span></span>
+            <div class="stat__cap"><span class="lang-en">Reads / failures through a path failure</span><span class="lang-zh">路徑故障期間的讀取／失敗</span></div>
+            <div class="stat__value"><span class="lang-en">60 / 0</span><span class="lang-zh">60 / 0</span></div>
         </div>
         <div class="stat">
-            <span class="stat__value"><span class="lang-en">3</span><span class="lang-zh">3 種</span></span>
-            <span class="stat__label"><span class="lang-en"><code>vzdump</code> modes, restores byte-identical</span><span class="lang-zh"><code>vzdump</code> 模式，還原位元組相同</span></span>
+            <div class="stat__cap"><span class="lang-en"><code>vzdump</code> modes, restores byte-identical</span><span class="lang-zh"><code>vzdump</code> 模式，還原位元組相同</span></div>
+            <div class="stat__value"><span class="lang-en">3</span><span class="lang-zh">3</span><span class="stat__unit"><span class="lang-en">modes</span><span class="lang-zh">種</span></span></div>
         </div>
         <div class="stat">
-            <span class="stat__value stat__value--sm"><span class="lang-en">7.1.1 &rarr; 7.4.1</span><span class="lang-zh">7.1.1 → 7.4.1</span></span>
-            <span class="stat__label"><span class="lang-en">a DSM upgrade mid-test, every LUN uuid intact</span><span class="lang-zh">測試途中的 DSM 升級，LUN uuid 完好</span></span>
+            <div class="stat__cap"><span class="lang-en">Models &times; DSM versions, upgrade included</span><span class="lang-zh">機型 × DSM 版本，含跨版升級</span></div>
+            <div class="stat__value"><span class="lang-en">2 &times; 3</span><span class="lang-zh">2 × 3</span></div>
         </div>
         <div class="stat">
-            <span class="stat__value"><span class="lang-en">0</span><span class="lang-zh">0</span></span>
-            <span class="stat__label"><span class="lang-en">processes stuck by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後卡住的行程</span></span>
+            <div class="stat__cap"><span class="lang-en">Processes stuck by a whole-NAS outage</span><span class="lang-zh">整台 NAS 中斷後卡住的行程</span></div>
+            <div class="stat__value"><span class="lang-en">0</span><span class="lang-zh">0</span></div>
         </div>
     </div>
 

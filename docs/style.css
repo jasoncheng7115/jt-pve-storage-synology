@@ -452,42 +452,53 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* The measured numbers, above the prose that explains them: a reader deciding
    whether to try this wants the evidence before the narrative.
-
-   One panel divided by hairlines rather than six floating boxes: the 1px grid gap
-   over a border-coloured background draws every separator, so the rules stay right
-   at two columns and at one without a per-cell border to switch off. */
+ *
+ * One panel divided by hairlines rather than six bordered boxes. The 1px grid gap
+ * over a border-coloured background draws every separator, so the rules stay right
+ * at three columns, at two and at one, with no per-cell border to switch off.
+ *
+ * Every tile has the same two parts in the same order — what was measured, then the
+ * figure — because six tiles whose shapes differ read as six unrelated things.
+ */
 .stat-strip {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
+    border-top: 2px solid var(--indigo);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    margin: 6px 0 22px;
+    margin: 8px 0 22px;
 }
 @media (max-width: 860px) { .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .stat-strip { grid-template-columns: 1fr; } }
 
-.stat { background: var(--surface-0); padding: 18px 20px 17px; }
+.stat {
+    background: var(--surface-0);
+    padding: 15px 20px 17px;
+}
+
+.stat__cap {
+    font-size: 0.73rem; color: var(--text-muted);
+    line-height: 1.45; letter-spacing: 0.01em;
+    margin-bottom: 7px;
+    min-height: 2.1em;
+}
+.stat__cap code { font-size: 0.95em; }
 
 .stat__value {
-    display: block;
-    font-size: 1.6rem; font-weight: 700;
-    color: var(--navy); line-height: 1.15;
-    letter-spacing: -0.02em;
+    font-size: 1.85rem; font-weight: 700;
+    color: var(--navy); line-height: 1;
+    letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
-    margin-bottom: 5px;
 }
-/* A version pair is a figure too, and it does not fit at the headline size. */
-.stat__value--sm { font-size: 1.15rem; letter-spacing: 0; }
-
-.stat__label {
-    display: block;
-    font-size: 0.79rem; color: var(--text-muted);
-    line-height: 1.5;
+.stat__unit {
+    font-size: 0.85rem; font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0;
+    margin-left: 5px;
 }
-.stat__label code { font-size: 0.95em; }
 
 /* Verified and not verified, side by side and the same size, so neither half
    is easier to skip than the other. */

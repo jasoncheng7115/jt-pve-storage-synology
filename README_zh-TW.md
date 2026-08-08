@@ -30,9 +30,9 @@
 | 離線遷移 | ✓ | ✓ |
 | 備份、還原 | ✓ | ✓ |
 | 多重路徑，而且是自動設定的<br>multipath 的設定由 plugin 自己寫，變更時也自己重新載入。沒有東西需要手動編輯 | ✓ | ✓ |
+| CHAP 驗證<br>隨時都可以設，不必在建立 storage 的時候。改密碼會一併寫到這個 storage 擁有的每一個 target，以及節點自己的 iSCSI 記錄 | ✓ | ✓ |
 | 儲存遷移<br>Proxmox VE 的 **move disk**，容器是 **move volume**。搬到其他 storage 型別再搬回來，兩個方向都測 | ✓ | ✓ |
 
-CHAP 是這個 storage 的性質，不是 guest 的，因為節點上同一個 iSCSI 工作階段同時服務兩種 guest，所以沒有放進表格。它驗證過。
 
 > ### 狀態：**它已經在正式環境的叢集上運作。**
 >

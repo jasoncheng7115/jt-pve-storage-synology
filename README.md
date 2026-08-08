@@ -36,10 +36,9 @@ not a yes say why.
 | Offline migration | ✓ | ✓ |
 | Backup and restore | ✓ | ✓ |
 | Multipath, configured for you<br>The plugin writes the multipath configuration itself and reloads multipathd when it changes. Nothing to edit by hand | ✓ | ✓ |
+| CHAP authentication<br>Set it at any time, not only when the storage is created. Changing the secret pushes it to every target the storage owns and to the node's own iSCSI record | ✓ | ✓ |
 | Storage migration<br>Proxmox VE's **move disk**, and **move volume** for a container. Onto another storage type and back again, both directions | ✓ | ✓ |
 
-CHAP is a property of the storage rather than of a guest, since one iSCSI session on
-the node serves both kinds, so it is not in the table. It is verified.
 
 > ### Status: **it is running on a production cluster.**
 >
